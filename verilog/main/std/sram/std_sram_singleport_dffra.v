@@ -8,7 +8,7 @@
 // @author Kumonda221
 //
 
-module srd_sram_singleport_dffra #(
+module std_sram_singleport_dffra #(
     parameter   ADDR_WIDTH          = 1,
     parameter   DATA_WIDTH          = 1
 ) (
