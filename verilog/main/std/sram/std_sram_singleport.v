@@ -23,7 +23,7 @@ module std_sram_singleport #(
 
     localparam SRAM_DEPTH = 1 << ADDR_WIDTH;
 
-    reg  [DATA_WIDTH - 1:0]     mem [SRAM_DPETH - 1:0];
+    reg  [DATA_WIDTH - 1:0]     mem [SRAM_DEPTH - 1:0];
 
     always @(posedge clk) begin
         
