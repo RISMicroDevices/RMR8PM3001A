@@ -8,7 +8,7 @@
 // @author Kumonda221
 //
 
-module std_dfferan #(
+module std_dffran #(
     parameter   DFF_WIDTH       = 1
 ) (
     input   wire                        clk,

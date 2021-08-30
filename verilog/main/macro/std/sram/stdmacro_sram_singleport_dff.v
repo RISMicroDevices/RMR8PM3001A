@@ -10,6 +10,8 @@
 // @author Kumonda221
 //
 
+`include "macro/conf/confmacro_dff.v"
+
 module stdmacro_sram_singleport_dff #(
     parameter   ADDR_WIDTH          = 1,
     parameter   DATA_WIDTH          = 1
