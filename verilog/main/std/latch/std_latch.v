@@ -11,7 +11,7 @@
 module std_latch #(
     parameter   LATCH_WIDTH         = 1
 ) (
-    input   wire                        en
+    input   wire                        en,
 
     input   wire [LATCH_WIDTH - 1:0]    d,
     output  wire [LATCH_WIDTH - 1:0]    q

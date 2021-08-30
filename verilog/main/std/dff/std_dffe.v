@@ -31,6 +31,5 @@ module std_dffe #(
     end
 
     assign q = q_R;
-);
-
+    
 endmodule
