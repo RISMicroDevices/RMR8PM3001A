@@ -33,7 +33,7 @@ module std_sram_singleport_latch #(
         .din(din),
         .en(en),
         .we(we),
-        .dout()
+        .dout(out)
     );
 
     std_latch #(
