@@ -23,8 +23,8 @@ module std_sram_singleport_64d128x (
 
     S011HD1P_X32Y2D128 S011HD1P_X32Y2D128_INST_WRAPPED (
         .CLK(clk),
-        .CEN(en),
-        .WEN(we),
+        .CEN(~en),
+        .WEN(~we),
         .A(addr),
         .D(din),
         .Q(dout)
