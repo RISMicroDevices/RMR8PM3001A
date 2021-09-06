@@ -9,7 +9,8 @@
 //
 
 module std_dffera #(
-    parameter   DFF_WIDTH       = 1
+    parameter   DFF_WIDTH       = 1,
+    parameter   DFF_RESET_VALUE = 'b0
 ) (
     input   wire                        clk,
     input   wire                        areset,
@@ -24,7 +25,7 @@ module std_dffera #(
     always @(posedge clk or posedge areset) begin
         
         if (areset) begin
-            q_R <= 'b0;
+            q_R <= DFF_RESET_VALUE;
         end
         else if (en) begin
             q_R <= d;

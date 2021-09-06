@@ -9,7 +9,8 @@
 //
 
 module std_dfferan #(
-    parameter   DFF_WIDTH       = 1
+    parameter   DFF_WIDTH       = 1,
+    parameter   DFF_RESET_VALUE = 'b0
 ) (
     input   wire                        clk,
     input   wire                        aresetn,
@@ -24,7 +25,7 @@ module std_dfferan #(
     always @(posedge clk or negedge aresetn) begin
         
         if (~aresetn) begin
-            q_R <= 'b0;
+            q_R <= DFF_RESET_VALUE;
         end
         else if (en) begin
             q_R <= d;

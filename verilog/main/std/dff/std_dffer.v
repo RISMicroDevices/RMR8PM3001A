@@ -9,7 +9,8 @@
 //
 
 module std_dffer #(
-    parameter DFF_WIDTH         = 1
+    parameter DFF_WIDTH         = 1,
+    parameter DFF_RESET_VALUE   = 'b0
 ) (
     input   wire                        clk,
     input   wire                        reset,
@@ -24,7 +25,7 @@ module std_dffer #(
     always @(posedge clk) begin
         
         if (reset) begin
-            q_R <= 'b0;
+            q_R <= DFF_RESET_VALUE;
         end
         else if (en) begin
             q_R <= d;
