@@ -3,13 +3,13 @@
 //  RMR8PM3001A - Taurus 3001
 //  (RISC-V 64-bit Privileged Minimal System Processor for T110 ASIC)
 //
-//  Between-Pipeline Passive Bypass Buffer Module
+//  Between-Pipeline Bypass Buffer Module
 //  ('ready' always asserted when buffer empty)
 //
 // @author Kumonda221
 //
 
-module common_bypass_buffer_passive #(
+module common_bypass_buffer #(
     parameter   BUFFER_WIDTH    = 1
 ) (
     // 
