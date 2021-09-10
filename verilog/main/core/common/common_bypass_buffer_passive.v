@@ -3,12 +3,13 @@
 //  RMR8PM3001A - Taurus 3001
 //  (RISC-V 64-bit Privileged Minimal System Processor for T110 ASIC)
 //
-//  Between-Pipeline Bypass Buffer Module
+//  Between-Pipeline Passive Bypass Buffer Module
+//  ('ready' always asserted when buffer empty)
 //
 // @author Kumonda221
 //
 
-module common_bypass_buffer #(
+module common_bypass_buffer_passive #(
     parameter   BUFFER_WIDTH    = 1
 ) (
     // 
@@ -45,6 +46,8 @@ module common_bypass_buffer #(
     wire    valid_d;
     wire    valid_q;
 
+    wire    valid_t;
+
     stdmacro_dffe  #(
         .DFF_WIDTH(1)
     ) stdmacro_dffe_INST_buffer_valid (
@@ -60,11 +63,12 @@ module common_bypass_buffer #(
     assign buffer_d  = prev_i_data;
 
     // Buffer write condition:
-    assign buffer_en = prev_i_valid & ~next_i_ready;
+    assign buffer_en = ~valid_q ? ( prev_i_valid & ~next_i_ready )
+                                : 1'b0;
 
     // Valid flag transition:
-    assign valid_d   = ~valid_q ? ( prev_i_valid & ~next_i_ready ? 1'b1 : 1'b0)
-                                : (                 next_i_ready ? 1'b0 : 1'b1);
+    assign valid_d   = ~valid_q ? ( prev_i_valid & ~next_i_ready )
+                                : (                ~next_i_ready );
 
     //
     assign valid_en  = 'b1;
