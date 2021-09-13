@@ -33,12 +33,12 @@ module common_bypass_buffer #(
     stdmacro_dffe #(
         .DFF_WIDTH(BUFFER_WIDTH)
     ) stdmacro_dffe_INST_buffer (
-        .clk(clk),
-        .reset(reset),
+        .clk    (clk),
+        .reset  (reset),
 
-        .en(buffer_en),
-        .d(buffer_d),
-        .q(buffer_q)
+        .en     (buffer_en),
+        .d      (buffer_d),
+        .q      (buffer_q)
     );
 
     //
@@ -46,17 +46,15 @@ module common_bypass_buffer #(
     wire    valid_d;
     wire    valid_q;
 
-    wire    valid_t;
-
     stdmacro_dffe  #(
         .DFF_WIDTH(1)
     ) stdmacro_dffe_INST_buffer_valid (
-        .clk(clk),
-        .reset(reset),
+        .clk    (clk),
+        .reset  (reset),
 
-        .en(valid_en),
-        .d(valid_d),
-        .q(valid_q)
+        .en     (valid_en),
+        .d      (valid_d),
+        .q      (valid_q)
     );
 
     //

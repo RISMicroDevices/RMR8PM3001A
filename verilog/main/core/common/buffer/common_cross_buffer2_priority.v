@@ -40,16 +40,16 @@ module common_cross_buffer2_priority #(
     common_bypass_buffer #(
         .BUFFER_WIDTH(BUFFER_WIDTH)
     ) common_bypass_buffer_p0_INST (
-        .clk(clk),
-        .reset(reset),
+        .clk            (clk),
+        .reset          (reset),
         
-        .prev_i_data(prev0_i_data),
-        .prev_i_valid(prev0_i_valid),
-        .prev_o_ready(prev0_o_ready),
+        .prev_i_data    (prev0_i_data),
+        .prev_i_valid   (prev0_i_valid),
+        .prev_o_ready   (prev0_o_ready),
 
-        .next_o_data(next0_o_data),
-        .next_o_valid(next0_o_valid),
-        .next_i_ready(next0_i_ready)
+        .next_o_data    (next0_o_data),
+        .next_o_valid   (next0_o_valid),
+        .next_i_ready   (next0_i_ready)
     );
 
     // bypass buffer on port 1
@@ -60,16 +60,16 @@ module common_cross_buffer2_priority #(
     common_bypass_buffer #(
         .BUFFER_WIDTH(BUFFER_WIDTH)
     ) common_bypass_buffer_p1_INST (
-        .clk(clk),
-        .reset(reset),
+        .clk            (clk),
+        .reset          (reset),
         
-        .prev_i_data(prev1_i_data),
-        .prev_i_valid(prev1_i_valid),
-        .prev_o_ready(prev1_o_ready),
+        .prev_i_data    (prev1_i_data),
+        .prev_i_valid   (prev1_i_valid),
+        .prev_o_ready   (prev1_o_ready),
 
-        .next_o_data(next1_o_data),
-        .next_o_valid(next1_o_valid),
-        .next_i_ready(next1_i_ready)
+        .next_o_data    (next1_o_data),
+        .next_o_valid   (next1_o_valid),
+        .next_i_ready   (next1_i_ready)
     );
 
     // priority arbiter
