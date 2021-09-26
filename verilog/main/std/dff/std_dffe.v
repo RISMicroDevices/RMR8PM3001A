@@ -1,7 +1,7 @@
 // @description
 //  ** PART OF **
-//  RMM4NC3001X - Gemini 3001
-//  (MIPS32 Processor for NSCSCC2021)
+//  RMR8PM3001A - Taurus 3001
+//  (RISC-V 64-bit Privileged Minimal System Processor for T110 ASIC)
 //
 //  Standard DFF Module with Enable
 //
