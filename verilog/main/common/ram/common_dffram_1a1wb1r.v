@@ -42,13 +42,13 @@ module common_dffram_1a1wb1r #(
                 .DFF_WIDTH          (RAM_DATA_WIDTH),
                 .DFF_RESET_VALUE    (RAM_RESET_VALUE[i])
             ) stdmacro_dffe_INST_dffram_dff (
-                .clk(clk),
-                .reset(reset),
+                .clk    (clk),
+                .reset  (reset),
 
-                .en(dff_we),
-                .d(din),
+                .en     (dff_we),
+                .d      (din),
 
-                .q(dff_dout[i])
+                .q      (dff_dout[i])
             );
 
             assign dff_we  = we & { (RAM_DATA_WIDTH){en} } & { (RAM_DATA_WIDTH){addr == i} };
