@@ -3,7 +3,7 @@
 //  RMR8PM3001A - Taurus 3001
 //  (RISC-V 64-bit Privileged Minimal System Processor for T110 ASIC)
 //
-//  DFF with Enable STDMACRO
+//  DFF with Bit Enable STDMACRO
 //
 // @see macro/conf/confmacro_dff.v
 //
@@ -12,13 +12,13 @@
 
 `include "macro/conf/confmacro_dff.v"
 
-module stdmacro_dffe #(
+module stdmacro_dffbe #(
     parameter                       DFF_WIDTH           = 1,
     parameter [DFF_WIDTH - 1:0]     DFF_RESET_VALUE     = 'b0
 ) (
     input   wire                        clk,
     input   wire                        reset,
-    input   wire                        en,
+    input   wire [DFF_WIDTH - 1:0]      en,
 
     input   wire [DFF_WIDTH - 1:0]      d,
     output  wire [DFF_WIDTH - 1:0]      q
@@ -26,7 +26,7 @@ module stdmacro_dffe #(
 
 `ifdef STDMACRO_DFF_RESET_SYNC
 `ifdef STDMACRO_DFF_RESET_ON_HIGH
-    std_dffer #(
+    std_dffber #(
         .DFF_WIDTH(DFF_WIDTH),
         .DFF_RESET_VALUE(DFF_RESET_VALUE)
     ) std_macro_dff_INST (
@@ -38,7 +38,7 @@ module stdmacro_dffe #(
     );
 `endif
 `ifdef STDMACRO_DFF_RESET_ON_LOW
-    std_dffern #(
+    std_dffbern #(
         .DFF_WIDTH(DFF_WIDTH),
         .DFF_RESET_VALUE(DFF_RESET_VALUE)
     ) std_macro_dff_INST (
@@ -53,7 +53,7 @@ module stdmacro_dffe #(
 
 `ifdef STDMACRO_DFF_RESET_ASYNC
 `ifdef STDMACRO_DFF_RESET_ON_HIGH
-    std_dffera #(
+    std_dffbera #(
         .DFF_WIDTH(DFF_WIDTH),
         .DFF_RESET_VALUE(DFF_RESET_VALUE)
     ) std_macro_dff_INST (
@@ -65,7 +65,7 @@ module stdmacro_dffe #(
     );
 `endif
 `ifdef STDMACRO_DFF_RESET_ON_LOW
-    std_dfferan #(
+    std_dffberan #(
         .DFF_WIDTH(DFF_WIDTH),
         .DFF_RESET_VALUE(DFF_RESET_VALUE)
     ) std_macro_dff_INST (
