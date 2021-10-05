@@ -3,14 +3,14 @@
 //  RMR8PM3001A - Taurus 3001
 //  (RISC-V 64-bit Privileged Minimal System Processor for T110 ASIC)
 //
-//  Standard DFF Module with High-Active Synchronous & Enable
+//  Standard DFF Module with High-Active Synchronous Reset & Enable
 //
 // @author Kumonda221
 //
 
 module std_dffer #(
-    parameter DFF_WIDTH         = 1,
-    parameter DFF_RESET_VALUE   = 'b0
+    parameter                       DFF_WIDTH           = 1,
+    parameter [DFF_WIDTH - 1:0]     DFF_RESET_VALUE     = 'b0
 ) (
     input   wire                        clk,
     input   wire                        reset,
