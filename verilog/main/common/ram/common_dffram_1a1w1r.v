@@ -4,6 +4,7 @@
 //  (RISC-V 64-bit Privileged Minimal System Processor for T110 ASIC)
 //
 //  DFF-base RAM module
+//  (Single-port: 1 address port, 1 read port, 1 write port)
 //
 // @author Kumonda221
 //
@@ -11,9 +12,9 @@
 `define     RAM_DEPTH       (1 << RAM_ADDR_WIDTH)
 
 module common_dffram_1a1w1r #(
-    parameter                   RAM_DATA_WIDTH      = 1,
-    parameter                   RAM_ADDR_WIDTH      = 1,
-    parameter [`RAM_DEPTH:0]    RAM_RESET_VALUE     = { (`RAM_DEPTH){ {(RAM_ADDR_WIDTH){1'b0}} } }
+    parameter                       RAM_DATA_WIDTH      = 1,
+    parameter                       RAM_ADDR_WIDTH      = 1,
+    parameter [`RAM_DEPTH - 1:0]    RAM_RESET_VALUE     = { (`RAM_DEPTH){ {(RAM_ADDR_WIDTH){1'b0}} } }
 ) (
     input   wire                            clk,
     input   wire                            reset,
