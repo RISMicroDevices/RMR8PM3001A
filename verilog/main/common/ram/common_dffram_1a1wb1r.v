@@ -38,10 +38,10 @@ module common_dffram_1a1wb1r #(
             //
             wire [RAM_DATA_WIDTH - 1:0]     dff_we;
 
-            stdmacro_dffe #(
+            stdmacro_dffbe #(
                 .DFF_WIDTH          (RAM_DATA_WIDTH),
                 .DFF_RESET_VALUE    (RAM_RESET_VALUE[i])
-            ) stdmacro_dffe_INST_dffram_dff (
+            ) stdmacro_dffbe_INST_dffram_dff (
                 .clk    (clk),
                 .reset  (reset),
 
