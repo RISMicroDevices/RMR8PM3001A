@@ -13,9 +13,9 @@
 `define     RAM_DEPTH       (1 << RAM_ADDR_WIDTH)
 
 module common_dffram_2a1wb1r #(
-    parameter                       RAM_DATA_WIDTH      = 1,
-    parameter                       RAM_ADDR_WIDTH      = 1,
-    parameter [`RAM_DEPTH - 1:0]    RAM_RESET_VALUE     = { (`RAM_DEPTH){ {(RAM_ADDR_WIDTH){1'b0}} } }
+    parameter                                       RAM_DATA_WIDTH      = 1,
+    parameter                                       RAM_ADDR_WIDTH      = 1,
+    parameter [`RAM_DEPTH * RAM_DATA_WIDTH - 1:0]   RAM_RESET_VALUE     = { (`RAM_DEPTH){ {(RAM_ADDR_WIDTH){1'b0}} } }
 ) (
     input  wire                             clk,
     input  wire                             reset,
@@ -48,7 +48,7 @@ module common_dffram_2a1wb1r #(
 
             stdmacro_dffbe #(
                 .DFF_WIDTH          (RAM_DATA_WIDTH),
-                .DFF_RESET_VALUE    (RAM_RESET_VALUE[i])
+                .DFF_RESET_VALUE    (RAM_RESET_VALUE[RAM_DATA_WIDTH * i +: RAM_DATA_WIDTH])
             ) stdmacro_dffbe_INST_dffram_dff (
                 .clk    (clk),
                 .reset  (reset),
