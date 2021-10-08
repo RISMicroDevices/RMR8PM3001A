@@ -33,6 +33,7 @@ module common_fifo_shift_1w1r #(
     wire r_push;  // functionally accepted writing into FIFO, pushed
 
     wire p_hold;  // read and write FIFO simultaneously
+    
     wire p_pop;   // read FIFO only
     wire p_push;  // write FIFO only
 
@@ -82,8 +83,8 @@ module common_fifo_shift_1w1r #(
             wire    content_dff_dw; // direct write
 
             stdmacro_dffe #(
-                .DFF_WIDTH(FIFO_WIDTH),
-                .DFF_RESET_VALUE(FIFO_RESET_VALUE[i])
+                .DFF_WIDTH          (FIFO_WIDTH),
+                .DFF_RESET_VALUE    (FIFO_RESET_VALUE[i])
             ) stdmacro_dffe_INST_fifo_content_dffs (
                 .clk    (clk),
                 .reset  (reset),
@@ -103,16 +104,16 @@ module common_fifo_shift_1w1r #(
 
             // P registers 
             stdmacro_dffe #(
-                .DFF_WIDTH(1),
-                .DFF_RESET_VALUE(FIFO_RESET_STATE == (FIFO_DEPTH - i) ? 1'b1 : 1'b0)
+                .DFF_WIDTH          (1),
+                .DFF_RESET_VALUE    (FIFO_RESET_STATE == (FIFO_DEPTH - i) ? 1'b1 : 1'b0)
             ) stdmacro_dffe_INST_fifo_p_reg (
-                .clk(clk),
-                .reset(reset),
+                .clk    (clk),
+                .reset  (reset),
 
-                .en(p_mov),
+                .en     (p_mov),
 
-                .d(p_pop ? fifo_p[i - 1] : fifo_p[i + 1]),
-                .q(fifo_p[i])
+                .d      (p_pop ? fifo_p[i - 1] : fifo_p[i + 1]),
+                .q      (fifo_p[i])
             );
             //
         end
