@@ -12,10 +12,10 @@
 `define     FIFO_DEPTH          (1 << FIFO_DEPTH_LOG2)
 
 module common_fifo_ram_1w1r #(
-    parameter                       FIFO_DEPTH_LOG2     = 5,
-    parameter                       FIFO_WIDTH          = 6,
-    parameter                       FIFO_RESET_STATE    = 0,
-    parameter [`FIFO_DEPTH - 1:0]   FIFO_RESET_VALUE    = { (`FIFO_DEPTH){ {(FIFO_WIDTH){1'b0}} } }
+    parameter                                   FIFO_DEPTH_LOG2     = 1,
+    parameter                                   FIFO_WIDTH          = 1,
+    parameter                                   FIFO_RESET_STATE    = 0,
+    parameter [`FIFO_DEPTH * FIFO_WIDTH - 1:0]  FIFO_RESET_VALUE    = { (`FIFO_DEPTH){ {(FIFO_WIDTH){1'b0}} } }
 ) (
     input   wire                        clk,
     input   wire                        reset,
@@ -30,16 +30,12 @@ module common_fifo_ram_1w1r #(
     output  wire                        fifo_full
 );
 
-    // FIFO state signals
+    // FIFO state signals 
     wire    s_overlap;
 
     wire    s_empty;
     wire    s_full;
-
-    assign s_overlap = wptr_q[FIFO_DEPTH_LOG2 - 1:0] == rptr_q[FIFO_DEPTH_LOG2 - 1:0];
-
-    assign s_empty   = s_overlap && (wptr_q[FIFO_DEPTH_LOG2] == rptr_q[FIFO_DEPTH_LOG2]);
-    assign s_full    = s_overlap && (wptr_q[FIFO_DEPTH_LOG2] != rptr_q[FIFO_DEPTH_LOG2]);
+    //    
 
     // 
     wire    r_pop;   // functionally accepted reading from FIFO
@@ -108,6 +104,13 @@ module common_fifo_ram_1w1r #(
     assign rptr_en = p_pop;
     //
 
+    // FIFO state connections to W/R pointers
+    assign s_overlap = wptr_q[FIFO_DEPTH_LOG2 - 1:0] == rptr_q[FIFO_DEPTH_LOG2 - 1:0];
+
+    assign s_empty   = s_overlap && (wptr_q[FIFO_DEPTH_LOG2] == rptr_q[FIFO_DEPTH_LOG2]);
+    assign s_full    = s_overlap && (wptr_q[FIFO_DEPTH_LOG2] != rptr_q[FIFO_DEPTH_LOG2]);
+    //
+
     // FIFO RAM
     wire    ram_wen;
     wire    ram_ren;
@@ -125,12 +128,12 @@ module common_fifo_ram_1w1r #(
         .clk    (clk),
         .reset  (reset),
 
-        .addra  (wptr_q),
+        .addra  (wptr_q[FIFO_DEPTH_LOG2 - 1:0]),
         .ena    (ram_ena),
         .wea    (ram_wea),
         .dina   (din),
 
-        .addrb  (rptr_q),
+        .addrb  (rptr_q[FIFO_DEPTH_LOG2 - 1:0]),
         .enb    (ram_enb),
         .doutb  (dout)
     );

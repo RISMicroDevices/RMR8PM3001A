@@ -10,10 +10,10 @@
 //
 
 module common_fifo_shift_1w1r #(
-    parameter                       FIFO_DEPTH          = 1,
-    parameter                       FIFO_WIDTH          = 1,
-    parameter                       FIFO_RESET_STATE    = 0,
-    parameter [FIFO_DEPTH - 1:0]    FIFO_RESET_VALUE    = { (FIFO_DEPTH){ {(FIFO_WIDTH){1'b0}} } }
+    parameter                                   FIFO_DEPTH          = 1,
+    parameter                                   FIFO_WIDTH          = 1,
+    parameter                                   FIFO_RESET_STATE    = 0,
+    parameter [FIFO_DEPTH * FIFO_WIDTH - 1:0]   FIFO_RESET_VALUE    = { (FIFO_DEPTH){ {(FIFO_WIDTH){1'b0}} } }
 ) (
     input   wire                        clk,
     input   wire                        reset,
@@ -33,7 +33,7 @@ module common_fifo_shift_1w1r #(
     wire r_push;  // functionally accepted writing into FIFO, pushed
 
     wire p_hold;  // read and write FIFO simultaneously
-    
+
     wire p_pop;   // read FIFO only
     wire p_push;  // write FIFO only
 
