@@ -7,7 +7,7 @@
 
 using namespace std;
 
-#define FIFO_RAM_BASE
+//#define FIFO_RAM_BASE
 
 #define GEN(p, t) (p | (t << 8) | (t << 16) | (t << 24))
 #define PRT(t)    (t & 0x00FF) 
@@ -186,8 +186,6 @@ int testbench_1(int& t)
     int i;
     for (i = 0; i < 16; i++)
     {
-        clkp_dumpgen(t);
-
         if (dut_ptr->fifo_full)
         {
             printf("[#1] FIFO data overflow.\n");
@@ -200,11 +198,11 @@ int testbench_1(int& t)
         dut_ptr->din = i;
 
         clkn_dumpgen(t);
+
+        clkp_dumpgen(t);
     }
 
     //
-    clkp_dumpgen(t);
-
     printf("[#1] %d of %d data values written.\n", i, 16);
 
     //
@@ -236,9 +234,6 @@ int testbench_2(int& t)
     int i;
     for (i = 0; i < 16; i++)
     {
-
-        clkp_dumpgen(t);
-
         if (dut_ptr->fifo_empty)
         {
             printf("[#2] FIFO data underflow.\n");
@@ -257,11 +252,11 @@ int testbench_2(int& t)
         dut_ptr->ren = 1;
 
         clkn_dumpgen(t);
+
+        clkp_dumpgen(t);
     }
 
     //
-    clkp_dumpgen(t);
-
     printf("[#2] %d of %d data values read.\n", i, 16);
 
     //
@@ -293,7 +288,7 @@ int testbench_3(int& t)
 
     const int checkpoint_lifecycle = 64;
     const int checkpoint_limiter = 16;
-    const int checkpoint_count = 16;
+    const int checkpoint_count = 32;
 
     printf("[#3] \033[1;30mConfigured checkpoint.lifecycle         = %4d.\033[0m\n", checkpoint_lifecycle);
     printf("[#3] \033[1;30mConfigured checkpoint.lifecycle.limiter = %4d.\033[0m\n", checkpoint_limiter);
