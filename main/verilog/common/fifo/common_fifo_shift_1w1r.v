@@ -84,7 +84,7 @@ module common_fifo_shift_1w1r #(
 
             stdmacro_dffe #(
                 .DFF_WIDTH          (FIFO_WIDTH),
-                .DFF_RESET_VALUE    (FIFO_RESET_VALUE[i])
+                .DFF_RESET_VALUE    (FIFO_RESET_VALUE[FIFO_WIDTH * (FIFO_DEPTH - i - 1) +: FIFO_WIDTH])
             ) stdmacro_dffe_INST_fifo_content_dffs (
                 .clk    (clk),
                 .reset  (reset),
@@ -95,9 +95,9 @@ module common_fifo_shift_1w1r #(
                 .q      (content_dff_dout[i])
             );
 
-            assign  content_dff_en      =  p_hold | p_pop;
-            assign  content_dff_dw      = (p_hold & fifo_p[i])   // direct write on Read-Write
-                                        | (p_push & fifo_p[i]);  // direct write on Write-Only
+            assign  content_dff_dw      = (p_hold & fifo_p[i])       // direct write on Read-Write
+                                        | (p_push & fifo_p[i + 1]);  // direct write on Write-Only
+            assign  content_dff_en      =  p_hold | p_pop | content_dff_dw;
 
             assign  content_dff_din[i]  = content_dff_dw ? din : content_dff_dout[i - 1];
             //
