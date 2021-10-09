@@ -1,3 +1,8 @@
 # .gitignore
 
+# difftest build folders
 **/build_test/
+
+# build folders
+**/build/
+
