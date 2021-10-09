@@ -77,7 +77,7 @@ module common_fifo_ram_1w1r #(
 
     assign wptr_d  = $unsigned(wptr_q) + 1;
 
-    assign wptr_en = p_push;
+    assign wptr_en = p_push | p_hold;
     //
 
     // FIFO read pointer
@@ -101,7 +101,7 @@ module common_fifo_ram_1w1r #(
 
     assign rptr_d  = $unsigned(rptr_q) + 1;
 
-    assign rptr_en = p_pop;
+    assign rptr_en = p_pop | p_hold;
     //
 
     // FIFO state connections to W/R pointers
