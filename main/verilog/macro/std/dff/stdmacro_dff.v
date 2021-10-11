@@ -14,7 +14,7 @@
 
 module stdmacro_dff #(
     parameter                       DFF_WIDTH           = 1,
-    parameter [DFF_WIDITH - 1:0]    DFF_RESET_VALUE     = 'b0
+    parameter [DFF_WIDTH - 1:0]     DFF_RESET_VALUE     = 'b0
 ) (
     input   wire                        clk,
     input   wire                        reset,
