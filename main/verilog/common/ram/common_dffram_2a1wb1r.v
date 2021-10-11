@@ -29,7 +29,6 @@ module common_dffram_2a1wb1r #(
 
     // Port B - read only
     input  wire [RAM_ADDR_WIDTH - 1:0]      addrb,
-    input  wire                             enb,   // reserved for power-saving implementations
 
     output wire [RAM_DATA_WIDTH - 1:0]      doutb
 );
