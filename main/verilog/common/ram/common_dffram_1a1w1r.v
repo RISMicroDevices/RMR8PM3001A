@@ -28,7 +28,7 @@ module common_dffram_1a1w1r #(
 );
 
     //
-    parameter   RAM_DEPTH   = `RAM_DEPTH;
+    localparam   RAM_DEPTH   = `RAM_DEPTH;
 
     wire [RAM_DATA_WIDTH - 1:0]     dff_dout [RAM_DEPTH - 1:0];
 
