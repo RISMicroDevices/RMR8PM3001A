@@ -134,7 +134,7 @@ module common_fifo_ram_1w1r #(
         .dina   (din),
 
         .addrb  (rptr_q[FIFO_DEPTH_LOG2 - 1:0]),
-        .enb    (ram_enb),
+//      .enb    (ram_enb),
         .doutb  (dout)
     );
 
@@ -144,7 +144,7 @@ module common_fifo_ram_1w1r #(
     assign ram_ena = ram_wen;
     assign ram_wea = ram_wen;
 
-    assign ram_enb = ram_ren;
+//  assign ram_enb = ram_ren;
     //
 
     //
