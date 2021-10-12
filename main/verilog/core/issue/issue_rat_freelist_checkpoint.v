@@ -9,6 +9,13 @@
 // @author Kumonda221
 //
 
+/*
+* *Notice:
+*   The behaviour of checkpoint was UNDEFINED, when abandon port and commit port
+*   had the same valid input ('i_abandon_valid' and 'i_commit_valid' was both high,
+*   while 'i_abandon_fgr' and 'i_commit_fgr' indicated the same FGR).
+*/
+
 module issue_rat_freelist_checkpoint #(
     parameter   PRF_WIDTH       = 6,
     parameter   FGR_WIDTH       = 3,
@@ -66,15 +73,15 @@ module issue_rat_freelist_checkpoint #(
     wire                    fifo_s_empty    [BANK_COUNT - 1:0];
 
     //
-    genvar i;
+    genvar i, j, k;
 
     //
     generate
         for (i = 0; i < BANK_COUNT; i = i + 1) begin :GENERATED_CHECKPOINT_BANK
 
             issue_rat_freelist_checkpoint_bank #(
-                .PRF_WIDTH(PRF_WIDTH),
-                .FGR_WIDTH(FGR_WIDTH)
+                .PRF_WIDTH  (PRF_WIDTH),
+                .FGR_WIDTH  (FGR_WIDTH)
             ) issue_rat_freelist_checkpoint_bank_INST (
                 .clk                (clk),
                 .reset              (reset),
@@ -124,20 +131,36 @@ module issue_rat_freelist_checkpoint #(
     endgenerate
 
     //
-    assign c_wen[0] = ((~fifo_s_full[0] &  tag_r_valid[0] & i_acquired_valid & (i_acquired_fgr == fgr_r[0]))
-                    |  (~tag_r_valid[0] | ~tag_r_abandoned[0]));
+    /* verilator lint_off UNOPTFLAT */
+    wire    c_wen_carrier       [BANK_COUNT - 1:0];
+    /* verilator lint_off UNOPTFLAT */
+    wire    c_wb_sel_carrier    [BANK_COUNT - 1:0];
 
-    assign c_wb_sel[0] = tag_r_abandoned[0];
+    assign c_wen[0]         = ((~fifo_s_full[0] &  tag_r_valid[0] & (i_acquired_fgr == fgr_r[0]))
+                            |  (~tag_r_valid[0] & ~tag_r_abandoned[0]))
+                            & i_acquired_valid;
+
+
+    assign c_wb_sel[0]      = tag_r_abandoned[0];
+
+    assign c_wen_carrier[0]     = 1'b0;
+
+    assign c_wb_sel_carrier[0]  = 1'b0;
 
     generate
         for (i = 1; i < BANK_COUNT; i = i + 1) begin : GENERATED_CHECKPOINT_CONTROL_WEN
 
-            assign c_wen[i] = ((~fifo_s_full[i] &  tag_r_valid[i] & i_acquired_valid & (i_acquired_fgr == fgr_r[i]))
-                            |  (~tag_r_valid[i] | ~tag_r_abandoned[i]))
-                            & ~(|{c_wen[i - 1:0]});
+            assign c_wen[i]     = ((~fifo_s_full[i] &  tag_r_valid[i] & (i_acquired_fgr == fgr_r[i]))
+                                |  (~tag_r_valid[i] & ~tag_r_abandoned[i]))
+                                & ~c_wen_carrier[i]
+                                &  i_acquired_valid;
 
-            assign c_wb_sel[i] = tag_r_abandoned[i]
-                               & ~(|{c_wb_sel[i - 1:0]});
+            assign c_wb_sel[i]  =  tag_r_abandoned[i]
+                                & ~c_wb_sel_carrier[i];
+
+            assign c_wen_carrier[i]     = c_wen_carrier[i - 1]    | c_wen[i - 1];
+
+            assign c_wb_sel_carrier[i]  = c_wb_sel_carrier[i - 1] | c_wb_sel[i - 1];
         end
     endgenerate
     //
@@ -172,7 +195,7 @@ module issue_rat_freelist_checkpoint #(
 
             assign fifo_w_reset[i]  = ~c_commit[i];
 
-            assign fifo_w_wen[i]    = ~c_wen[i];
+            assign fifo_w_wen[i]    = c_wen[i];
 
             assign fifo_w_prf[i]    = i_acquired_prf;
         end        
@@ -185,7 +208,7 @@ module issue_rat_freelist_checkpoint #(
     generate
         for (i = 0; i < 4; i = i + 1) begin : GENERATED_CHECKPOINT_FIFO_READ
             
-            assign fifo_r_ren[i] = { (PRF_WIDTH){c_wb_sel[i]} } & i_abandoned_ready;
+            assign fifo_r_ren[i] = c_wb_sel[i] & i_abandoned_ready;
 
             assign r_prf[i] = { (PRF_WIDTH){c_wb_sel[i]} } & fifo_r_prf[i];
         end
@@ -193,25 +216,31 @@ module issue_rat_freelist_checkpoint #(
     //
 
     // output logic
-    reg [PRF_WIDTH - 1:0]   r_prf_aggregation;
+    wire [PRF_WIDTH * BANK_COUNT - 1:0] r_prf_reduction_tree;
+    wire [PRF_WIDTH - 1:0]              r_prf_reducted;
 
-    integer j;
-    always @(*) begin
-
-        r_prf_aggregation = 'b0;
-
-        for (j = 0; j < BANK_COUNT; j = j + 1) begin
-
-            r_prf_aggregation = r_prf_aggregation | r_prf[j];
+    generate 
+        for (i = 0; i < BANK_COUNT; i = i + 1) begin
+            
+            assign r_prf_reduction_tree[i * PRF_WIDTH +: PRF_WIDTH] = r_prf[i];
         end
-    end
-    //
+    endgenerate
 
-    assign o_abandoned_prf   = r_prf_aggregation;
+    macro_or_reduction_tree #(
+        .INPUT_WIDTH    (PRF_WIDTH),
+        .INPUT_COUNT    (BANK_COUNT)
+    ) macro_or_reduction_tree_INST_r_prf (
+        .d(r_prf_reduction_tree),
+        .q(r_prf_reducted)
+    );
+
+    //
+    assign o_abandoned_prf   = r_prf_reducted;
 
     assign o_acquired_ready  = |{c_wen    [BANK_COUNT - 1:0]};
 
     assign o_abandoned_valid = |{c_wb_sel [BANK_COUNT - 1:0]};
+
     //
 
 endmodule
