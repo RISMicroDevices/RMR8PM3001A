@@ -62,6 +62,7 @@ int testbench_0(int& t)
     // Testbench #0
     // Verify on reset state.
     printf("[#0] Testbench #0\n");
+    printf("[#0] \033[1;33mStarting at clock edge %d (ps)\033[0m\n", t);
     printf("[#0] Verify on post-reset state.\n");
 
     //
@@ -111,6 +112,7 @@ int testbench_1(int& t)
     // Testbench #1
     // Saturated write and abandon-backtrack test.
     printf("[#1] Testbench #1\n");
+    printf("[#1] \033[1;33mStarting at clock edge %d (ps)\033[0m\n", t);
     printf("[#1] Saturated write and abandon-backtrack test.\n");
 
     //
@@ -136,7 +138,7 @@ int testbench_1(int& t)
             //
             if (!dut_ptr->o_acquired_ready)
             {
-                printf("[#1] Incorrect state detected. Early saturation. Checkpoint overflow at (FGR = %d, index = %d).\n",
+                printf("[#1] Incorrect state detected. Early saturation (FGR = %d, index = %d).\n",
                     i, prf_sim);
                 error++;
 
@@ -179,6 +181,13 @@ int testbench_1(int& t)
 
         clkn_dumpgen(t);
         clkp_dumpgen(t);
+
+        //
+        dut_ptr->i_abandon_valid = 0;
+        dut_ptr->i_abandon_fgr   = 0;
+
+        clkn_dumpgen(t);
+        clkp_dumpgen(t);
         
         //
         if (!dut_ptr->o_abandoned_valid)
@@ -208,9 +217,15 @@ int testbench_1(int& t)
             clkn_dumpgen(t);
             clkp_dumpgen(t);
         }
+
+        //
+        dut_ptr->i_abandoned_ready = 0;
+
+        clkn_dumpgen(t);
+        clkp_dumpgen(t);
     }
 
-    if (!dut_ptr->o_abandoned_valid)
+    if (dut_ptr->o_abandoned_valid)
     {
         printf("[#1] Incorrect state detected. Abandon-backtrack hold-up.\n");
         error++;
@@ -225,6 +240,7 @@ int testbench_1(int& t)
         {
             printf("[#1] Abandon-backtrack pattern incorrect. Missing at '%d'.\n", i);
             backtrack_error++;
+            error++;
         }
 
     if (!backtrack_error)
@@ -252,17 +268,171 @@ int testbench_2(int& t)
     // Testbench #2
     // Incremental un-saturated write and abandon-trackback test
     printf("[#2] Testbench #2\n");
+    printf("[#2] \033[1;33mStarting at clock edge %d (ps)\033[0m\n", t);
     printf("[#2] Incremental un-saturated write and abandon-trackback test.\n");
 
     //
+    bool prf_sim_backtrack[16];
+    int  prf_sim;
 
-    // TODO ...
+    for (int i = 1; i < 4; i++)
+    {
+        printf("[#2] %d/4 un-saturated write ...\n", i);
+
+        //
+        for (int j = 0; j < 16; j++)
+            prf_sim_backtrack[j] = 0;
+
+        prf_sim = 0;
+
+        // unsaturated bank write
+        for (int j = 0; j < 4; j++)
+        {
+            // j -> FGR
+
+            for (int k = 0; k < i; k++, prf_sim++)
+            {
+                //
+                dut_ptr->i_acquired_valid = 1;
+                dut_ptr->i_acquired_fgr   = j;
+                dut_ptr->i_acquired_prf   = prf_sim;
+
+                clkn_dumpgen(t);
+                
+                //
+                if (!dut_ptr->o_acquired_ready)
+                {
+                    printf("[#2] Incorrect state detected (%d/4). Early saturation (FGR = %d, index = %d).\n",
+                        i, j, prf_sim);
+                    error++;
+
+                    goto TESTBENCH_2_WRITE_END;
+                }
+
+                clkp_dumpgen(t);
+                //
+            }
+        }
+
+        TESTBENCH_2_WRITE_END:
+        dut_ptr->i_acquired_valid = 0;
+        dut_ptr->i_acquired_fgr   = 0;
+        dut_ptr->i_acquired_prf   = 0;
+
+        clkn_dumpgen(t);
+        clkp_dumpgen(t);
+
+        // backtrack read
+        for (int j = 0; j < 4; j++)
+        {
+            // j -> FGR
+
+            //
+            dut_ptr->i_abandon_valid = 1;
+            dut_ptr->i_abandon_fgr   = j;
+
+            clkn_dumpgen(t);
+            clkp_dumpgen(t);
+
+            //
+            dut_ptr->i_abandon_valid = 0;
+            dut_ptr->i_abandon_fgr   = 0;
+
+            clkn_dumpgen(t);
+            clkp_dumpgen(t);
+
+            for (int k = 0; k < i; k++)
+            {
+                dut_ptr->i_abandoned_ready = 1;
+
+                if (!dut_ptr->o_abandoned_valid)
+                {
+                    printf("[#2] Abandon-backtrack no response on FGR '%d'.\n", i);
+                    error++;
+
+                    goto TESTBENCH_2_BACKTRACK_END;
+                }
+
+                prf_sim_backtrack[dut_ptr->o_abandoned_prf] = 1;
+
+                clkn_dumpgen(t);
+                clkp_dumpgen(t);
+            }
+
+            //
+            dut_ptr->i_abandoned_ready = 0;
+
+            clkn_dumpgen(t);
+            clkp_dumpgen(t);
+        }
+
+        if (dut_ptr->o_abandoned_valid)
+        {
+            printf("[#2] Incorrect state detected (%d/4). Abandon-backtrack hold-up.\n", i);
+            error++;
+        }
+
+        TESTBENCH_2_BACKTRACK_END:
+        dut_ptr->i_abandoned_ready = 0;
+
+        clkn_dumpgen(t);
+        clkp_dumpgen(t);
+
+        for (int j = 0; j < prf_sim; j++)
+            if (!prf_sim_backtrack[j])
+            {
+                printf("[#2] Abandon-backtrack pattern incorrect (%d/4). Missing at '%d'.\n", i, j);
+                error++;
+            }
+    }
 
     //
     if (error)
         printf("[#2] Testbench #2 \033[1;31mFAILED\033[0m !!!\n");
     else
         printf("[#2] Testbench #2 \033[1;32mPASSED\033[0m !!!\n");
+
+    return error;
+}
+
+int testbench_3(int& t)
+{
+    int error = 0;
+
+    // Testbench #3
+    // Interleaving saturated write and abandon-backtrack test.
+    printf("[#3] Testbench #3\n");
+    printf("[#3] \033[1;33mStarting at clock edge %d (ps)\033[0m\n", t);
+    printf("[#3] Interleaving saturated write and abandon-backtrack test.\n");
+
+    // TODO
+
+    //
+    if (error)
+        printf("[#3] Testbench #3 \033[1;31mFAILED\033[0m !!!\n");
+    else
+        printf("[#3] Testbench #3 \033[1;32mPASSED\033[0m !!!\n");
+
+    return error;
+}
+
+int testbench_4(int& t)
+{
+    int error = 0;
+
+    // Testbench #4
+    // Interleaving incremental un-saturated write and abandon-backtrack test.
+    printf("[#4] Testbench #4\n");
+    printf("[#4] \033[1;33mStarting at clock edge %d (ps)\033[0m\n", t);
+    printf("[#4] Interleaving incremental un-saturated write and abandon-backtrack test.\n");
+
+    // TODO
+
+    //
+    if (error)
+        printf("[#4] Testbench #4 \033[1;31mFAILED\033[0m !!!\n");
+    else
+        printf("[#4] Testbench #4 \033[1;32mPASSED\033[0m !!!\n");
 
     return error;
 }
@@ -291,6 +461,14 @@ void test()
     printf("[--] ----------------------------------------\n");
 
     e += testbench_2(t);
+
+    printf("[--] ----------------------------------------\n");
+
+    e += testbench_3(t);
+
+    printf("[--] ----------------------------------------\n");
+
+    e += testbench_4(t);
 
     printf("[--] ----------------------------------------\n");
 
