@@ -8,7 +8,7 @@
 // @author Kumonda221
 //
 
-module common_rtlrom_incr5 (
+module macro_rom_incr5 (
     input   wire [4:0]          d,
     output  wire [4:0]          q,
     output  wire                c

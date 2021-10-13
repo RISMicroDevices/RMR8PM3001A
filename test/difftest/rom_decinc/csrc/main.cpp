@@ -1,5 +1,5 @@
 #include "verilated.h"
-#include "Vsim_rtlrom_decinc.h"
+#include "Vsim_rom_decinc.h"
 #include <cstdio>
 
 #define TRUE                1
@@ -10,7 +10,7 @@
 static VerilatedVcdC* fp;      //to form *.vcd file
 #endif
 
-Vsim_rtlrom_decinc* dut_ptr;
+Vsim_rom_decinc* dut_ptr;
 
 int test(int time, int t, bool dec) 
 {
@@ -238,7 +238,7 @@ int test(int time, int t, bool dec)
 
 int main() 
 {
-    dut_ptr = new Vsim_rtlrom_decinc;
+    dut_ptr = new Vsim_rom_decinc;
 
 #ifdef VM_TRACE
     ////// !!!  ATTENTION  !!!//////

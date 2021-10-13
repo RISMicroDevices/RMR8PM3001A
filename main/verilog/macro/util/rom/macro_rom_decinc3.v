@@ -10,7 +10,7 @@
 // @author Kumonda221
 //
 
-module common_rtlrom_decinc3 (
+module macro_rom_decinc3 (
     input   wire [2:0]          d,
     input   wire                dec,
     output  wire [2:0]          q,

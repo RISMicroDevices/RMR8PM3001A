@@ -1,7 +1,7 @@
 
 //
 
-module sim_rtlrom_decinc (
+module sim_rom_decinc (
     input   wire [4:0]          d,
     input   wire                dec,
 
@@ -43,19 +43,19 @@ module sim_rtlrom_decinc (
 );
 
     // INCR-DECR-2
-    common_rtlrom_incr2 common_rtlrom_incr2_INST_SIM (
+    macro_rom_incr2 macro_rom_incr2_INST_SIM (
         .d(d[1:0]),
         .q(q_incr2),
         .c(c_incr2)
     );
     
-    common_rtlrom_decr2 common_rtlrom_decr2_INST_SIM (
+    macro_rom_decr2 macro_rom_decr2_INST_SIM (
         .d(d[1:0]),
         .q(q_decr2),
         .c(c_decr2)
     );
 
-    common_rtlrom_decinc2 common_rtlrom_decinc2_INST_SIM (
+    macro_rom_decinc2 macro_rom_decinc2_INST_SIM (
         .d(d[1:0]),
         .dec(dec),
         .q(q_decinc2),
@@ -63,19 +63,19 @@ module sim_rtlrom_decinc (
     );
 
     // INCR-DECR-3
-    common_rtlrom_incr3 common_rtlrom_incr3_INST_SIM (
+    macro_rom_incr3 macro_rom_incr3_INST_SIM (
         .d(d[2:0]),
         .q(q_incr3),
         .c(c_incr3)
     );
     
-    common_rtlrom_decr3 common_rtlrom_decr3_INST_SIM (
+    macro_rom_decr3 macro_rom_decr3_INST_SIM (
         .d(d[2:0]),
         .q(q_decr3),
         .c(c_decr3)
     );
 
-    common_rtlrom_decinc3 common_rtlrom_decinc3_INST_SIM (
+    macro_rom_decinc3 macro_rom_decinc3_INST_SIM (
         .d(d[2:0]),
         .dec(dec),
         .q(q_decinc3),
@@ -83,19 +83,19 @@ module sim_rtlrom_decinc (
     );
 
     // INCR-DECR-4
-    common_rtlrom_incr4 common_rtlrom_incr4_INST_SIM (
+    macro_rom_incr4 macro_rom_incr4_INST_SIM (
         .d(d[3:0]),
         .q(q_incr4),
         .c(c_incr4)
     );
     
-    common_rtlrom_decr4 common_rtlrom_decr4_INST_SIM (
+    macro_rom_decr4 macro_rom_decr4_INST_SIM (
         .d(d[3:0]),
         .q(q_decr4),
         .c(c_decr4)
     );
 
-    common_rtlrom_decinc4 common_rtlrom_decinc4_INST_SIM (
+    macro_rom_decinc4 macro_rom_decinc4_INST_SIM (
         .d(d[3:0]),
         .dec(dec),
         .q(q_decinc4),
@@ -103,19 +103,19 @@ module sim_rtlrom_decinc (
     );
 
     // INCR-DECR-5
-    common_rtlrom_incr5 common_rtlrom_incr5_INST_SIM (
+    macro_rom_incr5 macro_rom_incr5_INST_SIM (
         .d(d),
         .q(q_incr5),
         .c(c_incr5)
     );
 
-    common_rtlrom_decr5 common_rtlrom_decr5_INST_SIM (
+    macro_rom_decr5 macro_rom_decr5_INST_SIM (
         .d(d),
         .q(q_decr5),
         .c(c_decr5)
     );
 
-    common_rtlrom_decinc5 common_rtlrom_decinc5_INST_SIM (
+    macro_rom_decinc5 macro_rom_decinc5_INST_SIM (
         .d(d),
         .dec(dec),
         .q(q_decinc5),
