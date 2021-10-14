@@ -112,43 +112,27 @@ module issue_rat_freelist_checkpoint #(
     endgenerate
 
     // Checkpoint control signals
-    wire [BANK_COUNT - 1:0]     c_wen;
+    wire [BANK_COUNT - 1:-1]    c_wen;
+    wire [BANK_COUNT - 1:-1]    c_wb_sel;
+
     wire [BANK_COUNT - 1:0]     c_wb_done;
-    wire [BANK_COUNT - 1:0]     c_wb_sel;
     wire [BANK_COUNT - 1:0]     c_abandon;
     wire [BANK_COUNT - 1:0]     c_commit;
 
     //
-    generate
-        for (i = 0; i < BANK_COUNT; i = i + 1) begin : GENERATED_CHECKPOINT_CONTROL
-
-            assign c_wb_done[i] = fifo_s_empty[i] & tag_r_abandoned[i];
-
-            assign c_abandon[i] = tag_r_valid[i] & i_abandon_valid & (i_abandon_fgr == fgr_r[i]);
-
-            assign c_commit[i]  = tag_r_valid[i] & i_commit_valid & (i_commit_fgr == fgr_r[i]);
-        end
-    endgenerate
-
-    //
     /* verilator lint_off UNOPTFLAT */
-    wire    c_wen_carrier       [BANK_COUNT - 1:0];
+    wire    c_wen_carrier       [BANK_COUNT - 1:-1];
     /* verilator lint_off UNOPTFLAT */
-    wire    c_wb_sel_carrier    [BANK_COUNT - 1:0];
+    wire    c_wb_sel_carrier    [BANK_COUNT - 1:-1];
 
-    assign c_wen[0]         = ((~fifo_s_full[0] &  tag_r_valid[0] & (i_acquired_fgr == fgr_r[0]))
-                            |  (~tag_r_valid[0] & ~tag_r_abandoned[0]))
-                            & i_acquired_valid;
+    assign c_wen   [-1] = 1'b0;
+    assign c_wb_sel[-1] = 1'b0;
 
-
-    assign c_wb_sel[0]      = tag_r_abandoned[0];
-
-    assign c_wen_carrier[0]     = 1'b0;
-
-    assign c_wb_sel_carrier[0]  = 1'b0;
+    assign c_wen_carrier   [-1] = 1'b0;
+    assign c_wb_sel_carrier[-1] = 1'b0;
 
     generate
-        for (i = 1; i < BANK_COUNT; i = i + 1) begin : GENERATED_CHECKPOINT_CONTROL_WEN
+        for (i = 0; i < BANK_COUNT; i = i + 1) begin : GENERATED_CHECKPOINT_CONTROL_READ_WRITE
 
             assign c_wen[i]     = ((~fifo_s_full[i] &  tag_r_valid[i] & (i_acquired_fgr == fgr_r[i]))
                                 |  (~tag_r_valid[i] & ~tag_r_abandoned[i]))
@@ -165,49 +149,47 @@ module issue_rat_freelist_checkpoint #(
     endgenerate
     //
 
-    // Checkpoint Tag update
     generate
-        for (i = 0; i < BANK_COUNT; i = i + 1) begin : GENERATED_CHECKPOINT_TAG_UPDATE
+        for (i = 0; i < BANK_COUNT; i = i + 1) begin : GENERATED_CHECKPOINT_CONTROL_STATE_TRANS
 
+            assign c_wb_done[i]  = fifo_s_empty[i];
+
+            assign c_abandon[i]  = i_abandon_valid  & (i_abandon_fgr  == fgr_r[i]);
+
+            assign c_commit[i]   = i_commit_valid   & (i_commit_fgr   == fgr_r[i]);
+        end
+    endgenerate
+
+    // Checkpoint update (state transition, read, write)
+    wire [PRF_WIDTH - 1:0]  r_prf [BANK_COUNT - 1:0];
+
+    generate
+        for (i = 0; i < BANK_COUNT; i = i + 1) begin : GENERATED_CHECKPOINT_UPDATE
+
+            // Tag update
             assign tag_w_wen[i] = 1'b1;
 
-            assign tag_w_valid[i]       = ~tag_r_valid[i] ? c_wen[i] : ~(c_commit[i] | c_abandon[i]);
+            assign tag_w_valid[i]       = ~tag_r_valid[i] 
+                                        ?  c_wen[i] 
+                                        : ~(c_commit[i] | c_abandon[i]);
 
-            assign tag_w_abandoned[i]   = ~tag_r_abandoned[i] ? c_abandon[i] : ~c_wb_done[i];
-        end
-    endgenerate
-    //
+            assign tag_w_abandoned[i]   = ~tag_r_abandoned[i] 
+                                        ? (tag_r_valid[i] & c_abandon[i])
+                                        : ~c_wb_done[i];
 
-    // Checkpoint FGR Tag update
-    generate
-        for (i = 0; i < BANK_COUNT; i = i + 1) begin : GENERATED_CHECKPOINT_FGR_UPDATE
-
+            // FGR update
             assign fgr_w_wen[i] = c_wen[i];
 
-            assign fgr_w[i]     = i_acquired_fgr;        
-        end
-    endgenerate
-    //
+            assign fgr_w[i]     = i_acquired_fgr;
 
-    // Checkpoint FIFO write
-    generate
-        for (i = 0; i < BANK_COUNT; i = i + 1) begin : GENERATED_CHECKPOINT_FIFO_WRITE
-
+            // FIFO write
             assign fifo_w_reset[i]  = ~c_commit[i];
 
             assign fifo_w_wen[i]    = c_wen[i];
 
             assign fifo_w_prf[i]    = i_acquired_prf;
-        end        
-    endgenerate
-    //
 
-    // Checkpoint FIFO read
-    wire [PRF_WIDTH - 1:0]  r_prf [BANK_COUNT - 1:0];
-
-    generate
-        for (i = 0; i < 4; i = i + 1) begin : GENERATED_CHECKPOINT_FIFO_READ
-            
+            // FIFO read
             assign fifo_r_ren[i] = c_wb_sel[i] & i_abandoned_ready;
 
             assign r_prf[i] = { (PRF_WIDTH){c_wb_sel[i]} } & fifo_r_prf[i];
