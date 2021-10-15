@@ -55,6 +55,108 @@ void reset(int& t)
     printf("[##] \033[1;33mCircuit reset.\033[0m\n");
 }
 
+//
+#define ELABORATED_STATE_INVALID        0x00
+#define ELABORATED_STATE_VALID          0x01
+#define ELABORATED_STATE_ABANDONED      0x02
+
+list<int>* elaborated_banks;
+
+int* elaborated_fgrs;
+
+int* elaborated_states;
+
+void elaborated_initialize()
+{
+    elaborated_banks = new list<int>[4];
+    elaborated_fgrs = new int[4];
+    elaborated_states = new int[4];
+
+    for (int i = 0; i < 4; i++)
+        elaborated_fgrs[i] = -1;
+
+    for (int i = 0; i < 4; i++)
+        elaborated_states[i] = ELABORATED_STATE_INVALID;
+}
+
+void elaborated_delete()
+{
+    delete[] elaborated_banks;
+    delete[] elaborated_fgrs;
+    delete[] elaborated_states;
+}
+
+void elaborated_push(int fgr, int value)
+{
+    for (int i = 0; i < 4; i++)
+    {
+        if (elaborated_states[i] == ELABORATED_STATE_INVALID)
+        {
+            elaborated_fgrs[i] = fgr;
+            elaborated_banks[i].push_front(value);
+
+            break;
+        }
+        else if (elaborated_states[i] == ELABORATED_STATE_VALID)
+        {
+            if ((elaborated_fgrs[i] == fgr)
+                && (elaborated_banks[i].size() < 4))
+            {
+                elaborated_banks[i].push_front(value);
+
+                break;
+            }
+        }
+    }
+}
+
+void elaborated_abandon(int fgr)
+{
+    for (int i = 0; i < 4; i++)
+    {
+        if ((elaborated_states[i] == ELABORATED_STATE_VALID)
+            && (elaborated_fgrs[i] == fgr))
+        {
+            elaborated_states[i] = ELABORATED_STATE_ABANDONED;
+        }
+    }
+}
+
+void elaborated_commit(int fgr)
+{
+    for (int i = 0; i < 4; i++)
+    {
+        if ((elaborated_states[i] == ELABORATED_STATE_VALID)
+            && (elaborated_fgrs[i] == fgr))
+        {
+            elaborated_banks[i].clear();
+            elaborated_states[i] = ELABORATED_STATE_INVALID;
+        }
+    }
+}
+
+int elaborated_pop(int& fgr)
+{
+    for (int i = 0; i < 4; i++)
+    {
+        if (elaborated_states[i] == ELABORATED_STATE_ABANDONED)
+        {
+            fgr = elaborated_banks[i].back();
+
+            elaborated_banks[i].pop_back();
+
+            if (elaborated_banks[i].empty())
+                elaborated_states[i] = ELABORATED_STATE_INVALID;
+
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+//
+
 int testbench_0(int& t)
 {
     int error = 0;
@@ -406,6 +508,137 @@ int testbench_3(int& t)
     printf("[#3] Interleaving saturated write and abandon-backtrack test.\n");
 
     // TODO
+    bool prf_sim_backtrack[16] = { 0 };
+    int  prf_sim = 0;
+
+    int  backtrack_error = 0;
+
+    for (int i = 0; i < 4; i++)
+    {
+        for (int j = 0; j < 4; j++, prf_sim++)
+        {
+            // j -> FGR
+
+            //
+            dut_ptr->i_acquired_valid = 1;
+            dut_ptr->i_acquired_fgr   = j;
+            dut_ptr->i_acquired_prf   = prf_sim;
+
+            clkn_dumpgen(t);
+
+            //
+            if (!dut_ptr->o_acquired_ready)
+            {
+                printf("[#3] Incorrect state detected. Early saturation (FGR = %d, index = %d).\n",
+                    i, prf_sim);
+                error++;
+
+                goto TESTBENCH_3_WRITE_END;
+            }
+
+            clkp_dumpgen(t);
+            //
+        }
+    }
+
+    clkn_dumpgen(t);
+
+    if (dut_ptr->o_acquired_ready)
+    {
+        printf("[#3] Incorrect state detected. Out of saturation.\n");
+        error++;
+    }
+    else
+        printf("[#3] Saturation correct.\n");
+
+    clkp_dumpgen(t);
+
+    TESTBENCH_3_WRITE_END:
+    dut_ptr->i_acquired_valid = 0;
+    dut_ptr->i_acquired_fgr   = 0;
+    dut_ptr->i_acquired_prf   = 0;
+
+    // abandon-backtrack
+    for (int i = 0; i < 4; i++)
+    {
+        // i -> FGR
+
+        //
+        dut_ptr->i_abandon_valid = 1;
+        dut_ptr->i_abandon_fgr   = i;
+
+        clkn_dumpgen(t);
+        clkp_dumpgen(t);
+
+        //
+        dut_ptr->i_abandon_valid = 0;
+        dut_ptr->i_abandon_fgr   = 0;
+
+        clkn_dumpgen(t);
+        clkp_dumpgen(t);
+        
+        //
+        if (!dut_ptr->o_abandoned_valid)
+        {
+            printf("[#3] Abandon-backtrack no response on FGR '%d'.\n", i);
+            error++;
+
+            goto TESTBENCH_3_BACKTRACK_END;
+        }
+
+        //
+        for (int j = 0; j < 4; j++)
+        {
+            dut_ptr->i_abandoned_ready = 1;
+
+            if (!dut_ptr->o_abandoned_valid)
+            {
+                printf("[#3] Abandon-backtrack no response on FGR '%d' (offset = %d).\n",
+                    i, j);
+                error++;
+
+                goto TESTBENCH_3_BACKTRACK_END;
+            }
+
+            prf_sim_backtrack[dut_ptr->o_abandoned_prf] = 1;
+
+            clkn_dumpgen(t);
+            clkp_dumpgen(t);
+        }
+
+        //
+        dut_ptr->i_abandoned_ready = 0;
+
+        clkn_dumpgen(t);
+        clkp_dumpgen(t);
+    }
+
+    if (dut_ptr->o_abandoned_valid)
+    {
+        printf("[#3] Incorrect state detected. Abandon-backtrack hold-up.\n");
+        error++;
+    }
+    else
+    {
+        printf("[#3] Abandon-backtrack state correct.\n");
+    }
+
+    for (int i = 0; i < 16; i++)
+        if (!prf_sim_backtrack[i])
+        {
+            printf("[#3] Abandon-backtrack pattern incorrect. Missing at '%d'.\n", i);
+            backtrack_error++;
+            error++;
+        }
+
+    if (!backtrack_error)
+        printf("[#3] Abandon-backtrack pattern correct.\n");
+
+    TESTBENCH_3_BACKTRACK_END:
+    dut_ptr->i_abandoned_ready = 0;
+
+    clkn_dumpgen(t);
+    clkp_dumpgen(t);
 
     //
     if (error)
@@ -426,13 +659,171 @@ int testbench_4(int& t)
     printf("[#4] \033[1;33mStarting at clock edge %d (ps)\033[0m\n", t);
     printf("[#4] Interleaving incremental un-saturated write and abandon-backtrack test.\n");
 
-    // TODO
+    //
+    bool prf_sim_backtrack[16];
+    int  prf_sim;
+
+    for (int i = 1; i < 4; i++)
+    {
+        printf("[#4] %d/4 un-saturated write ...\n", i);
+
+        //
+        for (int j = 0; j < 16; j++)
+            prf_sim_backtrack[j] = 0;
+
+        prf_sim = 0;
+
+        // unsaturated bank write
+        for (int j = 0; j < i; j++)
+        {
+            for (int k = 0; k < 4; k++, prf_sim++)
+            {
+                // k -> FGR
+
+                //
+                dut_ptr->i_acquired_valid = 1;
+                dut_ptr->i_acquired_fgr   = k;
+                dut_ptr->i_acquired_prf   = prf_sim;
+
+                clkn_dumpgen(t);
+                
+                //
+                if (!dut_ptr->o_acquired_ready)
+                {
+                    printf("[#4] Incorrect state detected (%d/4). Early saturation (FGR = %d, index = %d).\n",
+                        j, k, prf_sim);
+                    error++;
+
+                    goto TESTBENCH_4_WRITE_END;
+                }
+
+                clkp_dumpgen(t);
+                //
+            }
+        }
+
+        TESTBENCH_4_WRITE_END:
+        dut_ptr->i_acquired_valid = 0;
+        dut_ptr->i_acquired_fgr   = 0;
+        dut_ptr->i_acquired_prf   = 0;
+
+        clkn_dumpgen(t);
+        clkp_dumpgen(t);
+
+        // backtrack read
+        for (int j = 0; j < 4; j++)
+        {
+            // j -> FGR
+
+            //
+            dut_ptr->i_abandon_valid = 1;
+            dut_ptr->i_abandon_fgr   = j;
+
+            clkn_dumpgen(t);
+            clkp_dumpgen(t);
+
+            //
+            dut_ptr->i_abandon_valid = 0;
+            dut_ptr->i_abandon_fgr   = 0;
+
+            clkn_dumpgen(t);
+            clkp_dumpgen(t);
+
+            for (int k = 0; k < i; k++)
+            {
+                dut_ptr->i_abandoned_ready = 1;
+
+                if (!dut_ptr->o_abandoned_valid)
+                {
+                    printf("[#4] Abandon-backtrack no response on FGR '%d'.\n", i);
+                    error++;
+
+                    goto TESTBENCH_4_BACKTRACK_END;
+                }
+
+                prf_sim_backtrack[dut_ptr->o_abandoned_prf] = 1;
+
+                clkn_dumpgen(t);
+                clkp_dumpgen(t);
+            }
+
+            //
+            dut_ptr->i_abandoned_ready = 0;
+
+            clkn_dumpgen(t);
+            clkp_dumpgen(t);
+        }
+
+        if (dut_ptr->o_abandoned_valid)
+        {
+            printf("[#4] Incorrect state detected (%d/4). Abandon-backtrack hold-up.\n", i);
+            error++;
+        }
+
+        TESTBENCH_4_BACKTRACK_END:
+        dut_ptr->i_abandoned_ready = 0;
+
+        clkn_dumpgen(t);
+        clkp_dumpgen(t);
+
+        for (int j = 0; j < prf_sim; j++)
+            if (!prf_sim_backtrack[j])
+            {
+                printf("[#4] Abandon-backtrack pattern incorrect (%d/4). Missing at '%d'.\n", i, j);
+                error++;
+            }
+    }
 
     //
     if (error)
         printf("[#4] Testbench #4 \033[1;31mFAILED\033[0m !!!\n");
     else
         printf("[#4] Testbench #4 \033[1;32mPASSED\033[0m !!!\n");
+
+    return error;
+}
+
+int testbench_5(int& t)
+{
+    int error = 0;
+
+    // Testbench #5
+    // Elaborated differential random read-write test.
+    printf("[#5] Testbench #5\n");
+    printf("[#5] \033[1;33mStarting at clock edge %d (ps)\033[0m\n", t);
+    printf("[#5] Elaborated differential random read-write test.\n");
+
+    //
+    elaborated_initialize();
+    printf("[#5] Elaborated variables initialized.\n");
+
+    //
+    int c = 2048;
+
+    printf("[#5] \033[1;30mDifferential payload count: %d\033[0m\n", c);
+
+    srand(time(0));
+
+    int delay_push      = rand() % 4;
+    int delay_pop       = rand() % 4;
+    int delay_abandon   = rand() % 16;
+    int delay_commit    = rand() % 16;
+
+    // payload
+    for (int i = 0; i < c; i++)
+    {
+`       // TOOD
+    }
+
+    //
+    elaborated_delete();
+    printf("[#5] Elaborated variables finalized.\n");
+
+    //
+    if (error)
+        printf("[#5] Testbench #5 \033[1;31mFAILED\033[0m !!!\n");
+    else
+        printf("[#5] Testbench #5 \033[1;32mPASSED\033[0m !!!\n");
 
     return error;
 }
@@ -469,6 +860,10 @@ void test()
     printf("[--] ----------------------------------------\n");
 
     e += testbench_4(t);
+
+    printf("[--] ----------------------------------------\n");
+
+    e += testbench_5(t);
 
     printf("[--] ----------------------------------------\n");
 
