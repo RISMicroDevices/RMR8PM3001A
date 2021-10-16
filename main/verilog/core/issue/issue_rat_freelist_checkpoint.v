@@ -140,6 +140,7 @@ module issue_rat_freelist_checkpoint #(
                                 &  i_acquired_valid;
 
             assign c_wb_sel[i]  =  tag_r_abandoned[i]
+                                & ~fifo_s_empty[i]
                                 & ~c_wb_sel_carrier[i];
 
             assign c_wen_carrier[i]     = c_wen_carrier[i - 1]    | c_wen[i - 1];
@@ -183,7 +184,7 @@ module issue_rat_freelist_checkpoint #(
             assign fgr_w[i]     = i_acquired_fgr;
 
             // FIFO write
-            assign fifo_w_reset[i]  = ~c_commit[i];
+            assign fifo_w_reset[i]  = ~(tag_r_valid[i] & c_commit[i]);
 
             assign fifo_w_wen[i]    = c_wen[i];
 
