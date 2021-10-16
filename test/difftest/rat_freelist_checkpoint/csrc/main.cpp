@@ -7,6 +7,8 @@
 
 using namespace std;
 
+//#define DIFF_DEBUG
+
 #ifdef VM_TRACE         // --trace
 #include <verilated_vcd_c.h>
 static VerilatedVcdC* fp;      //to form *.vcd file
@@ -60,23 +62,38 @@ void reset(int& t)
 #define ELABORATED_STATE_VALID          0x01
 #define ELABORATED_STATE_ABANDONED      0x02
 
-list<int>* elaborated_banks;
+#define ELABORATED_BANK_NEXT_NOP        -1
+#define ELABORATED_BANK_NEXT_POP        -2
+#define ELABORATED_BANK_NEXT_CLEAR      -3
 
-int* elaborated_fgrs;
+list<int>*  elaborated_banks;
+int*        elaborated_fgrs;
+int*        elaborated_states;
 
-int* elaborated_states;
+int*        elaborated_next_banks;
+int*        elaborated_next_fgrs;
+int*        elaborated_next_states;
 
 void elaborated_initialize()
 {
-    elaborated_banks = new list<int>[4];
-    elaborated_fgrs = new int[4];
+    elaborated_banks  = new list<int>[4];
+    elaborated_fgrs   = new int[4];
     elaborated_states = new int[4];
 
-    for (int i = 0; i < 4; i++)
-        elaborated_fgrs[i] = -1;
+    elaborated_next_banks  = new int[4];
+    elaborated_next_fgrs   = new int[4];
+    elaborated_next_states = new int[4];
 
     for (int i = 0; i < 4; i++)
-        elaborated_states[i] = ELABORATED_STATE_INVALID;
+    {
+        elaborated_fgrs[i]      = -1;
+        elaborated_next_fgrs[i] = -1;
+
+        elaborated_states[i]      = ELABORATED_STATE_INVALID;
+        elaborated_next_states[i] = ELABORATED_STATE_INVALID;
+
+        elaborated_next_banks[i] = ELABORATED_BANK_NEXT_NOP;
+    }
 }
 
 void elaborated_delete()
@@ -84,75 +101,126 @@ void elaborated_delete()
     delete[] elaborated_banks;
     delete[] elaborated_fgrs;
     delete[] elaborated_states;
+
+    delete[] elaborated_next_banks;
+    delete[] elaborated_next_fgrs;
+    delete[] elaborated_next_states;
 }
 
-void elaborated_push(int fgr, int value)
+int elaborated_push(int fgr, int value)
 {
     for (int i = 0; i < 4; i++)
     {
         if (elaborated_states[i] == ELABORATED_STATE_INVALID)
         {
-            elaborated_fgrs[i] = fgr;
-            elaborated_banks[i].push_front(value);
+            elaborated_next_fgrs[i]  = fgr;
+            elaborated_next_banks[i] = value;
 
-            break;
+            elaborated_next_states[i] = ELABORATED_STATE_VALID;
+
+            return 1;
         }
         else if (elaborated_states[i] == ELABORATED_STATE_VALID)
         {
             if ((elaborated_fgrs[i] == fgr)
                 && (elaborated_banks[i].size() < 4))
             {
-                elaborated_banks[i].push_front(value);
+                elaborated_next_banks[i] = value;
 
-                break;
+                return 1;
             }
         }
     }
+
+    return 0;
 }
 
-void elaborated_abandon(int fgr)
+int elaborated_abandon(int fgr)
 {
+    int r = 0;
+    
     for (int i = 0; i < 4; i++)
     {
         if ((elaborated_states[i] == ELABORATED_STATE_VALID)
             && (elaborated_fgrs[i] == fgr))
         {
-            elaborated_states[i] = ELABORATED_STATE_ABANDONED;
+            elaborated_next_states[i] = ELABORATED_STATE_ABANDONED;
+
+            r++;
         }
     }
+
+    return r;
 }
 
-void elaborated_commit(int fgr)
+int elaborated_commit(int fgr)
 {
+    int r = 0;
+
     for (int i = 0; i < 4; i++)
     {
         if ((elaborated_states[i] == ELABORATED_STATE_VALID)
             && (elaborated_fgrs[i] == fgr))
         {
-            elaborated_banks[i].clear();
-            elaborated_states[i] = ELABORATED_STATE_INVALID;
+            elaborated_next_banks[i]  = ELABORATED_BANK_NEXT_CLEAR;
+            elaborated_next_states[i] = ELABORATED_STATE_INVALID;
+
+            r++;
         }
     }
+
+    return r;
 }
 
-int elaborated_pop(int& fgr)
+int elaborated_pop(int& prf)
 {
     for (int i = 0; i < 4; i++)
     {
         if (elaborated_states[i] == ELABORATED_STATE_ABANDONED)
         {
-            fgr = elaborated_banks[i].back();
-
-            elaborated_banks[i].pop_back();
-
             if (elaborated_banks[i].empty())
-                elaborated_states[i] = ELABORATED_STATE_INVALID;
+                continue;
+
+            prf = elaborated_banks[i].back();
+
+            elaborated_next_banks[i] = ELABORATED_BANK_NEXT_POP;
 
             return 1;
         }
     }
 
     return 0;
+}
+
+void elaboration_eval()
+{
+    //
+    for (int i = 0; i < 4; i++)
+        if (elaborated_states[i] == ELABORATED_STATE_ABANDONED)
+            if (elaborated_banks[i].empty())
+                elaborated_next_states[i] = ELABORATED_STATE_INVALID;
+
+    //
+    for (int i = 0; i < 4; i++)
+    {
+        elaborated_fgrs[i]   = elaborated_next_fgrs[i];
+        elaborated_states[i] = elaborated_next_states[i];
+
+        if (elaborated_next_banks[i] >= 0)
+            elaborated_banks[i].push_front(elaborated_next_banks[i]);
+        else if (elaborated_next_banks[i] == ELABORATED_BANK_NEXT_POP)
+            elaborated_banks[i].pop_back();
+        else if (elaborated_next_banks[i] == ELABORATED_BANK_NEXT_CLEAR)
+            elaborated_banks[i].clear();
+    }
+
+    //
+    for (int i = 0; i < 4; i++)
+    {
+        elaborated_next_fgrs[i]   = elaborated_fgrs[i];
+        elaborated_next_states[i] = elaborated_states[i];
+        elaborated_next_banks[i]  = ELABORATED_BANK_NEXT_NOP;
+    }
 }
 
 //
@@ -798,26 +866,228 @@ int testbench_5(int& t)
     printf("[#5] Elaborated variables initialized.\n");
 
     //
-    int c = 2048;
+    int c = 65535;
 
     printf("[#5] \033[1;30mDifferential payload count: %d\033[0m\n", c);
 
     srand(time(0));
 
-    int delay_push      = rand() % 4;
-    int delay_pop       = rand() % 4;
-    int delay_abandon   = rand() % 16;
-    int delay_commit    = rand() % 16;
+#ifdef DIFF_DEBUG
+    vector<int> diff_elaborated_history;
+    vector<int> diff_dut_history;
+
+    vector<int> diff_trace_fgr;
+
+    vector<int> diff_trace_push;
+    vector<int> diff_trace_pop;
+    vector<int> diff_trace_abandon;
+    vector<int> diff_trace_commit;
+#endif
+
+    int delay_push      = 0;
+    int delay_pop       = 0;
+    int delay_abandon   = 0;
+    int delay_commit    = 0;
+
+    int cnt_push    = 0;
+    int cnt_pop     = 0;
+    int cnt_abandon = 0;
+    int cnt_commit  = 0;
 
     // payload
     for (int i = 0; i < c; i++)
     {
-`       // TOOD
+        int fgr     = rand() % 8;
+        int value   = rand() % 64;
+
+        //
+        if (!delay_abandon)
+        {
+            //
+            elaborated_abandon(fgr);
+
+            //
+            dut_ptr->i_abandon_valid = 1;
+            dut_ptr->i_abandon_fgr   = fgr;
+
+            // 
+            cnt_abandon++;
+            delay_abandon = rand() % 32;
+        }
+        else
+            delay_abandon--;
+
+        // Avoid abandon-commit FGR violation, not elaborated (UNDEFINED)
+        fgr = (fgr + 1) % 8;
+
+        //
+        if (!delay_commit)
+        {
+            //
+            elaborated_commit(fgr);
+
+            //
+            dut_ptr->i_commit_valid = 1;
+            dut_ptr->i_commit_fgr   = fgr;
+
+            //
+            cnt_commit++;
+            delay_commit = rand() % 64;
+        }
+        else
+            delay_commit--;
+
+        //
+        if (!delay_pop)
+        {
+            int diff_elaborated_val;
+            int diff_dut_val;
+
+            //
+            if (!elaborated_pop(diff_elaborated_val))
+                diff_elaborated_val = -1;
+
+            //
+            dut_ptr->i_abandoned_ready = 1;
+
+            if (!dut_ptr->o_abandoned_valid)
+                diff_dut_val = -1;
+            else
+                diff_dut_val = dut_ptr->o_abandoned_prf;
+
+            // 
+#ifdef DIFF_DEBUG
+            diff_elaborated_history.push_back(diff_elaborated_val);
+
+            diff_dut_history.push_back(diff_dut_val);
+#endif
+
+            // diff verify
+            if (diff_dut_val != diff_elaborated_val)
+            {
+                printf("[#5] Difference detected at clock edge %d.\n", t);
+
+#ifdef DIFF_DEBUG
+                for (int j = 0; j < 4; j++)
+                    diff_trace_fgr.push_back(elaborated_fgrs[j]);
+
+                diff_trace_push.push_back(cnt_push);
+                diff_trace_pop.push_back(cnt_pop);
+                diff_trace_abandon.push_back(cnt_abandon);
+                diff_trace_commit.push_back(cnt_commit);
+#endif
+
+                error++;
+            }
+
+            //
+            cnt_pop++;
+            delay_pop = rand() % 8;
+        }
+        else
+            delay_pop--;
+
+        //
+        fgr = (fgr + 1) % 8;
+
+        //
+        if (!delay_push)
+        {
+            //
+            elaborated_push(fgr, value);
+
+            //
+            dut_ptr->i_acquired_valid = 1;
+            dut_ptr->i_acquired_fgr   = fgr;
+            dut_ptr->i_acquired_prf   = value;
+
+            //
+            cnt_push++;
+            delay_push = rand() % 4;
+        }
+        else
+            delay_push--;
+
+        //
+        elaboration_eval();
+
+        //
+        clkn_dumpgen(t);
+        clkp_dumpgen(t);
+
+        //
+        dut_ptr->i_acquired_valid = 0;
+        dut_ptr->i_acquired_fgr   = 0;
+        dut_ptr->i_acquired_prf   = 0;
+
+        dut_ptr->i_abandoned_ready = 0;
+
+        dut_ptr->i_commit_valid = 0;
+        dut_ptr->i_commit_fgr   = 0;
+
+        dut_ptr->i_abandon_valid = 0;
+        dut_ptr->i_abandon_fgr   = 0;
     }
 
     //
     elaborated_delete();
     printf("[#5] Elaborated variables finalized.\n");
+
+#ifdef DIFF_DEBUG
+    if (error)
+    {
+        printf("[#5] Differential test failed.\n");
+
+        printf("[#5] Differential comparsion history: \n");
+
+        int j = 0;
+
+        for (int i = 0; i < diff_dut_history.size(); i++, j++)
+        {
+            if (diff_elaborated_history[i] != diff_dut_history[i])
+                printf("\033[1;31m");
+
+            printf("[%3d, %3d]", diff_elaborated_history[i], diff_dut_history[i]);
+
+            printf("\033[0m");
+
+            if (j == 8)
+            {
+                printf("\n");
+                j = -1;
+            }
+        }
+
+        printf("\n");
+
+        printf("[#5] Trace: \n");
+
+        for (int i = 0; i < diff_trace_push.size(); i++)
+        {
+            printf("[#5] ");
+
+            printf("FGR: [%3d, %3d, %3d, %3d], ",
+                    diff_trace_fgr[i * 4],
+                    diff_trace_fgr[i * 4 + 1],
+                    diff_trace_fgr[i * 4 + 2],
+                    diff_trace_fgr[i * 4 + 3]);
+
+            printf("push: %5d, pop: %5d, abandon: %5d, commit: %5d.\n",
+                diff_trace_push[i],
+                diff_trace_pop[i],
+                diff_trace_abandon[i],
+                diff_trace_commit[i]);
+        }
+
+        printf("\n");
+    }
+#else
+    if (error)
+    {
+        printf("[#5] - Differential test failed.\n");
+        printf("[#5] - Use definition symbol \'DIFF_DEBUG\' for further information.\n");
+    }
+#endif
 
     //
     if (error)
