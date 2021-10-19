@@ -145,19 +145,54 @@ module issue_rat_freelist_fifo (
     assign s_abandon_idle       = ~i_abandoned_valid & ~abandoned_buffer_valid_q;
 
     //
-    wire [1:0]  redeem_pick;
+    wire [1:0]  redeem_prepick;
 
-    assign redeem_pick[0] = i_redeemed_valid & ~i_redeemed_prf[0]; // one-hot or none
-    assign redeem_pick[1] = i_redeemed_valid &  i_redeemed_prf[0];
+    wire [1:0]  abandon_direct_prepick;
+    wire [1:0]  abandon_buffer_prepick;
+
+    assign redeem_prepick[0] = i_redeemed_valid & ~i_redeemed_prf[0]; // one-hot or none
+    assign redeem_prepick[1] = i_redeemed_valid &  i_redeemed_prf[0];
+
+    assign abandon_direct_prepick[0] = i_abandoned_valid & ~i_abandoned_prf[0];
+    assign abandon_direct_prepick[1] = i_abandoned_valid &  i_abandoned_prf[0];
+
+    assign abandon_buffer_prepick[0] = abandoned_buffer_valid_q & ~abandoned_buffer_q[0];
+    assign abandon_buffer_prepick[1] = abandoned_buffer_valid_q &  abandoned_buffer_q[0];
+
+    //
+    wire    r_redeem_prepick_p0;
+    wire    r_redeem_prepick_p1;
+    wire    r_redeem_prepick_none;
+
+    wire    r_abandon_direct_prepick_p0;
+    wire    r_abandon_direct_prepick_p1;
+    wire    r_abandon_direct_prepick_none;
+
+    wire    r_abandon_buffer_prepick_p0;
+    wire    r_abandon_buffer_prepick_p1;
+    wire    r_abandon_buffer_prepick_none;
+
+    assign r_redeem_prepick_p0      =    redeem_prepick[0] /*&   ~redeem_prepick[1]*/;
+    assign r_redeem_prepick_p1      = /*~redeem_prepick[0]   &*/  redeem_prepick[1];
+    assign r_redeem_prepick_none    =   ~redeem_prepick[0]   &   ~redeem_prepick[1];
+
+    assign r_abandon_direct_prepick_p0   =    abandon_direct_prepick[0] /*&  ~abandon_direct_prepick[1]*/;
+    assign r_abandon_direct_prepick_p1   = /*~abandon_direct_prepick[0]   &*/ abandon_direct_prepick[1];
+    assign r_abandon_direct_prepick_none =   ~abandon_direct_prepick[0]   &  ~abandon_direct_prepick[1];
+
+    assign r_abandon_buffer_prepick_p0   =    abandon_buffer_prepick[0] /*&  ~abandon_buffer_prepick[1]*/;
+    assign r_abandon_buffer_prepick_p1   = /*~abandon_buffer_prepick[0]   &*/ abandon_buffer_prepick[1];
+    assign r_abandon_buffer_prepick_none =   ~abandon_buffer_prepick[0]   &  ~abandon_buffer_prepick[1];
 
     //
     wire    r_redeem_p0;
     wire    r_redeem_p1;
-    wire    r_redeem_none;
 
-    assign r_redeem_p0      =    redeem_pick[0] /*& ~redeem_pick[1]*/;
-    assign r_redeem_p1      = /*~redeem_pick[0] &*/  redeem_pick[1];
-    assign r_redeem_none    =   ~redeem_pick[0] &   ~redeem_pick[1];
+    assign r_redeem_p0   = (r_redeem_p0 & ~bank_0_full) 
+                         | (r_redeem_p1 &  bank_1_full);
+    
+    assign r_redeem_p1   = (r_redeem_p0 &  bank_0_full)
+                         | (r_redeem_p1 & ~bank_1_full);
 
     //
     wire [5:0]  w_abandoned_prf;
@@ -170,37 +205,7 @@ module issue_rat_freelist_fifo (
     assign w_prf_p0 = r_redeem_p0 ? i_redeemed_prf : w_abandoned_prf;
     assign w_prf_p1 = r_redeem_p1 ? i_redeemed_prf : w_abandoned_prf;
 
-    //
-    wire    r_en_direct_p0;
-    wire    r_en_direct_p1;
-
-    wire    r_en_buffer_p0;
-    wire    r_en_buffer_p1;
-
-    wire    r_en_direct;
-    wire    r_en_buffer;
-
-    wire    r_en_redeem;
-
     // TODO
-
-    //
-    wire [5:0]  w_en_p0;
-    wire [5:0]  w_en_p1;
-
-    assign w_en_p0 = (r_redeem_p0 
-                   | (s_abandon_direct    & ~i_abandoned_prf[0])
-                   | (s_abandon_buffer    & ~abandoned_buffer_q[0])
-                   | (s_abandon_congested & (r_redeem_none ? ~i_abandoned_prf[0] : 1'b1))
-                /* | (s_abandon_idle      & 1'b0) */ ) 
-                   & ~bank_0_full;
-
-    assign w_en_p1 = (r_redeem_p1
-                   | (s_abandon_direct    &  i_abandoned_prf[0])
-                   | (s_abandon_buffer    &  abandoned_buffer_q[0])
-                   | (s_abandon_congested & (r_redeem_none ?  i_abandoned_prf[0] : 1'b1))
-                /* | (s_abandon_idle      & 1'b0) */ )
-                   & ~bank_1_full;
 
     //
 
