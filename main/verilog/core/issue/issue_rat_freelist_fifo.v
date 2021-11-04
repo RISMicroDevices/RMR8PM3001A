@@ -123,30 +123,38 @@ module issue_rat_freelist_fifo (
         .clk        (clk),
         .reset      (reset),
 
-        .din        (bank_0_din),
-        .wen        (bank_0_wen),
+        .din        (bank_1_din),
+        .wen        (bank_1_wen),
 
-        .dout       (bank_0_dout),
-        .ren        (bank_0_ren),
+        .dout       (bank_1_dout),
+        .ren        (bank_1_ren),
 
-        .fifo_empty (bank_0_empty),
-        .fifo_full  (bank_0_full)
+        .fifo_empty (bank_1_empty),
+        .fifo_full  (bank_1_full)
     );
 
-    //
-    wire    s_abandon_direct;
-    wire    s_abandon_buffer;
-    wire    s_abandon_congested;
-    wire    s_abandon_idle;
+    // bank read LRU register
+    wire    bank_lru_en;
+    wire    bank_lru_d;
 
-    assign s_abandon_direct     =  i_abandoned_valid & ~abandoned_buffer_valid_q;
-    assign s_abandon_buffer     = ~i_abandoned_valid &  abandoned_buffer_valid_q;
-    assign s_abandon_congested  =  i_abandoned_valid &  abandoned_buffer_valid_q;
-    assign s_abandon_idle       = ~i_abandoned_valid & ~abandoned_buffer_valid_q;
+    wire    bank_lru_q;
+
+    stdmacro_dffe #(
+        .DFF_WIDTH          (1),
+        .DFF_RESET_VALUE    (0)
+    ) stdmacro_dffe_INST_bank_lru (
+        .clk    (clk),
+        .reset  (reset),
+
+        .en     (bank_lru_en),
+        .d      (bank_lru_d),
+
+        .q      (bank_lru_q)
+    );
+
 
     //
     wire [1:0]  redeem_prepick;
-
     wire [1:0]  abandon_direct_prepick;
     wire [1:0]  abandon_buffer_prepick;
 
@@ -160,53 +168,145 @@ module issue_rat_freelist_fifo (
     assign abandon_buffer_prepick[1] = abandoned_buffer_valid_q &  abandoned_buffer_q[0];
 
     //
-    wire    r_redeem_prepick_p0;
-    wire    r_redeem_prepick_p1;
-    wire    r_redeem_prepick_none;
+    wire    congested_abandon;
 
-    wire    r_abandon_direct_prepick_p0;
-    wire    r_abandon_direct_prepick_p1;
-    wire    r_abandon_direct_prepick_none;
+    wire    accepted_L0_redeem              , accepted_L1_redeem;
+    wire    accepted_L0_abandon_buffer      , accepted_L1_abandon_buffer;
+    wire    accepted_L0_abandon_direct      , accepted_L1_abandon_direct;
 
-    wire    r_abandon_buffer_prepick_p0;
-    wire    r_abandon_buffer_prepick_p1;
-    wire    r_abandon_buffer_prepick_none;
+    wire    accepted_L0_p0                  , accepted_L1_p0;
+    wire    accepted_L0_p1                  , accepted_L1_p1;
 
-    assign r_redeem_prepick_p0      =    redeem_prepick[0] /*&   ~redeem_prepick[1]*/;
-    assign r_redeem_prepick_p1      = /*~redeem_prepick[0]   &*/  redeem_prepick[1];
-    assign r_redeem_prepick_none    =   ~redeem_prepick[0]   &   ~redeem_prepick[1];
+    wire    accepted_L0_p0_redeem           , accepted_L1_p0_redeem;
+    wire    accepted_L0_p0_abandon_direct   , accepted_L1_p0_abandon_direct;
+    wire    accepted_L0_p0_abandon_buffer   , accepted_L1_p0_abandon_buffer;
+    wire    accepted_L0_p1_redeem           , accepted_L1_p1_redeem;
+    wire    accepted_L0_p1_abandon_direct   , accepted_L1_p1_abandon_direct;
+    wire    accepted_L0_p1_abandon_buffer   , accepted_L1_p1_abandon_buffer;
 
-    assign r_abandon_direct_prepick_p0   =    abandon_direct_prepick[0] /*&  ~abandon_direct_prepick[1]*/;
-    assign r_abandon_direct_prepick_p1   = /*~abandon_direct_prepick[0]   &*/ abandon_direct_prepick[1];
-    assign r_abandon_direct_prepick_none =   ~abandon_direct_prepick[0]   &  ~abandon_direct_prepick[1];
+    wire [5:0]  accepted_prf_L0_p0          , accepted_prf_L1_p0;
+    wire [5:0]  accepted_prf_L0_p1          , accepted_prf_L1_p1;
 
-    assign r_abandon_buffer_prepick_p0   =    abandon_buffer_prepick[0] /*&  ~abandon_buffer_prepick[1]*/;
-    assign r_abandon_buffer_prepick_p1   = /*~abandon_buffer_prepick[0]   &*/ abandon_buffer_prepick[1];
-    assign r_abandon_buffer_prepick_none =   ~abandon_buffer_prepick[0]   &  ~abandon_buffer_prepick[1];
+    wire [9:0]  picked_redeem;
+    wire [9:0]  picked_abandon_direct;
+    wire [9:0]  picked_abandon_buffer;
+    wire [9:0]  picked_none;
+
+    assign congested_abandon  = (~accepted_L0_abandon_direct & i_abandoned_valid)
+                              & (~accepted_L0_abandon_buffer & abandoned_buffer_valid_q);
+
+    //                               WEN , redeem, direct, buffer, PRF
+    assign picked_redeem         = { 1'b1, 1'b1  , 1'b0  , 1'b0  , i_redeemed_prf     };
+    assign picked_abandon_direct = { 1'b1, 1'b0  , 1'b1  , 1'b0  , i_abandoned_prf    };
+    assign picked_abandon_buffer = { 1'b1, 1'b0  , 1'b0  , 1'b1  , abandoned_buffer_q };
+    assign picked_none           = { 1'b0, 1'b0  , 1'b0  , 1'b0  , 6'b0               };
+
+    // L0 FIFO MUXs
+    assign { accepted_L0_p0, accepted_L0_p0_redeem, accepted_L0_p0_abandon_direct, accepted_L0_p0_abandon_buffer, accepted_prf_L0_p0 }
+        //
+        = bank_0_full ?                 picked_none
+        : bank_1_full ? (  // Forced write MUX enabled when another FIFO was full
+            i_redeemed_valid         ?  picked_redeem
+          : i_abandoned_valid        ?  picked_abandon_direct
+          : abandoned_buffer_valid_q ?  picked_abandon_buffer
+          :                             picked_none
+        )
+        : redeem_prepick[0]         ?   picked_redeem
+        : abandon_direct_prepick[0] ?   picked_abandon_direct
+        : abandon_buffer_prepick[0] ?   picked_abandon_buffer
+        :                               picked_none;
+
+    assign { accepted_L0_p1, accepted_L0_p1_redeem, accepted_L0_p1_abandon_direct, accepted_L0_p1_abandon_buffer, accepted_prf_L0_p1 }
+        //
+        = bank_1_full ?                 picked_none
+        : bank_0_full ? (
+            i_redeemed_valid         ?  picked_redeem
+          : i_abandoned_valid        ?  picked_abandon_direct
+          : abandoned_buffer_valid_q ?  picked_abandon_buffer
+          :                             picked_none
+        )
+        : redeem_prepick[1]         ?   picked_redeem
+        : abandon_direct_prepick[1] ?   picked_abandon_direct
+        : abandon_buffer_prepick[1] ?   picked_abandon_buffer
+        :                               picked_none;
+
+    // L1 FIFO MUXs for Congestion Redirection (abandon direct first)
+    assign { accepted_L1_p0, accepted_L1_p0_redeem, accepted_L1_p0_abandon_direct, accepted_L1_p0_abandon_buffer, accepted_prf_L1_p0 }
+        //
+        = (~accepted_L0_p0 & ~bank_0_full & congested_abandon) ? picked_abandon_direct
+        : { accepted_L0_p0, accepted_L0_p0_redeem, accepted_L0_p0_abandon_direct, accepted_L0_p0_abandon_buffer, accepted_prf_L0_p0 };
+
+    assign { accepted_L1_p1, accepted_L1_p1_redeem, accepted_L1_p1_abandon_direct, accepted_L1_p1_abandon_buffer, accepted_prf_L1_p1 }
+        //
+        = (~accepted_L0_p1 & ~bank_1_full & congested_abandon) ? picked_abandon_direct
+        : { accepted_L0_p1, accepted_L0_p1_redeem, accepted_L0_p1_abandon_direct, accepted_L0_p1_abandon_buffer, accepted_prf_L0_p1 };
 
     //
-    wire    r_redeem_p0;
-    wire    r_redeem_p1;
+    assign accepted_L0_redeem         = accepted_L0_p0_redeem         | accepted_L0_p1_redeem;
+    assign accepted_L0_abandon_direct = accepted_L0_p0_abandon_direct | accepted_L0_p1_abandon_direct;
+    assign accepted_L0_abandon_buffer = accepted_L0_p0_abandon_buffer | accepted_L0_p1_abandon_buffer;
 
-    assign r_redeem_p0   = (r_redeem_p0 & ~bank_0_full) 
-                         | (r_redeem_p1 &  bank_1_full);
-    
-    assign r_redeem_p1   = (r_redeem_p0 &  bank_0_full)
-                         | (r_redeem_p1 & ~bank_1_full);
+    assign accepted_L1_redeem         = accepted_L1_p0_redeem         | accepted_L1_p1_redeem;
+    assign accepted_L1_abandon_direct = accepted_L1_p0_abandon_direct | accepted_L1_p1_abandon_direct;
+    assign accepted_L1_abandon_buffer = accepted_L1_p0_abandon_buffer | accepted_L1_p1_abandon_buffer;
 
-    //
-    wire [5:0]  w_abandoned_prf;
+    // Input control
+    assign o_redeemed_ready     = accepted_L1_redeem;
+    assign o_abandoned_ready    = accepted_L1_abandon_direct;
 
-    wire [5:0]  w_prf_p0;
-    wire [5:0]  w_prf_p1;
+    // FIFO write control
+    assign bank_0_din = accepted_prf_L1_p0;
+    assign bank_0_wen = accepted_L1_p0_redeem;
 
-    assign w_abandoned_prf = i_abandoned_valid ? i_abandoned_prf : abandoned_buffer_q;
+    assign bank_1_din = accepted_prf_L1_p1;
+    assign bank_1_wen = accepted_L1_p1_redeem;
 
-    assign w_prf_p0 = r_redeem_p0 ? i_redeemed_prf : w_abandoned_prf;
-    assign w_prf_p1 = r_redeem_p1 ? i_redeemed_prf : w_abandoned_prf;
+    // abandon buffer/direct control
+    wire    abandoned_buffer_writable;
 
-    // TODO
+    assign abandoned_buffer_writable = ~abandoned_buffer_valid_q | accepted_L1_abandon_buffer;
 
+    assign abandoned_buffer_d   = i_abandoned_prf;
+    assign abandoned_buffer_en  = ~accepted_L1_abandon_direct & abandoned_buffer_writable;
+
+    assign abandoned_buffer_valid_d     = abandoned_buffer_en;
+    assign abandoned_buffer_valid_en    = abandoned_buffer_en | accepted_L1_abandon_buffer;
+
+    // FIFO read MUX
+    wire        acquire_L0_valid     ,      acquire_L1_valid;
+    wire        acquire_L0_p0_picked ,      acquire_L1_p0_picked;
+    wire        acquire_L0_p1_picked ,      acquire_L1_p1_picked;
+
+    wire [5:0]  acquire_prf_L0       ,      acquire_prf_L1;
+
+    wire [8:0]  acquire_picked_p0;
+    wire [8:0]  acquire_picked_p1;
+
+    assign acquire_picked_p0    = { 1'b1, 1'b0, ~bank_0_empty, bank_0_dout };
+    assign acquire_picked_p1    = { 1'b0, 1'b1, ~bank_1_empty, bank_1_dout };
+
+    assign { acquire_L0_p0_picked, acquire_L0_p1_picked, acquire_L0_valid, acquire_prf_L0 }
+        //
+        = ~bank_lru_q ? acquire_picked_p0
+        :               acquire_picked_p1;
+
+    assign { acquire_L1_p0_picked, acquire_L1_p1_picked, acquire_L1_valid, acquire_prf_L1 }
+        //
+        = ~i_acquire_ready  ? { 1'b0, 1'b0, 1'b0, 6'b0 }
+        :  acquire_L0_valid ? { acquire_L0_p0_picked, acquire_L0_p1_picked, acquire_L0_valid, acquire_prf_L0 }
+        : ~bank_0_empty     ? acquire_picked_p0
+        : ~bank_1_empty     ? acquire_picked_p1
+        :                     { 1'b0, 1'b0, 1'b0, 6'b0 };
+
+    // FIFO read control
+    assign bank_lru_en  = acquire_L1_p0_picked | acquire_L1_p1_picked;
+    assign bank_lru_d   = acquire_L1_p0_picked;
+
+    assign o_acquire_prf    = acquire_prf_L1;
+    assign o_acquire_valid  = acquire_L1_valid;
+
+    assign bank_0_ren   = acquire_L1_p0_picked;
+    assign bank_1_ren   = acquire_L1_p1_picked;
     //
 
 endmodule
