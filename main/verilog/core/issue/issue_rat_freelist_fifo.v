@@ -281,9 +281,11 @@ module issue_rat_freelist_fifo (
 
     wire [8:0]  acquire_picked_p0;
     wire [8:0]  acquire_picked_p1;
+    wire [8:0]  acquire_picked_none;
 
     assign acquire_picked_p0    = { 1'b1, 1'b0, ~bank_0_empty, bank_0_dout };
     assign acquire_picked_p1    = { 1'b0, 1'b1, ~bank_1_empty, bank_1_dout };
+    assign acquire_picked_none  = { 1'b0, 1'b0,  1'b0        , 6'b0        };
 
     assign { acquire_L0_p0_picked, acquire_L0_p1_picked, acquire_L0_valid, acquire_prf_L0 }
         //
@@ -292,21 +294,20 @@ module issue_rat_freelist_fifo (
 
     assign { acquire_L1_p0_picked, acquire_L1_p1_picked, acquire_L1_valid, acquire_prf_L1 }
         //
-        = ~i_acquire_ready  ? { 1'b0, 1'b0, 1'b0, 6'b0 }
-        :  acquire_L0_valid ? { acquire_L0_p0_picked, acquire_L0_p1_picked, acquire_L0_valid, acquire_prf_L0 }
+        =  acquire_L0_valid ? { acquire_L0_p0_picked, acquire_L0_p1_picked, acquire_L0_valid, acquire_prf_L0 }
         : ~bank_0_empty     ? acquire_picked_p0
         : ~bank_1_empty     ? acquire_picked_p1
-        :                     { 1'b0, 1'b0, 1'b0, 6'b0 };
+        :                     acquire_picked_none;
 
     // FIFO read control
-    assign bank_lru_en  = acquire_L1_p0_picked | acquire_L1_p1_picked;
-    assign bank_lru_d   = acquire_L1_p0_picked;
+    assign bank_lru_en  = i_acquire_ready & (acquire_L1_p0_picked | acquire_L1_p1_picked);
+    assign bank_lru_d   = i_acquire_ready & (acquire_L1_p0_picked);
+
+    assign bank_0_ren   = i_acquire_ready & acquire_L1_p0_picked;
+    assign bank_1_ren   = i_acquire_ready & acquire_L1_p1_picked;
 
     assign o_acquire_prf    = acquire_prf_L1;
     assign o_acquire_valid  = acquire_L1_valid;
-
-    assign bank_0_ren   = acquire_L1_p0_picked;
-    assign bank_1_ren   = acquire_L1_p1_picked;
     //
 
 endmodule
