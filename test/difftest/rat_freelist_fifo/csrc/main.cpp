@@ -281,12 +281,95 @@ int testbench_3(int& t)
     int error = 0;
 
     // Testbench #3
-    // Random push (redeem & abandon) and pop-off test.
+    // Saturated abandon and pop-off test.
     printf("[#3] Testbench #3\n");
     printf("[#3] \033[1;33mStarting at clock edge %d (ps)\033[0m\n", t);
-    printf("[#3] Random push (redeem & abandon) and pop-off test.\n");
+    printf("[#3] Saturated abandon and pop-off test.\n");
 
-    // TODO
+    //
+    for (int i = 0; i < 64; i++)
+    {
+        dut_ptr->i_abandoned_prf    = i;
+        dut_ptr->i_abandoned_valid  = 1;
+
+        clkn_dumpgen(t);
+
+        if (!dut_ptr->o_abandoned_ready)
+        {
+            printf("[#3] Wrong state detected. Instant response not asserted.\n");
+            error++;
+        }
+
+        clkp_dumpgen(t);
+    }
+
+    if (dut_ptr->o_abandoned_ready)
+    {
+        printf("[#3] Wrong state detected. Imcomplete FIFO write.\n");
+        error++;
+    }
+
+    //
+    dut_ptr->i_abandoned_prf     = 0;
+    dut_ptr->i_abandoned_valid   = 0;
+
+    clkn_dumpgen(t);
+    clkp_dumpgen(t);
+
+    //
+    bool prf_slot[64] = { 0 };
+    int  prf_parity   = dut_ptr->o_acquire_prf & 0x01;
+
+    prf_slot[dut_ptr->o_acquire_prf] = true;
+
+    dut_ptr->i_acquire_ready = 1;
+
+    clkn_dumpgen(t);
+    clkp_dumpgen(t);
+
+    for (int i = 1; i < 64; i++)
+    {
+        //
+        if (!dut_ptr->o_acquire_valid)
+        {
+            printf("[#3] Wrong state detected. FIFO underflow at slot %d.\n", i);
+            error++;
+            break;
+        }
+
+        prf_parity = !prf_parity;
+
+        if ((dut_ptr->o_acquire_prf & 0x01) != prf_parity)
+            printf("[#3] \033[1;30mPRF parity sequence not satisfied at slot %d. LRU not working maybe.\033[0m\n", i);
+
+        prf_slot[dut_ptr->o_acquire_prf] = true;
+
+        //
+        dut_ptr->i_acquire_ready = 1;
+
+        clkn_dumpgen(t);
+        clkp_dumpgen(t);
+    }
+
+    //
+    if (dut_ptr->o_acquire_valid)
+    {
+        printf("[#3] Wrong state detected. FIFO overflow.\n");
+        error++;
+    }
+
+    for (int i = 0; i < 64; i++)
+        if (!prf_slot[i])
+        {
+            printf("[#3] PRF slot %d NOT covered.\n", i);
+            error++;
+        }
+
+    //
+    dut_ptr->i_acquire_ready = 0;
+
+    clkn_dumpgen(t);
+    clkp_dumpgen(t);
 
     //
     if (error)
@@ -297,8 +380,291 @@ int testbench_3(int& t)
     return error;
 }
 
+int testbench_4(int& t)
+{
+    int error = 0;
+
+    // Testbench #3
+    // Random push (redeem & abandon) and pop-off test.
+    printf("[#4] Testbench #3\n");
+    printf("[#4] \033[1;33mStarting at clock edge %d (ps)\033[0m\n", t);
+    printf("[#4] Random pop and push (redeem & abandon) test.\n");
+
+    //
+    int c = 65535;
+
+    printf("[#4] \033[1;30mDifferential payload count: %d\033[0m\n", c);
+
+    //
+    int prf_parity = -1;
+
+    int prf_total = 0;
+    int prf_parity_hit = 0;
+
+    int pop_count = 0;
+    int pop_interval = 0;
+
+    int redeem_count = 0;
+    int redeem_interval = 0;
+
+    int abandon_count = 0;
+    int abandon_interval = 0;
+
+    list<int> redeem_list;
+    list<int> abandon_list;
+
+    for (int i = 0; i < c; i++)
+    {
+        int redeem_sel = -1;
+        if (redeem_interval == 0)
+            if (redeem_count == 0)
+            {
+                redeem_count    = rand() % 4;
+                redeem_interval = rand() % 4;
+
+                dut_ptr->i_redeemed_prf     = 0;
+                dut_ptr->i_redeemed_valid   = 0;
+            }
+            else
+            {
+                if (redeem_list.empty())
+                {
+                    dut_ptr->i_redeemed_prf     = 0;
+                    dut_ptr->i_redeemed_valid   = 0;
+                }
+                else
+                {
+                    dut_ptr->i_redeemed_prf     = (redeem_sel = rand() % 2) ? redeem_list.front() : redeem_list.back();
+                    dut_ptr->i_redeemed_valid   = 1;
+                }
+            }
+        else
+            redeem_interval--;
+
+        int abandon_sel = -1;
+        if (abandon_interval == 0)
+            if (abandon_count == 0)
+            {
+                abandon_count       = rand() % 7;
+                abandon_interval    = rand() % 7;
+
+                dut_ptr->i_abandoned_prf    = 0;
+                dut_ptr->i_abandoned_valid  = 0;
+            }
+            else
+            {
+                if (abandon_list.empty())
+                {
+                    dut_ptr->i_abandoned_prf    = 0;
+                    dut_ptr->i_abandoned_valid  = 0;
+                }
+                else
+                {
+                    dut_ptr->i_abandoned_prf    = (abandon_sel = rand() % 2) ? abandon_list.front() : abandon_list.back();
+                    dut_ptr->i_abandoned_valid  = 1;
+                }
+            }
+        else
+            abandon_interval--;
+
+        int pop_sel = -1;
+        if (pop_interval == 0)
+            if (pop_count == 0)
+            {
+                pop_count       = rand() % 5;
+                pop_interval    = rand() % 5;
+
+                dut_ptr->i_acquire_ready = 0;
+            }
+            else
+            {
+                dut_ptr->i_acquire_ready = 1;
+                pop_sel = 0;
+            }
+        else
+            pop_interval--;
+
+        clkn_dumpgen(t);
+
+        if (redeem_sel >= 0)
+        {
+            if (dut_ptr->o_redeemed_ready)
+            {
+                if (redeem_sel)
+                    redeem_list.pop_front();
+                else
+                    redeem_list.pop_back();
+
+                redeem_count--;
+            }
+        }
+
+        if (abandon_sel >= 0)
+        {
+            if (dut_ptr->o_abandoned_ready)
+            {
+                if (abandon_sel)
+                    abandon_list.pop_front();
+                else
+                    abandon_list.pop_back();
+
+                abandon_count--;
+            }
+        }
+
+        if (pop_sel >= 0)
+        {
+            if (dut_ptr->o_acquire_valid)
+            {
+                if (prf_parity < 0)
+                    prf_parity = dut_ptr->o_acquire_prf & 0x01;
+                else
+                    prf_parity = !prf_parity;
+
+                if (rand() % 2)
+                    redeem_list.push_back(dut_ptr->o_acquire_prf);
+                else
+                    abandon_list.push_back(dut_ptr->o_acquire_prf);
+
+                if ((dut_ptr->o_acquire_prf & 0x01) == prf_parity)
+                    prf_parity_hit++;
+
+                prf_total++;
+
+                pop_count--;
+            }
+        }
+
+        clkp_dumpgen(t);
+    }
+
+    //
+    dut_ptr->i_redeemed_prf     = 0;
+    dut_ptr->i_redeemed_valid   = 0;
+
+    dut_ptr->i_abandoned_prf    = 0;
+    dut_ptr->i_abandoned_valid  = 0;
+
+    dut_ptr->i_acquire_ready    = 0;
+
+    clkn_dumpgen(t);
+    clkp_dumpgen(t);
+
+    //
+    printf("[#4] PRF LRU parity hit rate: %d%%\n", (int)(((float)prf_parity_hit / prf_total) * 100));
+
+    printf("[#4] \033[1;30mRemaining PRFs in redeem queue: %d\033[0m\n", (int)redeem_list.size());
+    printf("[#4] \033[1;30mRemaining PRFs in abandon queue: %d\033[0m\n", (int)abandon_list.size());
+
+    //
+    while(!redeem_list.empty())
+    {
+        dut_ptr->i_redeemed_prf     = redeem_list.back();
+        dut_ptr->i_redeemed_valid   = 1;
+
+        clkn_dumpgen(t);
+
+        if (dut_ptr->o_redeemed_ready)
+            redeem_list.pop_back();
+
+        clkp_dumpgen(t);
+    }
+
+    dut_ptr->i_redeemed_prf     = 0;
+    dut_ptr->i_redeemed_valid   = 0;
+
+    clkn_dumpgen(t);
+    clkp_dumpgen(t);
+
+    while(!abandon_list.empty())
+    {
+        dut_ptr->i_abandoned_prf    = abandon_list.back();
+        dut_ptr->i_abandoned_valid  = 1;
+
+        clkn_dumpgen(t);
+
+        if (dut_ptr->o_abandoned_ready)
+            abandon_list.pop_back();
+
+        clkp_dumpgen(t);
+    }
+
+    dut_ptr->i_abandoned_prf    = 0;
+    dut_ptr->i_abandoned_valid  = 0;
+
+    clkn_dumpgen(t);
+    clkp_dumpgen(t);
+
+    //
+    printf("[#4] Popping out all PRF entries in FIFO (at clock edge %d) ...\n", t);
+
+    bool prf_slot[64] = { 0 };
+    
+    prf_parity   = dut_ptr->o_acquire_prf & 0x01;
+    prf_slot[dut_ptr->o_acquire_prf] = true;
+
+    dut_ptr->i_acquire_ready = 1;
+
+    clkn_dumpgen(t);
+    clkp_dumpgen(t);
+
+    for (int i = 1; i < 64; i++)
+    {
+        //
+        if (!dut_ptr->o_acquire_valid)
+        {
+            printf("[#4] Wrong state detected. FIFO underflow at slot %d.\n", i);
+            error++;
+            break;
+        }
+
+        prf_parity = !prf_parity;
+
+        if ((dut_ptr->o_acquire_prf & 0x01) != prf_parity)
+            printf("[#4] \033[1;30mPRF parity sequence not satisfied at slot %d.\033[0m\n", i);
+
+        prf_slot[dut_ptr->o_acquire_prf] = true;
+
+        //
+        dut_ptr->i_acquire_ready = 1;
+
+        clkn_dumpgen(t);
+        clkp_dumpgen(t);
+    }
+
+    //
+    if (dut_ptr->o_acquire_valid)
+    {
+        printf("[#4] Wrong state detected. FIFO overflow.\n");
+        error++;
+    }
+
+    for (int i = 0; i < 64; i++)
+        if (!prf_slot[i])
+        {
+            printf("[#4] PRF slot %d NOT covered.\n", i);
+            error++;
+        }
+
+    //
+    dut_ptr->i_acquire_ready = 0;
+
+    clkn_dumpgen(t);
+    clkp_dumpgen(t);
+
+    //
+    if (error)
+        printf("[#4] Testbench #4 \033[1;31mFAILED\033[0m !!!\n");
+    else
+        printf("[#4] Testbench #4 \033[1;32mPASSED\033[0m !!!\n");
+
+    return error;
+}
+
 void test()
 {
+    srand(time(0));
+
     int t = 0;
     int e = 0;
 
@@ -324,11 +690,15 @@ void test()
 
     printf("[--] ----------------------------------------\n");
 
+    e += testbench_3(t);
+
+    printf("[--] ----------------------------------------\n");
+
     reset(t);
 
     printf("[--] ----------------------------------------\n");
 
-    e += testbench_3(t);
+    e += testbench_4(t);
 
     printf("[--] ----------------------------------------\n");
 
