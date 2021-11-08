@@ -250,27 +250,28 @@ module issue_rat_freelist_fifo (
     assign accepted_L1_abandon_direct = accepted_L1_p0_abandon_direct | accepted_L1_p1_abandon_direct;
     assign accepted_L1_abandon_buffer = accepted_L1_p0_abandon_buffer | accepted_L1_p1_abandon_buffer;
 
-    // Input control
-    assign o_redeemed_ready     = accepted_L1_redeem;
-    assign o_abandoned_ready    = accepted_L1_abandon_direct;
 
     // FIFO write control
     assign bank_0_din = accepted_prf_L1_p0;
-    assign bank_0_wen = accepted_L1_p0_redeem;
+    assign bank_0_wen = accepted_L1_p0;
 
     assign bank_1_din = accepted_prf_L1_p1;
-    assign bank_1_wen = accepted_L1_p1_redeem;
+    assign bank_1_wen = accepted_L1_p1;
 
     // abandon buffer/direct control
     wire    abandoned_buffer_writable;
 
-    assign abandoned_buffer_writable = ~abandoned_buffer_valid_q | accepted_L1_abandon_buffer;
+    assign abandoned_buffer_writable = (~abandoned_buffer_valid_q | accepted_L1_abandon_buffer) & ~(bank_0_full & bank_1_full);
 
     assign abandoned_buffer_d   = i_abandoned_prf;
-    assign abandoned_buffer_en  = ~accepted_L1_abandon_direct & abandoned_buffer_writable;
+    assign abandoned_buffer_en  = i_abandoned_valid & ~accepted_L1_abandon_direct & abandoned_buffer_writable;
 
     assign abandoned_buffer_valid_d     = abandoned_buffer_en;
     assign abandoned_buffer_valid_en    = abandoned_buffer_en | accepted_L1_abandon_buffer;
+
+    // Input control
+    assign o_redeemed_ready     = accepted_L1_redeem;
+    assign o_abandoned_ready    = accepted_L1_abandon_direct | abandoned_buffer_en;
 
     // FIFO read MUX
     wire        acquire_L0_valid     ,      acquire_L1_valid;
