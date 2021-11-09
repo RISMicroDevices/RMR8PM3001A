@@ -10,10 +10,10 @@ module sim_rat_freelist (
     output  wire                o_redeemed_ready,
 
     output  wire [5:0]          o_acquire_prf,
-    output  wire                o_acquire_valid,
+    output  wire                o_acquire_ready,
     input   wire [2:0]          i_acquire_fgr,
     input   wire                i_acquire_fgr_speculative,
-    input   wire                i_acquire_ready,
+    input   wire                i_acquire_valid,
 
     input   wire [2:0]          i_commit_fgr,
     input   wire                i_commit_valid,
@@ -32,10 +32,10 @@ module sim_rat_freelist (
         .o_redeemed_ready           (o_redeemed_ready),
 
         .o_acquire_prf              (o_acquire_prf),
-        .o_acquire_valid            (o_acquire_valid),
+        .o_acquire_ready            (o_acquire_ready),
         .i_acquire_fgr              (i_acquire_fgr),
         .i_acquire_fgr_speculative  (i_acquire_fgr_speculative),
-        .i_acquire_ready            (i_acquire_ready),
+        .i_acquire_valid            (i_acquire_valid),
 
         .i_commit_fgr               (i_commit_fgr),
         .i_commit_valid             (i_commit_valid),

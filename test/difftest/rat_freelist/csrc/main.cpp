@@ -67,7 +67,35 @@ int testbench_0(int& t)
     printf("[#0] \033[1;33mStarting at clock edge %d (ps)\033[0m\n", t);
     printf("[#0] Verify on post-reset state.\n");
 
-    // TODO
+    // zero beat
+    dut_ptr->i_redeemed_prf             = 0;
+    dut_ptr->i_redeemed_valid           = 0;
+
+    dut_ptr->i_acquire_fgr              = 0;
+    dut_ptr->i_acquire_fgr_speculative  = 0;
+    dut_ptr->i_acquire_valid            = 0;
+
+    dut_ptr->i_commit_fgr               = 0;
+    dut_ptr->i_commit_valid             = 0;
+
+    dut_ptr->i_abandon_fgr              = 0;
+    dut_ptr->i_abandon_valid            = 0;
+
+    clkn_dumpgen(t);
+
+    if (dut_ptr->o_redeemed_ready)
+    {
+        printf("[#0] Wrong state detected. 'o_redeemed_ready' asserted.\n");
+        error++;
+    }
+
+    if (dut_ptr->o_acquire_ready)
+    {
+        printf("[#0] Wrong state detected. 'o_acquire_ready' asserted.\n");
+        error++;
+    }
+
+    clkp_dumpgen(t);
 
     //
     clkn_dumpgen(t);
@@ -82,9 +110,32 @@ int testbench_0(int& t)
     return error;
 }
 
+int testbench_1(int& t)
+{
+    int error = 0;
+
+    // Testbench #0
+    // Mixed elaborated random differential test.
+    printf("[#1] Testbench #0\n");
+    printf("[#1] \033[1;33mStarting at clock edge %d (ps)\033[0m\n", t);
+    printf("[#1] Mixed elaboration random differential test.\n");
+
+    // TODO
+
+    //
+    if (error)
+        printf("[#1] Testbench #1 \033[1;31mFAILED\033[0m !!!\n");
+    else
+        printf("[#1] Testbench #1 \033[1;32mPASSED\033[0m !!!\n");
+
+    return error;
+}
+
 void test()
 {
-    srand(time(0));
+    unsigned long int seed = time(0);
+
+    srand(seed);
 
     int t = 0;
     int e = 0;
@@ -92,6 +143,7 @@ void test()
     printf("[--] ----------------------------------------\n");
 
     printf("[##] Testing on module '\033[1;33missue_rat_freelist\033[0m'\n");
+    printf("[##] \033[1;30mRandom sequence seed: %lu\033[0m\n", seed);
 
     printf("[--] ----------------------------------------\n");
 
@@ -100,6 +152,10 @@ void test()
     printf("[--] ----------------------------------------\n");
 
     e += testbench_0(t);
+
+    printf("[--] ----------------------------------------\n");
+
+    e += testbench_1(t);
 
     printf("[--] ----------------------------------------\n");
 
