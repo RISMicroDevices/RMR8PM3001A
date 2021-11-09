@@ -4,7 +4,7 @@
 //  (RISC-V 64-bit Privileged Minimal System Processor for T110 ASIC)
 //
 //  PRF Free List 64-entry FIFO
-//  (32 entries per-bank)
+//  (32 entries per-bank, 2 bank interleaving, 2 write per-clk max, 1 read per-clk max)
 //
 // @author Kumonda221
 //

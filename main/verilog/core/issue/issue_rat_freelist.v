@@ -3,8 +3,7 @@
 //  RMR8PM3001A - Taurus 3001
 //  (RISC-V 64-bit Privileged Minimal System Processor for T110 ASIC)
 //
-//  PRF free list for 64-entry RAT (Register Alias Table)
-//  (2 bank interleaving, 2 write per-clk max, 1 read per-clk max)
+//  PRF free list for 64-entry RAT (Register Alias Table) with checkpoints
 //
 // @author Kumonda221
 //
@@ -34,6 +33,12 @@ module issue_rat_freelist (
     input   wire                i_abandon_valid
 );
 
-    // TODO
+    issue_rat_freelist_fifo issue_rat_freelist_fifo_INST (
+
+    );
+
+    issue_rat_freelist_checkpoint issue_rat_freelist_checkpoint_INST (
+
+    );
 
 endmodule
