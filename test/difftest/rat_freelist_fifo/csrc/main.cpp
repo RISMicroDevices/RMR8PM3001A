@@ -670,7 +670,7 @@ void test()
 
     printf("[--] ----------------------------------------\n");
 
-    printf("[##] Testing on module '\033[1;33missue_rat_freelist_checkpoint\033[0m'\n");
+    printf("[##] Testing on module '\033[1;33missue_rat_freelist_fifo\033[0m'\n");
 
     printf("[--] ----------------------------------------\n");
 
