@@ -6,3 +6,5 @@
 # build folders
 **/build/
 
+# cross-project & cross-platform shared folders
+**/shared/
