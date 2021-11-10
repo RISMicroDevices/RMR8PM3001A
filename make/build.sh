@@ -22,7 +22,7 @@ help() {
     echo "-r: Run all test cases of the specified directory in the \"bin\" directory. For example: -r \"case1 case2\". This option requires the project to be able to connect to difftest."
     echo "-v: Parameters passed to verilator."
     echo "-i: Specify a external verilog source folder."
-    echo "-p: Specify the mixed elaboration components source folder."
+    echo "-p: Specify the mixed emulation components source folder."
     exit 0
 }
 
@@ -118,15 +118,15 @@ build_diff_proj() {
     compile_difftest
 }
 
-create_mela_soft_link()
+create_memu_soft_link()
 {
     for MELASRC_FILE in ${MELASRC_LIST[@]}
     do
-        eval "ln -s \"$MELASRC_FILE\" \"$PROJECT_PATH/$CSRC_FOLDER/${MELASRC_FILE##*/}\" 2>&1"
+        eval "ln -sf \"$MELASRC_FILE\" \"$PROJECT_PATH/$CSRC_FOLDER/${MELASRC_FILE##*/}\" 2>&1"
     done
 }
 
-finalize_mela_soft_link()
+finalize_memu_soft_link()
 {
     for MELASRC_FILE in ${MELASRC_LIST[@]}
     do
@@ -173,17 +173,17 @@ build_proj() {
     fi
 
     # compile
-    create_mela_soft_link
+    create_memu_soft_link
     mkdir $BUILD_FOLDER 1>/dev/null 2>&1
     eval "verilator --x-assign unique --cc --exe --trace --assert -O3 -CFLAGS \"-std=c++11 -Wall $INCLUDE_CSRC_FOLDERS $CFLAGS\" $LDFLAGS -o $PROJECT_PATH/$BUILD_FOLDER/$EMU_FILE \
         -Mdir $PROJECT_PATH/$BUILD_FOLDER/emu-compile $VERILATOR_PARAM $INCLUDE_EXT_VSRC_FOLDERS $INCLUDE_VSRC_FOLDERS --build $V_TOP_FILE $CSRC_FILES"
     if [ $? -ne 0 ]; then
         echo "Failed to run verilator!!!"
-        finalize_mela_soft_link
+        finalize_memu_soft_link
         exit 1
     fi
 
-    finalize_mela_soft_link
+    finalize_memu_soft_link
 
     cd $OSCPU_PATH
 }
