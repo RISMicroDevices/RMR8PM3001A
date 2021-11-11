@@ -122,7 +122,7 @@ create_memu_soft_link()
 {
     for MELASRC_FILE in ${MELASRC_LIST[@]}
     do
-        eval "ln -sf \"$MELASRC_FILE\" \"$PROJECT_PATH/$CSRC_FOLDER/${MELASRC_FILE##*/}\" 2>&1"
+        eval "cp -lf \"$MELASRC_FILE\" \"$PROJECT_PATH/$CSRC_FOLDER/${MELASRC_FILE##*/}\" 2>&1"
     done
 }
 
@@ -170,6 +170,12 @@ build_proj() {
         INCLUDE_CSRC_FOLDERS="$INCLUDE_CSRC_FOLDERS -I$VERILATOR_MELA_PATH"
 
         MELASRC_LIST=`find $VERILATOR_MELA_PATH -type f`
+
+        MELASRC_CPP_LIST=`find $VERILATOR_MELA_PATH -type f -name "*.cpp"`
+        for MELASRC_CPP_FILE in ${MELASRC_CPP_LIST}
+        do
+            CSRC_FILES="$CSRC_FILES $MELASRC_CPP_FILE"
+        done
     fi
 
     # compile
