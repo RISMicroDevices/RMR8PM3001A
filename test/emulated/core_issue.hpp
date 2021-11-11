@@ -46,6 +46,9 @@ namespace MEMU::Core::Issue {
         int     CommitFGR(int fgr);
         int     PopAbandoned(int& prf);
 
+        int     AbandonFGREx(int fgr, int* prf_dst);
+        int     CommitFGREx(int fgr, int* prf_dst);
+
         bool    IsBankFull(int index) const;
         bool    IsAllBankFull() const;
         bool    IsBankAbandoned(int index) const;
@@ -55,6 +58,10 @@ namespace MEMU::Core::Issue {
 
         int     GetBankFGR(int index) const;
         bool    IsBankFGRValid(int index) const;
+
+        int     GetBankPRF(int index, int* prf_dst) const;
+        int     GetBankPRFCount(int index) const;
+        bool    IsBankPRFValid(int index) const;
 
         void    Eval();
     };

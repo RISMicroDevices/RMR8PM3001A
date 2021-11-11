@@ -107,39 +107,12 @@ namespace MEMU::Core::Issue {
 
     int RATFreelistCheckpoint::AbandonFGR(int fgr)
     {
-        int r = 0;
-    
-        for (int i = 0; i < bank_count; i++)
-        {
-            if ((emulated_states[i] == EMULATED_RAT_FREELIST_CHECKPOINT_STATE_VALID)
-                && (emulated_fgrs[i] == fgr))
-            {
-                emulated_next_states[i] = EMULATED_RAT_FREELIST_CHECKPOINT_STATE_ABANDONED;
-
-                r++;
-            }
-        }
-
-        return r;
+        return AbandonFGREx(fgr, nullptr);
     }
 
     int RATFreelistCheckpoint::CommitFGR(int fgr)
     {
-        int r = 0;
-
-        for (int i = 0; i < bank_count; i++)
-        {
-            if ((emulated_states[i] == EMULATED_RAT_FREELIST_CHECKPOINT_STATE_VALID)
-                && (emulated_fgrs[i] == fgr))
-            {
-                emulated_next_banks[i]  = EMULATED_RAT_FREELIST_CHECKPOINT_BANK_NEXT_CLEAR;
-                emulated_next_states[i] = EMULATED_RAT_FREELIST_CHECKPOINT_STATE_INVALID;
-
-                r++;
-            }
-        }
-
-        return r;
+        return CommitFGREx(fgr, nullptr);
     }
 
     int RATFreelistCheckpoint::PopAbandoned(int& prf)
@@ -161,6 +134,60 @@ namespace MEMU::Core::Issue {
 
         return 0;
     }
+
+    int RATFreelistCheckpoint::AbandonFGREx(int fgr, int* dst)
+    {
+        int r = 0;
+    
+        for (int i = 0; i < bank_count; i++)
+        {
+            if ((emulated_states[i] == EMULATED_RAT_FREELIST_CHECKPOINT_STATE_VALID)
+                && (emulated_fgrs[i] == fgr))
+            {
+                emulated_next_states[i] = EMULATED_RAT_FREELIST_CHECKPOINT_STATE_ABANDONED;
+
+                if (dst)
+                {
+                    list<int>::iterator iter = emulated_banks[i].begin();
+
+                    while (iter != emulated_banks[i].end())
+                        dst[r++] = *iter;
+                }
+                else
+                    r += emulated_banks[i].size();
+            }
+        }
+
+        return r;
+    }
+
+    int RATFreelistCheckpoint::CommitFGREx(int fgr, int* dst)
+    {
+        int r = 0;
+
+        for (int i = 0; i < bank_count; i++)
+        {
+            if ((emulated_states[i] == EMULATED_RAT_FREELIST_CHECKPOINT_STATE_VALID)
+                && (emulated_fgrs[i] == fgr))
+            {
+                emulated_next_banks[i]  = EMULATED_RAT_FREELIST_CHECKPOINT_BANK_NEXT_CLEAR;
+                emulated_next_states[i] = EMULATED_RAT_FREELIST_CHECKPOINT_STATE_INVALID;
+
+                if (dst)
+                {
+                    list<int>::iterator iter = emulated_banks[i].begin();
+
+                    while (iter != emulated_banks[i].end())
+                        dst[r++] = *iter;
+                }
+                else
+                    r += emulated_banks[i].size();
+            }
+        }
+
+        return r;
+    }
+
 
     bool RATFreelistCheckpoint::IsBankFull(int index) const
     {
@@ -210,6 +237,32 @@ namespace MEMU::Core::Issue {
     }
 
     bool RATFreelistCheckpoint::IsBankFGRValid(int index) const
+    {
+        return IsBankValid(index) || IsBankAbandoned(index);
+    }
+
+    int RATFreelistCheckpoint::GetBankPRF(int index, int* dst) const
+    {
+        if (!IsBankPRFValid(index))
+            return 0;
+
+        int i = 0;
+        list<int>::iterator iter = emulated_banks[index].begin();
+        while (iter != emulated_banks[index].end())
+            dst[i++] = *iter++;
+
+        return emulated_banks[index].size();
+    }
+
+    int RATFreelistCheckpoint::GetBankPRFCount(int index) const
+    {
+        if (!IsBankPRFValid(index))
+            return 0;
+
+        return emulated_banks[index].size();
+    }
+
+    bool RATFreelistCheckpoint::IsBankPRFValid(int index) const
     {
         return IsBankValid(index) || IsBankAbandoned(index);
     }
