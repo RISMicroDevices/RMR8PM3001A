@@ -33,7 +33,7 @@ namespace MEMU::Core::Issue {
     }
 
     RATFreelistCheckpoint::RATFreelistCheckpoint(const RATFreelistCheckpoint& obj)
-        : bank_count(bank_count), bank_depth(bank_depth)
+        : bank_count(obj.bank_count), bank_depth(obj.bank_depth)
     {
         emulated_banks  = new list<int>[bank_count];
         emulated_fgrs   = new int[bank_count];
