@@ -11,14 +11,14 @@ module sim_rat_freelist (
 
     output  wire [5:0]          o_acquire_prf,
     output  wire                o_acquire_ready,
-    input   wire [2:0]          i_acquire_fgr,
+    input   wire [3:0]          i_acquire_fgr,
     input   wire                i_acquire_fgr_speculative,
     input   wire                i_acquire_valid,
 
-    input   wire [2:0]          i_commit_fgr,
+    input   wire [3:0]          i_commit_fgr,
     input   wire                i_commit_valid,
 
-    input   wire [2:0]          i_abandon_fgr,
+    input   wire [3:0]          i_abandon_fgr,
     input   wire                i_abandon_valid
 );
 
