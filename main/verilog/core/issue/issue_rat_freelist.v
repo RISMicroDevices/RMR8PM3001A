@@ -20,16 +20,16 @@ module issue_rat_freelist (
     //
     output  wire [5:0]          o_acquire_prf,
     output  wire                o_acquire_ready,
-    input   wire [2:0]          i_acquire_fgr,
+    input   wire [3:0]          i_acquire_fgr,
     input   wire                i_acquire_fgr_speculative,
     input   wire                i_acquire_valid,
 
     //
-    input   wire [2:0]          i_commit_fgr,
+    input   wire [3:0]          i_commit_fgr,
     input   wire                i_commit_valid,
 
     //
-    input   wire [2:0]          i_abandon_fgr,
+    input   wire [3:0]          i_abandon_fgr,
     input   wire                i_abandon_valid
 );
     //
@@ -63,10 +63,10 @@ module issue_rat_freelist (
     );
 
     //
-    wire [2:0]      o_cp_abandon_fgr;
+    wire [3:0]      o_cp_abandon_fgr;
     wire            o_cp_abandon_valid;
 
-    wire [2:0]      o_cp_commit_fgr;
+    wire [3:0]      o_cp_commit_fgr;
     wire            o_cp_commit_valid;
 
     wire [5:0]      i_cp_abandoned_prf;
@@ -74,7 +74,7 @@ module issue_rat_freelist (
     wire            o_cp_abandoned_ready;
 
     wire [5:0]      o_cp_acquired_prf;
-    wire [2:0]      o_cp_acquired_fgr;
+    wire [3:0]      o_cp_acquired_fgr;
     wire            o_cp_acquired_valid;
     wire            i_cp_acquired_ready;
 

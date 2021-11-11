@@ -11,7 +11,7 @@
 
 module issue_rat_freelist_checkpoint_bank #(
     parameter   PRF_WIDTH       = 6,
-    parameter   FGR_WIDTH       = 3
+    parameter   FGR_WIDTH       = 4
 ) (
     input   wire                        clk,
     input   wire                        reset,
