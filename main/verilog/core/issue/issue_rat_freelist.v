@@ -99,15 +99,15 @@ module issue_rat_freelist (
     );
 
     //
-    wire    r_cp_acquired_push;
+    wire   r_fifo_acquired_valid;
 
-    assign r_cp_acquired_push   =  i_acquire_valid & i_fifo_acquire_valid;
+    assign r_fifo_acquired_valid   =  i_acquire_valid & i_fifo_acquire_valid;
 
     assign o_cp_acquired_prf    =  i_fifo_acquire_prf;
     assign o_cp_acquired_fgr    =  i_acquire_fgr;
-    assign o_cp_acquired_valid  =  i_acquire_fgr_speculative & r_cp_acquired_push;
+    assign o_cp_acquired_valid  =  i_acquire_fgr_speculative & r_fifo_acquired_valid;
 
-    assign o_fifo_acquire_ready =  i_acquire_fgr_speculative ? (r_cp_acquired_push & i_cp_acquired_ready) : i_acquire_valid;
+    assign o_fifo_acquire_ready =  i_acquire_fgr_speculative ? (r_fifo_acquired_valid & i_cp_acquired_ready) : r_fifo_acquired_valid;
 
     //
     assign o_fifo_abandoned_prf     =  i_cp_abandoned_prf;
