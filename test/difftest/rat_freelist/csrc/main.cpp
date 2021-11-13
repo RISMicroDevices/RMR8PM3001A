@@ -127,7 +127,7 @@ int testbench_1(int& t)
     //
     int c = 65535;
 
-    printf("[#4] \033[1;30mDifferential payload count: %d\033[0m\n", c);
+    printf("[#1] \033[1;30mDifferential payload count: %d\033[0m\n", c);
 
     //
     list<int> on_flight_prfs; // On-flight non-speculative PRFs
@@ -149,6 +149,9 @@ int testbench_1(int& t)
     int redeem_count        = 0;
     int redeem_interval     = 0;
 
+    int* prf_buffer      = new int[elaborated.GetBankCount() * elaborated.GetBankDepth()];
+
+
     for (int i = 0; i < c; i++)
     {
         //
@@ -169,8 +172,8 @@ int testbench_1(int& t)
         //
         if (!acquire_count)
         {
-            acquire_count       = (rand() % 4) + 1;
-            acquire_interval    = (rand() % 4) + 1;
+            acquire_count       = (rand() % 8) + 1;
+            acquire_interval    = (rand() % 8) + 1;
 
             dut_ptr->i_acquire_valid = 0;
         }
@@ -190,8 +193,8 @@ int testbench_1(int& t)
         {
             if (!on_flight_prfs.empty())
             {
-                redeem_count    = (rand() % 4) + 1;
-                redeem_interval = (rand() % 4) + 1;
+                redeem_count    = (rand() % 8) + 1;
+                redeem_interval = (rand() % 8) + 1;
             }
 
             dut_ptr->i_redeemed_prf     = 0;
@@ -204,10 +207,15 @@ int testbench_1(int& t)
             dut_ptr->i_redeemed_prf     = 0;
             dut_ptr->i_redeemed_valid   = 0;
         }
-        else
+        else if (!on_flight_prfs.empty())
         {
             dut_ptr->i_redeemed_prf     = on_flight_prfs.back();
             dut_ptr->i_redeemed_valid   = 1;
+        }
+        else
+        {
+            dut_ptr->i_redeemed_prf     = 0;
+            dut_ptr->i_redeemed_valid   = 0;
         }
 
         //
@@ -264,6 +272,14 @@ int testbench_1(int& t)
 
         clkn_dumpgen(t);
 
+        if (on_flight_prfs.size() > 64)
+        {
+            printf("[#1] Wrong state detected at clock edge %d. FIFO data overflow.\n", t);
+            error++;
+
+            break;
+        }
+
         if (dut_ptr->o_acquire_ready)
         {
             if (!dut_ptr->i_acquire_fgr_speculative)
@@ -272,10 +288,14 @@ int testbench_1(int& t)
             }
             else if (!elaborated.PushAcquired(dut_ptr->i_acquire_fgr, dut_ptr->o_acquire_prf))
             {
-                // TODO error
+                printf("[#1] Wrong state detected at clock edge %d. Push operation accepted ahead of emulation.\n", t);
+                error++;
+
+                break;
             }
 
             acquire_count--;
+            fgr_lifecycle--;
         }
 
         if (dut_ptr->o_redeemed_ready)
@@ -285,20 +305,144 @@ int testbench_1(int& t)
             redeem_count--;
         }
 
+        // not precisely emulated on Abandon-Popback
+        int abandoned_prf;
+        if (elaborated.PopAbandoned(abandoned_prf))
+        {
+            // back into the FIFO, nothing needed to be done for emulation here
+        }
+
         if (dut_ptr->i_abandon_valid)
         {
-            // TODO
+            elaborated.AbandonFGR(dut_ptr->i_abandon_fgr);
         }
 
         if (dut_ptr->i_commit_valid)
         {
-            // TODO
+            int commit_count = elaborated.CommitFGREx(dut_ptr->i_commit_fgr, prf_buffer);
+
+            for (int j = 0; j < commit_count; j++)
+                on_flight_prfs.push_back(prf_buffer[j]);
         }
 
-        // TODO
+        elaborated.Eval();
 
         clkp_dumpgen(t);
     }
+
+    //
+    dut_ptr->i_redeemed_prf             = 0;
+    dut_ptr->i_redeemed_valid           = 0;
+
+    dut_ptr->i_acquire_fgr              = 0;
+    dut_ptr->i_acquire_fgr_speculative  = 0;
+    dut_ptr->i_acquire_valid            = 0;
+
+    dut_ptr->i_commit_fgr               = 0;
+    dut_ptr->i_commit_valid             = 0;
+
+    dut_ptr->i_abandon_fgr              = 0;
+    dut_ptr->i_abandon_valid            = 0;
+
+    clkn_dumpgen(t);
+    clkp_dumpgen(t);
+
+    printf("[#1] \033[1;30mRemaining on-flight PRFs: %lu\033[0m\n", on_flight_prfs.size());
+
+    //
+    printf("[#1] \033[1;30mFinalize interval starting at clock edge %d.\033[0m\n", t);
+
+    for (int i = 0; i < 256; i++)
+    {
+        clkn_dumpgen(t);
+        clkp_dumpgen(t);
+    }
+
+    printf("[#1] \033[1;30mFinalize interval ending at clock edge %d.\033[0m\n", t);
+
+    //
+    bool* prf_slots = new bool[64];
+
+    for (int i = 0; i < 64; i++)
+        prf_slots[i] = false;
+
+    list<int>::iterator iter = on_flight_prfs.begin();
+    while (iter != on_flight_prfs.end())
+        if (prf_slots[*iter])
+        {
+            printf("[#1] Duplicated PRF detected in on-flight PRF sequence.\n");
+            error++;
+        }
+        else
+            prf_slots[*iter++] = true;
+
+    int prf_buffer_count;
+    for (int i = 0; i < 16; i++)
+    {
+        if ((prf_buffer_count = elaborated.CommitFGREx(i, prf_buffer)) != 0)
+            for (int j = 0; j < prf_buffer_count; j++)
+                if (prf_slots[prf_buffer[j]])
+                {
+                    printf("[#1] Duplicated PRF detected in checkpoint.\n");
+                    error++;
+                }
+                else
+                    prf_slots[prf_buffer[j]] = true;
+        else
+            continue;
+    }
+
+    while (true)
+    {
+        dut_ptr->i_acquire_fgr              = 0;
+        dut_ptr->i_acquire_fgr_speculative  = 0;
+        dut_ptr->i_acquire_valid            = 1;
+
+        clkn_dumpgen(t);
+
+        if (!dut_ptr->o_acquire_ready)
+            break;
+
+        if (prf_slots[dut_ptr->o_acquire_prf])
+        {
+            printf("[#1] Duplicated PRF detected in FIFO acquire sequence.\n");
+            error++;
+        }
+        else
+            prf_slots[dut_ptr->o_acquire_prf] = true;
+
+        clkp_dumpgen(t);
+    }
+
+    clkp_dumpgen(t);
+
+    for (int i = 0; i < 64; i++)
+        if (!prf_slots[i])
+        {
+            printf("[#1] PRF slot %d not covered !!!\n", i);
+            error++;
+        }
+
+    //
+    dut_ptr->i_redeemed_prf             = 0;
+    dut_ptr->i_redeemed_valid           = 0;
+
+    dut_ptr->i_acquire_fgr              = 0;
+    dut_ptr->i_acquire_fgr_speculative  = 0;
+    dut_ptr->i_acquire_valid            = 0;
+
+    dut_ptr->i_commit_fgr               = 0;
+    dut_ptr->i_commit_valid             = 0;
+
+    dut_ptr->i_abandon_fgr              = 0;
+    dut_ptr->i_abandon_valid            = 0;
+
+    clkn_dumpgen(t);
+    clkp_dumpgen(t);
+
+    //
+    delete[] prf_buffer;
+    delete[] prf_slots;
 
     //
     if (error)
