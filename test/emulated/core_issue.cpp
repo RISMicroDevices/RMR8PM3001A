@@ -151,7 +151,7 @@ namespace MEMU::Core::Issue {
                     list<int>::iterator iter = emulated_banks[i].begin();
 
                     while (iter != emulated_banks[i].end())
-                        dst[r++] = *iter;
+                        dst[r++] = *iter++;
                 }
                 else
                     r += emulated_banks[i].size();
@@ -178,7 +178,7 @@ namespace MEMU::Core::Issue {
                     list<int>::iterator iter = emulated_banks[i].begin();
 
                     while (iter != emulated_banks[i].end())
-                        dst[r++] = *iter;
+                        dst[r++] = *iter++;
                 }
                 else
                     r += emulated_banks[i].size();
@@ -270,13 +270,13 @@ namespace MEMU::Core::Issue {
     void RATFreelistCheckpoint::Eval()
     {
         //
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < bank_count; i++)
             if (emulated_states[i] == EMULATED_RAT_FREELIST_CHECKPOINT_STATE_ABANDONED)
                 if (emulated_banks[i].empty())
                     emulated_next_states[i] = EMULATED_RAT_FREELIST_CHECKPOINT_STATE_INVALID;
 
         //
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < bank_count; i++)
         {
             emulated_fgrs[i]   = emulated_next_fgrs[i];
             emulated_states[i] = emulated_next_states[i];
@@ -290,7 +290,7 @@ namespace MEMU::Core::Issue {
         }
 
         //
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < bank_count; i++)
         {
             emulated_next_fgrs[i]   = emulated_fgrs[i];
             emulated_next_states[i] = emulated_states[i];
