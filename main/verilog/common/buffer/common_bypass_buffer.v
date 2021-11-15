@@ -42,17 +42,15 @@ module common_bypass_buffer #(
     );
 
     //
-    wire    valid_en;
     wire    valid_d;
     wire    valid_q;
 
-    stdmacro_dffe  #(
+    stdmacro_dff  #(
         .DFF_WIDTH(1)
-    ) stdmacro_dffe_INST_buffer_valid (
+    ) stdmacro_dff_INST_buffer_valid (
         .clk    (clk),
         .reset  (reset),
 
-        .en     (valid_en),
         .d      (valid_d),
         .q      (valid_q)
     );
@@ -67,9 +65,6 @@ module common_bypass_buffer #(
     // Valid flag transition:
     assign valid_d   = ~valid_q ? ( prev_i_valid & ~next_i_ready )
                                 : (                ~next_i_ready );
-
-    //
-    assign valid_en  = 'b1;
 
     //
     assign prev_o_ready = ~valid_q;
