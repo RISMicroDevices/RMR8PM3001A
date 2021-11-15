@@ -7,6 +7,8 @@
 
 #include <list>
 
+#include "base.hpp"
+
 #define EMULATED_RAT_FREELIST_CHECKPOINT_STATE_INVALID            0x00
 #define EMULATED_RAT_FREELIST_CHECKPOINT_STATE_VALID              0x01
 #define EMULATED_RAT_FREELIST_CHECKPOINT_STATE_ABANDONED          0x02
@@ -19,7 +21,7 @@ using namespace std;
 
 namespace MEMU::Core::Issue {
 
-    class RATFreelistCheckpoint final
+    class RATFreelistCheckpoint final : public MEMU::Emulated
     {
     private:
         list<int>*  emulated_banks;
@@ -63,7 +65,7 @@ namespace MEMU::Core::Issue {
         int     GetBankPRFCount(int index) const;
         bool    IsBankPRFValid(int index) const;
 
-        void    Eval();
+        virtual void Eval() override;
     };
 }
 
