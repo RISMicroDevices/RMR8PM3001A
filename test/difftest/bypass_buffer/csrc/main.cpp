@@ -6,9 +6,13 @@
 #include <list>
 #include <vector>
 
+#include "common.hpp"
+
 using namespace std;
 
-#define GEN(i) (i | (i << 8) | (i << 16) | (i << 24))
+using namespace MEMU::Common;
+
+#define GEN(i) ((i) | ((i) << 8) | ((i) << 16) | ((i) << 24))
 
 #ifdef VM_TRACE         // --trace
 #include <verilated_vcd_c.h>
@@ -51,6 +55,7 @@ void reset(int &time)
     dut_ptr->resetn = 0;
 
     clk_dumpgen(time);
+    clkp_dumpgen(time);
 
     dut_ptr->resetn = 1;
 }
@@ -60,6 +65,8 @@ void reset(int &time)
 void testbench_0(int &t)
 {
     int passed = 1;
+
+    clkn_dumpgen(t);
 
     printf("[#0] Testbench #0\n");
     printf("[#0] Next and prev pipelines are always ready, testing bypass ...\n");
@@ -115,10 +122,10 @@ void testbench_1(int &t)
 
     dut_ptr->next_i_ready = 1;
 
+    clkp_dumpgen(t);
+
     for (int i = 1; i < 0x100; )
     {
-        clk_dumpgen(t);
-
         if (dut_ptr->next_i_ready && dut_ptr->next_o_valid)
             records.push_back(dut_ptr->next_o_data);
 
@@ -141,12 +148,15 @@ void testbench_1(int &t)
             dut_ptr->next_i_ready = 1;
             i++;
         }
+
+        clkn_dumpgen(t);
+        clkp_dumpgen(t);
     }
 
     clk_dumpgen(t);
 
-        if (dut_ptr->next_i_ready && dut_ptr->next_o_valid)
-            records.push_back(dut_ptr->next_o_data);
+    if (dut_ptr->next_i_ready && dut_ptr->next_o_valid)
+        records.push_back(dut_ptr->next_o_data);
 
     printf("[#1] Verifying record sequence ...\n");
 
@@ -191,119 +201,84 @@ void testbench_1(int &t)
 }
 
 // Testbench #2
-// Interactive tests, random circumstances for prev and next pipelines.
+// Mixed emulation random input differential test.
 void testbench_2(int& t)
 {
     int passed = 1;
 
+    //
     printf("[#2] Testbench #2\n");
-    printf("[#2] Interactive tests, random circumstances for prev and next pipelines.\n");
+    printf("[#2] Mixed emulation random input differential test.\n");
 
-    printf("[#2] Reconstructing prev pipeline FSM and record sequence ... \n");
+    //
+    int c = 65535;
+    
+    printf("[#2] Configurated differential payload: %d\n", c);
 
-    // zero beat
+    //
     dut_ptr->prev_i_data  = 0;
     dut_ptr->prev_i_valid = 0;
 
     dut_ptr->next_i_ready = 0;
 
     clk_dumpgen(t);
-    
+    clkp_dumpgen(t);
+
     //
-    list<int> records;
+    NormalBypassBuffer<int> emulated;
 
-    int gen_t = 0;
-
-    int prev_nready = 0;
-    int next_nready = 0;
-
-    printf("[#2] Generating record sequence ...\n");
-
-    while (1)
+    for (int i = 0; i < c; i++)
     {
-        if (dut_ptr->next_i_ready && dut_ptr->next_o_valid)
-        {
-            records.push_back(dut_ptr->next_o_data);
+        int g = GEN(i & 0xFF);
 
-            next_nready = rand() % 8;
+        int w_valid = rand() % 2;
+        int r_ready = rand() % 2;
 
-            dut_ptr->next_i_ready = 0;
+        dut_ptr->prev_i_data  = g;
+        dut_ptr->prev_i_valid = w_valid;
+        dut_ptr->next_i_ready = r_ready;
 
-            if (gen_t == 0x100)
-                break;
-        }
+        if (w_valid)
+            emulated.SetInput(g);
 
-        if (next_nready == 0)
-        {
-            dut_ptr->next_i_ready = 1;
-        }
+        clkn_dumpgen(t);
+
+        int  emulated_read;
+        bool emulated_read_valid;
+
+        if (r_ready)
+            emulated_read_valid = emulated.ReadOutput(&emulated_read);
         else
+            emulated_read_valid = emulated.GetOutput(&emulated_read);
+
+        int  dut_read        = dut_ptr->next_o_data;
+        bool dut_read_valid  = dut_ptr->next_o_valid;
+
+        if (dut_read_valid != emulated_read_valid)
         {
-            dut_ptr->next_i_ready = 0;
-            
-            next_nready--;
+            printf("[#2] DUT differs from Emulation at clk %d (signal 'next_o_valid', %x, %x).\n",
+                t, dut_read_valid, emulated_read_valid);
+
+            passed = 0;
+        }
+        else if (dut_read_valid)
+        {
+            if (dut_read != emulated_read)
+            {
+                printf("[#2] DUT differs from Emulation at clk %d (signal 'next_o_data', %x, %x).\n", 
+                    t, dut_read, emulated_read);
+
+                passed = 0;
+            }
         }
 
         clkp_dumpgen(t);
 
-        if (prev_nready == 0)
-        {
-            dut_ptr->prev_i_data  = GEN(gen_t);
-            dut_ptr->prev_i_valid = 1;
-
-            if (dut_ptr->prev_o_ready)
-            {
-                gen_t++;
-
-                prev_nready = rand() % 4;
-            }
-        }
-        else
-        {
-            dut_ptr->prev_i_data  = 0xDEADBEEF;
-            dut_ptr->prev_i_valid = 0;
-
-            prev_nready--;
-        }
-
-        clkn_dumpgen(t);
-    }
-
-    if (records.size() == 0x100)
-        printf("[#2] Record sequence size matched.\n");
-    else
-    {
-        printf("[#2] Record sequence size unmatched. Result: %ld, Ref: %d.\n", records.size(), 0x100);
-        passed = 0;
+        emulated.Eval();
+        emulated.ResetInput();
     }
 
     //
-    int pattern_unmatch = 0;
-    int cti = 0;
-    list<int>::iterator iter = records.begin();
-
-    while (iter != records.end())
-    {
-        if (*iter != GEN(cti))
-        {
-            printf("[#2] Pattern unmatched at %3d. Result: %x, Ref: %x\n", cti, *iter, GEN(cti));
-
-            pattern_unmatch++;
-            passed = 0;
-        }
-
-        cti++;
-        iter++;
-    }
-    
-    if (!pattern_unmatch)
-        printf("[#2] Pattern test Passed.\n");
-    else
-    {
-        printf("[#2] Pattern test Failed. %d unmatched record(s) found.\n", pattern_unmatch);
-        passed = 0;
-    }
-
     if (passed)
         printf("[#2] [PASSED] Testbench #2 Passed !!!\n");
     else
@@ -332,6 +307,12 @@ void test()
     printf("[--] ----------------------------------------\n");
 
     testbench_1(time);
+
+    printf("[--] ----------------------------------------\n");
+
+    printf("[##] Circuit reset.\n");
+
+    reset(time);
 
     printf("[--] ----------------------------------------\n");
 
