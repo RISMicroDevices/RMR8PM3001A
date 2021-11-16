@@ -68,8 +68,8 @@ namespace MEMU::Common {
         __PayloadType   buffer_bypass;
         bool            buffer_bypass_valid;
         bool            buffer_flush;
-        bool            buffer_readed;
         bool            buffer_flushed;
+        bool            buffer_readed;
         
     public:
         FlushableBypassBuffer();
@@ -233,6 +233,7 @@ namespace MEMU::Common {
     bool            buffer_input_valid;
     __PayloadType   buffer_bypass;
     bool            buffer_bypass_valid;
+    bool            buffer_flush;
     bool            buffer_readed;
     bool            buffer_flushed;
     */
@@ -312,7 +313,11 @@ namespace MEMU::Common {
     template<typename __PayloadType>
     bool FlushableBypassBuffer<__PayloadType>::GetOutput(__PayloadType* dst) const
     {
-        if (buffer_bypass_valid)
+        if (buffer_flush)
+        {
+            return false;
+        }
+        else if (buffer_bypass_valid)
         {
             *dst = buffer_bypass;
             return true;
