@@ -174,7 +174,7 @@ build_proj() {
         MELASRC_CPP_LIST=`find $VERILATOR_MELA_PATH -type f -name "*.cpp"`
         for MELASRC_CPP_FILE in ${MELASRC_CPP_LIST}
         do
-            CSRC_FILES="$CSRC_FILES $MELASRC_CPP_FILE"
+            CSRC_FILES="$CSRC_FILES $PROJECT_PATH/$CSRC_FOLDER/${MELASRC_CPP_FILE##*/}"
         done
     fi
 
