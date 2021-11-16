@@ -5,7 +5,11 @@
 //  @see 'rat_freelist_checkpoint.v'
 //
 
+#include <bitset>
+
 #include "base.hpp"
+
+using namespace std;
 
 namespace MEMU::Common {
 
@@ -93,10 +97,29 @@ namespace MEMU::Common {
         virtual void    Eval() override;
     };
 
-    class PseudoLRUSwap final
+    template<int __size_log2>
+    class PseudoLRUSwap final : public MEMU::Emulated
     {
+    private:
+        constexpr static int    lru_bit_count = (1 << __size_log2) - 1;
+        bitset<lru_bit_count>   lru_bits;
+        int                     lru_picked_index;
+        int                     lru_update_index;
 
+    public:
+        PseudoLRUSwap();
+        PseudoLRUSwap(const PseudoLRUSwap<__size_log2>& obj);
+        ~PseudoLRUSwap();
+
+        constexpr int   GetSize() const;
+        int             GetPicked() const;
+        bool            IsPicked(int index) const;
+
+        void            Update(int index);
+
+        virtual void    Eval() override = 0;
     };
+
 
     class PseudoLRUPick final 
     {
@@ -365,3 +388,92 @@ namespace MEMU::Common {
     }
 };
 
+
+// class MEMU::Common::PseudoLRUSwap
+namespace MEMU::Common {
+    /*
+    constexpr int           lru_bit_count = (1 << __size_log2) - 1;
+    bitset<lru_bit_count>   lru_bits;
+    int                     lru_picked_index;
+    int                     lru_update_index;
+    */
+
+    template<int __size_log2>
+    PseudoLRUSwap<__size_log2>::PseudoLRUSwap()
+        : lru_picked_index(0)
+        , lru_update_index(-1)
+    { }
+
+    template<int __size_log2>
+    PseudoLRUSwap<__size_log2>::PseudoLRUSwap(const PseudoLRUSwap<__size_log2>& obj)
+        : lru_bits(obj.lru_bits)
+        , lru_picked_index(0)
+        , lru_update_index(-1)
+    { }
+
+    template<int __size_log2>
+    PseudoLRUSwap<__size_log2>::~PseudoLRUSwap()
+    { }
+
+    template<int __size_log2>
+    constexpr int PseudoLRUSwap<__size_log2>::GetSize() const
+    {
+        return lru_bit_count + 1;
+    }
+
+    template<int __size_log2>
+    int PseudoLRUSwap<__size_log2>::GetPicked() const
+    {
+        return lru_picked_index;        
+    }
+
+    template<int __size_log2>
+    bool PseudoLRUSwap<__size_log2>::IsPicked(int index) const
+    {
+        return lru_picked_index == index;
+    }
+
+    template<int __size_log2>
+    void PseudoLRUSwap<__size_log2>::Update(int index)
+    {
+        lru_update_index = index;
+    }
+    
+    template<int __size_log2>
+    void PseudoLRUSwap<__size_log2>::Eval()
+    {
+        // 
+        if (lru_update_index >= 0)
+        {
+            for (int i = 0; i < __size_log2; i++)
+            {
+                int pbase = (1 << (__size_log2 - i - 1)) - 1;
+
+                int lru = !((lru_update_index >>> i) & 0x01);
+                int index = (lru_update_index >>> (i + 1));
+
+                lru_bits[pbase + index] = lru;
+            }
+
+            lru_update_index = -1;
+        }
+
+        //
+        int picked = 0;
+
+        for (int i = 0; i < __size_log2; i++)
+        {
+            int nbase = (1 << (i + 1)) - 1;
+            int pbase = (1 << i) - 1;
+
+            int lru = lru_bits[picked];
+
+            picked = nbase + (picked - pbase) * 2 + lru;
+        }
+
+        picked -= lru_bit_count;
+
+        lru_picked_index = picked;
+    }
+
+}
