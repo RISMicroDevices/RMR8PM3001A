@@ -8,7 +8,7 @@
 // @author Kumonda221
 //
 
-module macro_xor_reduction_tree #(
+module macro_reduction_tree_xor #(
     parameter   INPUT_WIDTH         = 1,
     parameter   INPUT_COUNT         = 1
 ) (

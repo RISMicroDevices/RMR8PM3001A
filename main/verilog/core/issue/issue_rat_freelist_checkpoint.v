@@ -209,10 +209,10 @@ module issue_rat_freelist_checkpoint #(
         end
     endgenerate
 
-    macro_or_reduction_tree #(
+    macro_reduction_tree_or #(
         .INPUT_WIDTH    (PRF_WIDTH),
         .INPUT_COUNT    (BANK_COUNT)
-    ) macro_or_reduction_tree_INST_r_prf (
+    ) macro_reduction_tree_or_INST_r_prf (
         .d(r_prf_reduction_tree),
         .q(r_prf_reducted)
     );

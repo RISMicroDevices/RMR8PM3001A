@@ -8,7 +8,7 @@
 // @author Kumonda221
 //
 
-module macro_or_reduction_tree #(
+module macro_reduction_tree_or #(
     parameter   INPUT_WIDTH         = 1,
     parameter   INPUT_COUNT         = 1
 ) (
