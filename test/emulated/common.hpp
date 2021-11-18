@@ -449,8 +449,8 @@ namespace MEMU::Common {
             {
                 int pbase = (1 << (__size_log2 - i - 1)) - 1;
 
-                int lru = !((lru_update_index >>> i) & 0x01);
-                int index = (lru_update_index >>> (i + 1));
+                int lru = !(((unsigned) lru_update_index >> i) & 0x01);
+                int index = ((unsigned) lru_update_index >> (i + 1));
 
                 lru_bits[pbase + index] = lru;
             }
