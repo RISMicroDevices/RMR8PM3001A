@@ -3,7 +3,7 @@
 //  RMR8PM3001A - Taurus 3001
 //  (RISC-V 64-bit Privileged Minimal System Processor for T110 ASIC)
 //
-//  One-hot Binary Output Encoder
+//  One-hot Input & Binary Output Encoder
 //
 // @author Kumonda221
 //

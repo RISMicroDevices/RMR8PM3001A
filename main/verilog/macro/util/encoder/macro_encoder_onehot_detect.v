@@ -3,7 +3,7 @@
 //  RMR8PM3001A - Taurus 3001
 //  (RISC-V 64-bit Privileged Minimal System Processor for T110 ASIC)
 //
-//  One-hot Detector ('valid' is asserted only when the input is one-hot)
+//  One-hot Input Detector ('valid' is asserted only when the input is one-hot)
 //
 // @author Kumonda221
 //
