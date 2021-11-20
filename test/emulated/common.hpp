@@ -117,7 +117,7 @@ namespace MEMU::Common {
 
         void            Update(int index);
 
-        virtual void    Eval() override = 0;
+        virtual void    Eval() override;
     };
 
 
