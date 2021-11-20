@@ -181,8 +181,8 @@ build_proj() {
     # compile
     create_memu_soft_link
     mkdir $BUILD_FOLDER 1>/dev/null 2>&1
-    eval "verilator --x-assign unique --cc --exe --trace --assert -O3 -CFLAGS \"-std=c++11 -Wall $INCLUDE_CSRC_FOLDERS $CFLAGS\" $LDFLAGS -o $PROJECT_PATH/$BUILD_FOLDER/$EMU_FILE \
-        -Mdir $PROJECT_PATH/$BUILD_FOLDER/emu-compile $VERILATOR_PARAM $INCLUDE_EXT_VSRC_FOLDERS $INCLUDE_VSRC_FOLDERS --build $V_TOP_FILE $CSRC_FILES"
+    eval "verilator --x-assign unique --cc --exe --trace --assert $VERILATOR_PARAM  -O3 -CFLAGS \"-std=c++11 -Wall $INCLUDE_CSRC_FOLDERS $CFLAGS\" $LDFLAGS -o $PROJECT_PATH/$BUILD_FOLDER/$EMU_FILE \
+        -Mdir $PROJECT_PATH/$BUILD_FOLDER/emu-compile $INCLUDE_EXT_VSRC_FOLDERS $INCLUDE_VSRC_FOLDERS --build $V_TOP_FILE $CSRC_FILES"
     if [ $? -ne 0 ]; then
         echo "Failed to run verilator!!!"
         finalize_memu_soft_link
@@ -229,7 +229,7 @@ VERILATOR_EXT_INCLUDE=
 VERILATOR_MELA_PATH=
 
 # Check parameters
-while getopts 'he:bt:sa:f:l:gwcdm:r:vi:p:' OPT; do
+while getopts 'he:bt:sa:f:l:gwcdm:r:v:i:p:' OPT; do
     case $OPT in
         h) help;;
         e) PROJECT_FOLDER="$OPTARG";;
