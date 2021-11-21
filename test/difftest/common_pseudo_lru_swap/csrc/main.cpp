@@ -108,7 +108,7 @@ int testbench_1(int &t)
     //
     int c = 65535;
 
-    printf("[#4] \033[1;30mDifferential payload count: %d\033[0m\n", c);
+    printf("[#1] \033[1;30mDifferential payload count: %d\033[0m\n", c);
 
     //
     constexpr int lru_size_log2 = 6;
