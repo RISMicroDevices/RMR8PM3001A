@@ -14,7 +14,7 @@
 module common_dffram_1a1wb1r #(
     parameter                                       RAM_DATA_WIDTH      = 1,
     parameter                                       RAM_ADDR_WIDTH      = 1,
-    parameter [`RAM_DEPTH * RAM_DATA_WIDTH - 1:0]   RAM_RESET_VALUE     = { (`RAM_DEPTH){ {(RAM_ADDR_WIDTH){1'b0}} } }
+    parameter [`RAM_DEPTH * RAM_DATA_WIDTH - 1:0]   RAM_RESET_VALUE     = { (`RAM_DEPTH){ {(RAM_DATA_WIDTH){1'b0}} } }
 ) (
     input   wire                            clk,
     input   wire                            reset,
