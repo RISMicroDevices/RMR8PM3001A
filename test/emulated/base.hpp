@@ -5,6 +5,8 @@
 //  @see 'rat_freelist_checkpoint.v'
 //
 
+#include <cstdint>
+
 namespace MEMU {
 
     /*pure virtual*/
