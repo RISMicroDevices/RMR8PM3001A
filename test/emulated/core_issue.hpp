@@ -6,20 +6,45 @@
 //
 
 #include <list>
+#include <cstring>
 
 #include "base.hpp"
 
-#define EMULATED_RAT_FREELIST_CHECKPOINT_STATE_INVALID            0x00
-#define EMULATED_RAT_FREELIST_CHECKPOINT_STATE_VALID              0x01
-#define EMULATED_RAT_FREELIST_CHECKPOINT_STATE_ABANDONED          0x02
+#define EMULATED_RAT_FREELIST_CHECKPOINT_STATE_INVALID              0x00
+#define EMULATED_RAT_FREELIST_CHECKPOINT_STATE_VALID                0x01
+#define EMULATED_RAT_FREELIST_CHECKPOINT_STATE_ABANDONED            0x02
 
-#define EMULATED_RAT_FREELIST_CHECKPOINT_BANK_NEXT_NOP            -1
-#define EMULATED_RAT_FREELIST_CHECKPOINT_BANK_NEXT_POP            -2
-#define EMULATED_RAT_FREELIST_CHECKPOINT_BANK_NEXT_CLEAR          -3
+#define EMULATED_RAT_FREELIST_CHECKPOINT_BANK_NEXT_NOP              -1
+#define EMULATED_RAT_FREELIST_CHECKPOINT_BANK_NEXT_POP              -2
+#define EMULATED_RAT_FREELIST_CHECKPOINT_BANK_NEXT_CLEAR            -3
+
+#define EMULATED_PRF_SIZE                                           64
 
 using namespace std;
 
 namespace MEMU::Core::Issue {
+
+    class PhysicalRegisterFile final : public MEMU::Emulated
+    {
+    private:
+        int64_t prfs[EMULATED_PRF_SIZE] = { 0 };
+        int     writing_index;
+        int64_t writing_value;
+
+    public:
+        PhysicalRegisterFile();
+        PhysicalRegisterFile(const PhysicalRegisterFile& obj);
+        ~PhysicalRegisterFile();
+
+        constexpr int   GetCapacity() const;
+
+        bool            CheckBound(int index) const;
+
+        int64_t         Get(int index) const;
+        void            Set(int index, int64_t value);
+
+        virtual void    Eval() override;
+    };
 
     class RATFreelistCheckpoint final : public MEMU::Emulated
     {
@@ -67,6 +92,56 @@ namespace MEMU::Core::Issue {
 
         virtual void Eval() override;
     };
+}
+
+
+// class MEMU::Core::Issue::PhysicalRegisterFile
+namespace MEMU::Core::Issue {
+
+    //
+    PhysicalRegisterFile::PhysicalRegisterFile()
+        : writing_index(-1)
+    {  }
+
+    PhysicalRegisterFile::PhysicalRegisterFile(const PhysicalRegisterFile& obj)
+        : writing_index(-1)
+    {
+        memcpy(prfs, obj.prfs, sizeof(int64_t) * EMULATED_PRF_SIZE);
+    }
+
+    PhysicalRegisterFile::~PhysicalRegisterFile()
+    {  }
+
+    constexpr int PhysicalRegisterFile::GetCapacity() const
+    {
+        return EMULATED_PRF_SIZE;
+    }
+
+    bool PhysicalRegisterFile::CheckBound(int index) const
+    {
+        return (index >= 0) && (index < EMULATED_PRF_SIZE);
+    }
+
+    int64_t PhysicalRegisterFile::Get(int index) const
+    {
+        return prfs[index];
+    }
+
+    void PhysicalRegisterFile::Set(int index, int64_t value)
+    {
+        writing_index = index;
+        writing_value = value;
+    }
+
+    void PhysicalRegisterFile::Eval()
+    {
+        if (writing_index < 0)
+            return;
+
+        prfs[writing_index] = writing_value;
+        
+        writing_index = -1;
+    }
 }
 
 
