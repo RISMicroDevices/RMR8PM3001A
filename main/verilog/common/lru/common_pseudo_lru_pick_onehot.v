@@ -9,7 +9,7 @@
 //
 
 module common_pseudo_lru_pick_onehot #(
-    parameter       SUBJECT_COUNT_LOG2      = 3
+    parameter       SUBJECT_COUNT_LOG2      = 1
 ) (
     input   wire                                    clk,
     input   wire                                    reset,
