@@ -22,7 +22,8 @@ module common_pseudo_lru_pick_binwr #(
     input   wire [(1 << SUBJECT_COUNT_LOG2) - 1:0]  dvalid,
 
     //
-    output  wire [SUBJECT_COUNT_LOG2 - 1:0]         qaddr
+    output  wire [SUBJECT_COUNT_LOG2 - 1:0]         qaddr,
+    output  wire                                    qvalid
 );
 
     //
@@ -71,13 +72,26 @@ module common_pseudo_lru_pick_binwr #(
     );
 
     //
+    wire [P_COUNT - 1:0]            detector_d;
+    wire                            detector_valid;
+
+    macro_encoder_onehot_detect #(
+        .INPUT_WIDTH(P_COUNT)
+    ) macro_encoder_onehot_detect_INST (
+        .d      (detector_d),
+        .valid  (detector_valid)
+    );
+
+    //
     assign onehot_waddr = decoder_q;
     assign onehot_wen   = wen;
 
     assign decoder_d    = waddr;
     assign encoder_d    = onehot_qaddr;
+    assign detector_d   = onehot_qaddr;
 
     assign qaddr        = encoder_q;
+    assign qvalid       = detector_valid;
 
     //
 
