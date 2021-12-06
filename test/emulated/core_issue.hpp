@@ -1,19 +1,22 @@
 #pragma once
 //
-// Mixed emulation for RAT Freelist Checkpoint
+// Mixed emulation for Issue Stage
 //
 //  @see 'rat_freelist_checkpoint.v'
 //
 
 #include <list>
 #include <cstring>
+#include <bitset>
 
 #include "base.hpp"
+
+#define EMULATED_GC_COUNT                                           8
 
 #define EMULATED_PRF_SIZE                                           64
 
 #define EMULATED_RAT_SIZE                                           EMULATED_PRF_SIZE
-#define EMULATED_RAT_GC_COUNT                                       8
+#define EMULATED_RAT_GC_COUNT                                       EMULATED_GC_COUNT
 
 using namespace std;
 
@@ -42,18 +45,28 @@ namespace MEMU::Core::Issue {
     };
 
 
+    class GlobalCheckpointTable : public MEMU::Emulated
+    {
+
+    };
+
+
     class RegisterAliasTable final : public MEMU::Emulated
     {
     public:
         class Entry {
         public:
-            int         FID;   // Instruction Fetch ID
-            bool        FV;    // Instruction On-flight Valid
-            bool        NRA;   // Not reallocate-able Flag
+            int     FID;   // Instruction Fetch ID
+            bool    FV;    // Instruction On-flight Valid
+            bool    NRA;   // Not reallocate-able Flag
 
-            const int   PRF;   // PRF (Physical Register File) address
-            int         ARF;   // ARF (Architectural Register File) mapping address
-            bool        V;     // Mapping entry Valid
+            int     PRF;   // PRF (Physical Register File) address
+            int     ARF;   // ARF (Architectural Register File) mapping address
+            bool    V;     // Mapping entry Valid
+
+            Entry();
+            Entry(const Entry& obj);
+            ~Entry();
 
             int     GetFID() const;
             bool    GetFV() const;
@@ -68,20 +81,48 @@ namespace MEMU::Core::Issue {
             void    SetPRF(int val);
             void    SetARF(int val);
             void    SetValid(bool val);
+
+            void    operator=(const Entry& obj);
         };
 
         class GlobalCheckpoint {
         public:
-            bool*       V; // saved Mapping entry Valid
+            bitset<EMULATED_RAT_SIZE>   V; // saved Mapping entry Valid
 
-            // TODO
+            GlobalCheckpoint();
+            GlobalCheckpoint(const GlobalCheckpoint& obj);
+            ~GlobalCheckpoint();
+
+            constexpr int   GetSize() const;
+
+            bool            GetValid(int index) const;
+            void            SetValid(int index, bool valid);
+
+            void            operator=(const Entry& obj);
+            bool&           operator[](const int index);
         };
 
     private:
-
-        // TODO
+        Entry               entries[EMULATED_RAT_SIZE];
+        GlobalCheckpoint    checkpoints[EMULATED_RAT_GC_COUNT];   
 
     public:
+        RegisterAliasTable();
+        RegisterAliasTable(const RegisterAliasTable& obj);
+        ~RegisterAliasTable();
+
+        constexpr int       GetSize() const;
+        constexpr int       GetCheckpointCount() const;
+
+        Entry*              GetEntryReference(int index);
+        Entry               GetEntry(int index);
+        void                SetEntry(int index, Entry entry);
+
+        GlobalCheckpoint*   GetCheckpointReference(int index);
+        GlobalCheckpoint    GetCheckpoint(int index);
+        void                SetCheckpoint(int index, GlobalCheckpoint checkpoint);
+
+        // TODO
     };
 }
 
