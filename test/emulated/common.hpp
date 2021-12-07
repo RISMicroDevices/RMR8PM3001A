@@ -2,7 +2,6 @@
 //
 // Mixed emulation for common algorithm and modules
 //
-//  @see 'rat_freelist_checkpoint.v'
 //
 
 #include <bitset>

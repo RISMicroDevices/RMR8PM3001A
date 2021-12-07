@@ -2,7 +2,6 @@
 //
 // Mixed emulation base definitions and includes
 //
-//  @see 'rat_freelist_checkpoint.v'
 //
 
 #include <cstdint>
