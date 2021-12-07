@@ -2,7 +2,6 @@
 //
 // Mixed emulation for Issue Stage
 //
-//  @see 'rat_freelist_checkpoint.v'
 //
 
 #include <list>
@@ -10,8 +9,7 @@
 #include <bitset>
 
 #include "base.hpp"
-
-#define EMULATED_GC_COUNT                                           8
+#include "core_global.hpp"
 
 #define EMULATED_PRF_SIZE                                           64
 
@@ -43,13 +41,7 @@ namespace MEMU::Core::Issue {
 
         virtual void    Eval() override;
     };
-
-
-    class GlobalCheckpointTable : public MEMU::Emulated
-    {
-
-    };
-
+    
 
     class RegisterAliasTable final : public MEMU::Emulated
     {
