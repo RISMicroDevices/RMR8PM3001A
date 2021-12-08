@@ -11,10 +11,10 @@
 #include "base.hpp"
 #include "core_global.hpp"
 
-#define EMULATED_PRF_SIZE                                           64
+#define EMULATED_PRF_SIZE                           64
 
-#define EMULATED_RAT_SIZE                                           EMULATED_PRF_SIZE
-#define EMULATED_RAT_GC_COUNT                                       EMULATED_GC_COUNT
+#define EMULATED_RAT_SIZE                           EMULATED_PRF_SIZE
+#define EMULATED_RAT_GC_COUNT                       EMULATED_GC_COUNT
 
 using namespace std;
 
@@ -41,7 +41,7 @@ namespace MEMU::Core::Issue {
 
         virtual void    Eval() override;
     };
-    
+
 
     class RegisterAliasTable final : public MEMU::Emulated
     {
@@ -78,25 +78,31 @@ namespace MEMU::Core::Issue {
         };
 
         class GlobalCheckpoint {
+        private:
+            constexpr static int    gc_size = EMULATED_RAT_SIZE;
+
         public:
-            bitset<EMULATED_RAT_SIZE>   V; // saved Mapping entry Valid
+            bitset<gc_size>         V; // Saved Mapping entry Valid
 
             GlobalCheckpoint();
             GlobalCheckpoint(const GlobalCheckpoint& obj);
             ~GlobalCheckpoint();
 
-            constexpr int   GetSize() const;
+            constexpr int               GetSize() const;
 
-            bool            GetValid(int index) const;
-            void            SetValid(int index, bool valid);
+            bool                        GetValid(int index) const;
+            void                        SetValid(int index, bool valid);
 
-            void            operator=(const Entry& obj);
-            bool&           operator[](const int index);
+            void                        operator=(const GlobalCheckpoint& obj);
+            bitset<gc_size>::reference& operator[](const int index);
         };
 
     private:
-        Entry               entries[EMULATED_RAT_SIZE];
-        GlobalCheckpoint    checkpoints[EMULATED_RAT_GC_COUNT];   
+        constexpr static int    rat_size     = EMULATED_RAT_SIZE;
+        constexpr static int    rat_gc_count = EMULATED_RAT_GC_COUNT;
+
+        Entry                   entries     [rat_size];
+        GlobalCheckpoint        checkpoints [rat_gc_count];   
 
     public:
         RegisterAliasTable();
@@ -107,14 +113,17 @@ namespace MEMU::Core::Issue {
         constexpr int       GetCheckpointCount() const;
 
         Entry*              GetEntryReference(int index);
-        Entry               GetEntry(int index);
+        Entry               GetEntry(int index) const;
         void                SetEntry(int index, Entry entry);
 
         GlobalCheckpoint*   GetCheckpointReference(int index);
-        GlobalCheckpoint    GetCheckpoint(int index);
+        GlobalCheckpoint    GetCheckpoint(int index) const;
         void                SetCheckpoint(int index, GlobalCheckpoint checkpoint);
 
+
         // TODO
+
+        virtual void        Eval() override;
     };
 }
 
@@ -141,17 +150,17 @@ namespace MEMU::Core::Issue {
         return EMULATED_PRF_SIZE;
     }
 
-    bool PhysicalRegisterFile::CheckBound(int index) const
+    inline bool PhysicalRegisterFile::CheckBound(int index) const
     {
         return (index >= 0) && (index < EMULATED_PRF_SIZE);
     }
 
-    int64_t PhysicalRegisterFile::Get(int index) const
+    inline int64_t PhysicalRegisterFile::Get(int index) const
     {
         return prfs[index];
     }
 
-    void PhysicalRegisterFile::Set(int index, int64_t value)
+    inline void PhysicalRegisterFile::Set(int index, int64_t value)
     {
         writing_index = index;
         writing_value = value;
@@ -167,3 +176,154 @@ namespace MEMU::Core::Issue {
         writing_index = -1;
     }
 }
+
+
+// class MEMU::Core::Issue::RegisterAliasTable::Entry
+namespace MEMU::Core::Issue {
+    /*
+    int     FID;
+    bool    FV;
+    bool    NRA;
+
+    int     PRF;
+    int     ARF;
+    bool    V;
+    */
+
+    RegisterAliasTable::Entry::Entry()
+        : FID   (0)
+        , FV    (false)
+        , NRA   (false)
+        , PRF   (0)
+        , ARF   (0)
+        , V     (false)
+    { }
+
+    RegisterAliasTable::Entry::Entry(const RegisterAliasTable::Entry& obj)
+        : FID   (obj.FID)
+        , FV    (obj.FV)
+        , NRA   (obj.NRA)
+        , PRF   (obj.PRF)
+        , ARF   (obj.ARF)
+        , V     (obj.V)
+    { }
+
+    RegisterAliasTable::Entry::~Entry()
+    { }
+
+    inline int RegisterAliasTable::Entry::GetFID() const
+    {
+        return FID;
+    }
+
+    inline bool RegisterAliasTable::Entry::GetFV() const
+    {
+        return FV;
+    }
+
+    inline bool RegisterAliasTable::Entry::GetNRA() const
+    {
+        return NRA;
+    }
+
+    inline int RegisterAliasTable::Entry::GetPRF() const
+    {
+        return PRF;
+    }
+
+    inline int RegisterAliasTable::Entry::GetARF() const
+    {
+        return ARF;
+    }
+
+    inline bool RegisterAliasTable::Entry::GetValid() const
+    {
+        return V;
+    }
+
+    inline void RegisterAliasTable::Entry::SetFID(int val)
+    {
+        FID = val;
+    }
+
+    inline void RegisterAliasTable::Entry::SetFV(bool val)
+    {
+        FV = val;
+    }
+
+    inline void RegisterAliasTable::Entry::SetNRA(bool val)
+    {
+        NRA = val;
+    }
+
+    inline void RegisterAliasTable::Entry::SetPRF(int val)
+    {
+        PRF = val;
+    }
+
+    inline void RegisterAliasTable::Entry::SetARF(int val)
+    {
+        ARF = val;
+    }
+
+    inline void RegisterAliasTable::Entry::SetValid(bool val)
+    {
+        V = val;
+    }
+
+    void RegisterAliasTable::Entry::operator=(const RegisterAliasTable::Entry& obj)
+    {
+        FID = obj.FID;
+        FV = obj.FV;
+        NRA = obj.NRA;
+        PRF = obj.PRF;
+        ARF = obj.ARF;
+        V = obj.V;
+    }
+}
+
+
+// class MEMU::Core::Issue::RegisterAliasTable::GlobalCheckpoint
+namespace MEMU::Core::Issue {
+    /*
+    constexpr static int    gc_size = EMULATED_RAT_SIZE;
+
+    bitset<gc_size>         V;
+    */
+
+    RegisterAliasTable::GlobalCheckpoint::GlobalCheckpoint()
+    { }
+
+    RegisterAliasTable::GlobalCheckpoint::GlobalCheckpoint(const RegisterAliasTable::GlobalCheckpoint& obj)
+        : V(obj.V)
+    { }
+
+    RegisterAliasTable::GlobalCheckpoint::~GlobalCheckpoint()
+    { }
+
+    constexpr int RegisterAliasTable::GlobalCheckpoint::GetSize() const
+    {
+        return gc_size;
+    }
+
+    inline bool RegisterAliasTable::GlobalCheckpoint::GetValid(int index) const
+    {
+        return V[index];
+    }
+
+    inline void RegisterAliasTable::GlobalCheckpoint::SetValid(int index, bool valid)
+    {
+        V[index] = valid;
+    }
+
+    void RegisterAliasTable::GlobalCheckpoint::operator=(const RegisterAliasTable::GlobalCheckpoint& obj)
+    {
+        V = obj.V;
+    }
+
+    bitset<EMULATED_RAT_SIZE>::reference& RegisterAliasTable::GlobalCheckpoint::operator[](const int index)
+    {
+        return V[index];
+    }
+}
+
