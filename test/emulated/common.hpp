@@ -165,17 +165,17 @@ namespace MEMU::Common {
 
     template<typename __PayloadType>
     NormalBypassBuffer<__PayloadType>::NormalBypassBuffer()
-        : buffer_input_valid(false)
-        , buffer_bypass_valid(false)
-        , buffer_readed(false)
+        : buffer_input_valid    (false)
+        , buffer_bypass_valid   (false)
+        , buffer_readed         (false)
     { }
 
     template<typename __PayloadType>
     NormalBypassBuffer<__PayloadType>::NormalBypassBuffer(const NormalBypassBuffer<__PayloadType>& obj)
-        : buffer_input_valid(false)
-        , buffer_bypass_valid(obj.buffer_bypass_valid)
-        , buffer_bypass(obj.buffer_bypass)
-        , buffer_readed(false)
+        : buffer_input_valid    (false)
+        , buffer_bypass_valid   (obj.buffer_bypass_valid)
+        , buffer_bypass         (obj.buffer_bypass)
+        , buffer_readed         (false)
     { }
 
     template<typename __PayloadType>
@@ -183,38 +183,38 @@ namespace MEMU::Common {
     { }
 
     template<typename __PayloadType>
-    bool NormalBypassBuffer<__PayloadType>::IsWritable() const
+    inline bool NormalBypassBuffer<__PayloadType>::IsWritable() const
     {
         return !buffer_bypass_valid;
     }
 
     template<typename __PayloadType>
-    bool NormalBypassBuffer<__PayloadType>::IsReadable() const
+    inline bool NormalBypassBuffer<__PayloadType>::IsReadable() const
     {
         return buffer_input_valid || buffer_bypass_valid;
     }
 
     template<typename __PayloadType>
-    bool NormalBypassBuffer<__PayloadType>::IsInputValid() const
+    inline bool NormalBypassBuffer<__PayloadType>::IsInputValid() const
     {
         return buffer_input_valid;
     }
 
     template<typename __PayloadType>
-    bool NormalBypassBuffer<__PayloadType>::IsOutputValid() const
+    inline bool NormalBypassBuffer<__PayloadType>::IsOutputValid() const
     {
         return buffer_input_valid || buffer_bypass_valid;
     }
 
     template<typename __PayloadType>
-    void NormalBypassBuffer<__PayloadType>::SetInput(__PayloadType src) 
+    inline void NormalBypassBuffer<__PayloadType>::SetInput(__PayloadType src) 
     {
         buffer_input        = src;
         buffer_input_valid  = true;
     }
 
     template<typename __PayloadType>
-    void NormalBypassBuffer<__PayloadType>::ResetInput()
+    inline void NormalBypassBuffer<__PayloadType>::ResetInput()
     {
         buffer_input_valid  = false;
     }
@@ -288,21 +288,21 @@ namespace MEMU::Common {
 
     template<typename __PayloadType>
     FlushableBypassBuffer<__PayloadType>::FlushableBypassBuffer()
-        : buffer_input_valid(false)
-        , buffer_bypass_valid(false)
-        , buffer_flush(false)
-        , buffer_flushed(false)
-        , buffer_readed(false)
+        : buffer_input_valid    (false)
+        , buffer_bypass_valid   (false)
+        , buffer_flush          (false)
+        , buffer_flushed        (false)
+        , buffer_readed         (false)
     { }
 
     template<typename __PayloadType>
     FlushableBypassBuffer<__PayloadType>::FlushableBypassBuffer(const FlushableBypassBuffer& obj)
-        : buffer_input_valid(false)
-        , buffer_bypass_valid(obj.buffer_bypass_valid)
-        , buffer_bypass(obj.buffer_bypass)
-        , buffer_flush(false)
-        , buffer_flushed(false)
-        , buffer_readed(false)
+        : buffer_input_valid    (false)
+        , buffer_bypass_valid   (obj.buffer_bypass_valid)
+        , buffer_bypass         (obj.buffer_bypass)
+        , buffer_flush          (false)
+        , buffer_flushed        (false)
+        , buffer_readed         (false)
     { }
 
     template<typename __PayloadType>
@@ -310,38 +310,38 @@ namespace MEMU::Common {
     { }
 
     template<typename __PayloadType>
-    bool FlushableBypassBuffer<__PayloadType>::IsWritable() const
+    inline bool FlushableBypassBuffer<__PayloadType>::IsWritable() const
     {
         return !buffer_bypass_valid && !buffer_flush;
     }
 
     template<typename __PayloadType>
-    bool FlushableBypassBuffer<__PayloadType>::IsReadable() const
+    inline bool FlushableBypassBuffer<__PayloadType>::IsReadable() const
     {
         return (buffer_bypass_valid || buffer_input_valid) && !buffer_flush;
     }
 
     template<typename __PayloadType>
-    bool FlushableBypassBuffer<__PayloadType>::IsInputValid() const
+    inline bool FlushableBypassBuffer<__PayloadType>::IsInputValid() const
     {
         return buffer_input_valid;
     }
 
     template<typename __PayloadType>
-    bool FlushableBypassBuffer<__PayloadType>::IsOutputValid() const
+    inline bool FlushableBypassBuffer<__PayloadType>::IsOutputValid() const
     {
         return (buffer_bypass_valid || buffer_input_valid) && !buffer_flush;
     }
 
     template<typename __PayloadType>
-    void FlushableBypassBuffer<__PayloadType>::SetInput(__PayloadType src)
+    inline void FlushableBypassBuffer<__PayloadType>::SetInput(__PayloadType src)
     {
         buffer_input        = src;
         buffer_input_valid  = true;
     }
 
     template<typename __PayloadType>
-    void FlushableBypassBuffer<__PayloadType>::ResetInput()
+    inline void FlushableBypassBuffer<__PayloadType>::ResetInput()
     {
         buffer_input_valid  = false;
     }
@@ -425,17 +425,17 @@ namespace MEMU::Common {
 
     template<int __size_log2>
     PseudoLRUSwap<__size_log2>::PseudoLRUSwap()
-        : lru_picked_index(-1)
-        , lru_update_index(-1)
+        : lru_picked_index  (-1)
+        , lru_update_index  (-1)
     { 
         Eval();
     }
 
     template<int __size_log2>
     PseudoLRUSwap<__size_log2>::PseudoLRUSwap(const PseudoLRUSwap<__size_log2>& obj)
-        : lru_bits(obj.lru_bits)
-        , lru_picked_index(-1)
-        , lru_update_index(-1)
+        : lru_bits          (obj.lru_bits)
+        , lru_picked_index  (-1)
+        , lru_update_index  (-1)
     { 
         Eval();
     }
@@ -451,19 +451,19 @@ namespace MEMU::Common {
     }
 
     template<int __size_log2>
-    int PseudoLRUSwap<__size_log2>::GetPicked() const
+    inline int PseudoLRUSwap<__size_log2>::GetPicked() const
     {
         return lru_picked_index;        
     }
 
     template<int __size_log2>
-    bool PseudoLRUSwap<__size_log2>::IsPicked(int index) const
+    inline bool PseudoLRUSwap<__size_log2>::IsPicked(int index) const
     {
         return lru_picked_index == index;
     }
 
     template<int __size_log2>
-    void PseudoLRUSwap<__size_log2>::Update(int index)
+    inline void PseudoLRUSwap<__size_log2>::Update(int index)
     {
         lru_update_index = index;
     }
@@ -523,17 +523,17 @@ namespace MEMU::Common {
 
     template<int __size_log2>
     PseudoLRUPick<__size_log2>::PseudoLRUPick()
-        : lru_update_index(-1)
-        , lru_sub_picked_index(-1)
+        : lru_update_index      (-1)
+        , lru_sub_picked_index  (-1)
     { 
         Eval();
     }
 
     template<int __size_log2>
     PseudoLRUPick<__size_log2>::PseudoLRUPick(const PseudoLRUPick<__size_log2>& obj)
-        : lru_bits(obj.lru_bits)
-        , lru_update_index(-1)
-        , lru_sub_picked_index(-1)
+        : lru_bits              (obj.lru_bits)
+        , lru_update_index      (-1)
+        , lru_sub_picked_index  (-1)
     {  
         Eval();
     }
@@ -567,7 +567,7 @@ namespace MEMU::Common {
     }
 
     template<int __size_log2>
-    void PseudoLRUPick<__size_log2>::Update(int index)
+    inline void PseudoLRUPick<__size_log2>::Update(int index)
     {
         lru_update_index = index;
     }
@@ -584,7 +584,7 @@ namespace MEMU::Common {
     }
 
     template<int __size_log2>
-    void PseudoLRUPick<__size_log2>::ResetValid()
+    inline void PseudoLRUPick<__size_log2>::ResetValid()
     {
         lru_sub_picked_index = lru_sub_count;
     }
