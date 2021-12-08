@@ -4,38 +4,27 @@
 //  (RISC-V 64-bit Privileged Minimal System Processor for T110 ASIC)
 //
 //  DFF-base RAM module with Bit Write Enable
-//  (Simple dual-port: 3 address ports, 2 read ports, 1 write port)
+//  (Single-port: 1 address port, 1 read port, 1 write port)
 //
 // @author Kumonda221
 //
 
-
 `define     RAM_DEPTH       (1 << RAM_ADDR_WIDTH)
 
-module common_dffram_3a1wb2r #(
+module common_dffram_1a1we1r #(
     parameter                                       RAM_DATA_WIDTH      = 1,
     parameter                                       RAM_ADDR_WIDTH      = 1,
     parameter [`RAM_DEPTH * RAM_DATA_WIDTH - 1:0]   RAM_RESET_VALUE     = { (`RAM_DEPTH){ {(RAM_DATA_WIDTH){1'b0}} } }
 ) (
-    input  wire                             clk,
-    input  wire                             reset,
+    input   wire                            clk,
+    input   wire                            reset,
 
-    // Port A - write only
-    input  wire [RAM_ADDR_WIDTH - 1:0]      addra,
-    input  wire                             ena,
-    input  wire [RAM_DATA_WIDTH - 1:0]      wea,
+    input   wire [RAM_ADDR_WIDTH - 1:0]     addr,
+    input   wire                            en,
+    input   wire [RAM_DATA_WIDTH - 1:0]     we,
 
-    input  wire [RAM_DATA_WIDTH - 1:0]      dina,
-
-    // Port B - read only
-    input  wire [RAM_ADDR_WIDTH - 1:0]      addrb,
-
-    output wire [RAM_DATA_WIDTH - 1:0]      doutb,
-
-    // Port C - read only
-    input  wire [RAM_ADDR_WIDTH - 1:0]      addrc,
-
-    output wire [RAM_DATA_WIDTH - 1:0]      doutc
+    input   wire [RAM_DATA_WIDTH - 1:0]     din,
+    output  wire [RAM_DATA_WIDTH - 1:0]     dout
 );
 
     //
@@ -58,20 +47,18 @@ module common_dffram_3a1wb2r #(
                 .reset  (reset),
 
                 .en     (dff_we),
-                .d      (dina),
+                .d      (din),
 
                 .q      (dff_dout[i])
             );
 
-            assign dff_we  = wea & { (RAM_DATA_WIDTH){ena} } & { (RAM_DATA_WIDTH){addra == i} };
+            assign dff_we  = we & { (RAM_DATA_WIDTH){en} } & { (RAM_DATA_WIDTH){addr == i} };
             //
         end
     endgenerate
 
     //
-    assign  doutb = dff_dout[addrb];
-
-    assign  doutc = dff_dout[addrc];
+    assign  dout = dff_dout[addr];
 
     //
 

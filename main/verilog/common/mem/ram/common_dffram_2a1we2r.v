@@ -14,7 +14,7 @@
 
 `define     RAM_DEPTH       (1 << RAM_ADDR_WIDTH)
 
-module common_dffram_2a1wb2r #(
+module common_dffram_2a1we2r #(
     parameter                                       RAM_DATA_WIDTH      = 1,
     parameter                                       RAM_ADDR_WIDTH      = 1,
     parameter [`RAM_DEPTH * RAM_DATA_WIDTH - 1:0]   RAM_RESET_VALUE     = { (`RAM_DEPTH){ {(RAM_DATA_WIDTH){1'b0}} } }

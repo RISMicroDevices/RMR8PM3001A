@@ -4,7 +4,7 @@
 //  (RISC-V 64-bit Privileged Minimal System Processor for T110 ASIC)
 //
 //  DFF-base RAM module with Bit Write Enable
-//  (Simple dual-port: 2 address ports, 1 read port, 1 write port)
+//  (Simple dual-port: 3 address ports, 2 read ports, 1 write port)
 //
 // @author Kumonda221
 //
@@ -12,7 +12,7 @@
 
 `define     RAM_DEPTH       (1 << RAM_ADDR_WIDTH)
 
-module common_dffram_2a1wb1r #(
+module common_dffram_3a1we2r #(
     parameter                                       RAM_DATA_WIDTH      = 1,
     parameter                                       RAM_ADDR_WIDTH      = 1,
     parameter [`RAM_DEPTH * RAM_DATA_WIDTH - 1:0]   RAM_RESET_VALUE     = { (`RAM_DEPTH){ {(RAM_DATA_WIDTH){1'b0}} } }
@@ -30,7 +30,12 @@ module common_dffram_2a1wb1r #(
     // Port B - read only
     input  wire [RAM_ADDR_WIDTH - 1:0]      addrb,
 
-    output wire [RAM_DATA_WIDTH - 1:0]      doutb
+    output wire [RAM_DATA_WIDTH - 1:0]      doutb,
+
+    // Port C - read only
+    input  wire [RAM_ADDR_WIDTH - 1:0]      addrc,
+
+    output wire [RAM_DATA_WIDTH - 1:0]      doutc
 );
 
     //
@@ -66,6 +71,9 @@ module common_dffram_2a1wb1r #(
     //
     assign  doutb = dff_dout[addrb];
 
+    assign  doutc = dff_dout[addrc];
+
     //
 
 endmodule
+
