@@ -13,12 +13,9 @@
 `define     INPUT_WIDTH             INPUT_COUNT
 `define     OUTPUT_WIDTH            $clog2(INPUT_COUNT)
 
-`define     PRIORITY_LOWER_FIRST    0
-`define     PRIORITY_HIGHER_FIRST   1
-
 module macro_pick1_priority_bin #(
-    parameter               INPUT_COUNT = 1,
-    parameter               PRIORITY    = `PRIORITY_LOWER_FIRST
+    parameter               INPUT_COUNT             = 1,
+    parameter               PRIORITY_LOWER_FIRST    = 1
 ) (
     input   wire [`INPUT_WIDTH - 1:0]       dvalid,
     output  wire [`OUTPUT_WIDTH - 1:0]      qaddr,
@@ -68,7 +65,7 @@ module macro_pick1_priority_bin #(
                 wire                        qvalid;
 
                 //
-                if (PRIORITY == `PRIORITY_LOWER_FIRST) begin
+                if (PRIORITY_LOWER_FIRST) begin
 
                     macro_pick1_prioritylf_bin_unit #(
                         .OUTPUT_WIDTH(`OUTPUT_WIDTH)
@@ -83,7 +80,7 @@ module macro_pick1_priority_bin #(
                         .qvalid (qvalid)
                     );
                 end
-                else if (PRIORITY == `PRIORITY_HIGHER_FIRST) begin
+                else begin
                     
                     macro_pick1_priorityhf_bin_unit #(
                         .OUTPUT_WIDTH(`OUTPUT_WIDTH)
