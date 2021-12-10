@@ -21,23 +21,23 @@ module common_dffram_2a1w1r #(
 
     parameter                                       PORTB_ONEHOT_ADDRESSING = 0,
 
-    localparam                                      RAM_ADDR_PORTA_WIDTH    = PORTA_ONEHOT_ADDRESSING ? RAM_DEPTH : $clog2(RAM_DEPTH),
-    localparam                                      RAM_WE_PORTA_WIDTH      = PORTA_BIT_WRITE_ENABLE ? RAM_DATA_WIDTH : 1,
+    localparam                                      RAM_PORTA_ADDR_WIDTH    = PORTA_ONEHOT_ADDRESSING ? RAM_DEPTH : $clog2(RAM_DEPTH),
+    localparam                                      RAM_PORTA_WE_WIDTH      = PORTA_BIT_WRITE_ENABLE ? RAM_DATA_WIDTH : 1,
 
-    localparam                                      RAM_ADDR_PORTB_WIDTH    = PORTB_ONEHOT_ADDRESSING ? RAM_DEPTH : $clog2(RAM_DEPTH)
+    localparam                                      RAM_PORTB_ADDR_WIDTH    = PORTB_ONEHOT_ADDRESSING ? RAM_DEPTH : $clog2(RAM_DEPTH)
 ) (
     input  wire                                 clk,
     input  wire                                 reset,
 
     // Port A - write only
-    input  wire [RAM_ADDR_PORTA_WIDTH - 1:0]    addra,
+    input  wire [RAM_PORTA_ADDR_WIDTH - 1:0]    addra,
     input  wire                                 ena,
-    input  wire [RAM_WE_PORTA_WIDTH - 1:0]      wea,
+    input  wire [RAM_PORTA_WE_WIDTH - 1:0]      wea,
 
     input  wire [RAM_DATA_WIDTH - 1:0]          dina,
 
     // Port B - read only
-    input  wire [RAM_ADDR_PORTB_WIDTH - 1:0]    addrb,
+    input  wire [RAM_PORTB_ADDR_WIDTH - 1:0]    addrb,
 
     output wire [RAM_DATA_WIDTH - 1:0]          doutb
 );
@@ -55,7 +55,7 @@ module common_dffram_2a1w1r #(
         else begin :GENERATED_ADDRESS_INPUT_PORTA_BINARY
             
             macro_decoder_onehot_bin #(
-                .INPUT_WIDTH    (RAM_ADDR_PORTA_WIDTH)
+                .INPUT_WIDTH    (RAM_PORTA_ADDR_WIDTH)
             ) macro_decoder_onehot_bin_INST_addra (
                 .d  (addra),
                 .q  (dff_i_addra)
@@ -69,7 +69,7 @@ module common_dffram_2a1w1r #(
         else begin :GENERATED_ADDRESS_INPUT_PORTB_BINARY
             
             macro_decoder_onehot_bin #(
-                .INPUT_WIDTH    (RAM_ADDR_PORTB_WIDTH)
+                .INPUT_WIDTH    (RAM_PORTB_ADDR_WIDTH)
             ) macro_decoder_onehot_bin_INST_addrb (
                 .d  (addrb),
                 .q  (dff_i_addrb)
@@ -84,7 +84,7 @@ module common_dffram_2a1w1r #(
 
             //
             wire [RAM_DATA_WIDTH - 1:0]     dff_q;
-            wire [RAM_WE_PORTA_WIDTH - 1:0] dff_we;
+            wire [RAM_PORTA_WE_WIDTH - 1:0] dff_we;
 
             //
             if (PORTA_BIT_WRITE_ENABLE) begin

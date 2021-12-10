@@ -18,16 +18,16 @@ module common_dffram_1a1w1r #(
     parameter                                       BIT_WRITE_ENABLE    = 0,
 
     //
-    localparam                                      RAM_ADDR_PORT_WIDTH = ONEHOT_ADDRESSING ? RAM_DEPTH : $clog2(RAM_DEPTH),
-    localparam                                      RAM_WE_PORT_WIDTH   = BIT_WRITE_ENABLE ? RAM_DATA_WIDTH : 1
+    localparam                                      RAM_PORT_ADDR_WIDTH = ONEHOT_ADDRESSING ? RAM_DEPTH : $clog2(RAM_DEPTH),
+    localparam                                      RAM_PORT_WE_WIDTH   = BIT_WRITE_ENABLE ? RAM_DATA_WIDTH : 1
 ) (
     input   wire                                clk,
     input   wire                                reset,
 
     //
-    input   wire [RAM_ADDR_PORT_WIDTH - 1:0]    addr,
+    input   wire [RAM_PORT_ADDR_WIDTH - 1:0]    addr,
     input   wire                                en,
-    input   wire [RAM_WE_PORT_WIDTH - 1:0]      we, // TODO
+    input   wire [RAM_PORT_WE_WIDTH - 1:0]      we, // TODO
 
     //
     input   wire [RAM_DATA_WIDTH - 1:0]         din,
@@ -46,7 +46,7 @@ module common_dffram_1a1w1r #(
         else begin :GENERATED_ADDRESS_INPUT_BINARY
             
             macro_decoder_onehot_bin #(
-                .INPUT_WIDTH    (RAM_ADDR_PORT_WIDTH)
+                .INPUT_WIDTH    (RAM_PORT_ADDR_WIDTH)
             ) macro_decoder_onehot_bin_INST_addr (
                 .d  (addr),
                 .q  (dff_i_addr)
@@ -61,7 +61,7 @@ module common_dffram_1a1w1r #(
 
             //
             wire [RAM_DATA_WIDTH - 1:0]     dff_q;
-            wire [RAM_WE_PORT_WIDTH - 1:0]  dff_we;
+            wire [RAM_PORT_WE_WIDTH - 1:0]  dff_we;
 
             //
             if (BIT_WRITE_ENABLE) begin
