@@ -12,14 +12,14 @@
 `define     ADDR_WIDTH          (1 << $clog2(CAM_DEPTH))
 
 module common_dffcam_1a1w1qa #(
-    parameter       CAM_DEPTH                   = 1,
-    parameter       CAM_WIDTH                   = 1,
+    parameter       CAM_DEPTH                   = 8,
+    parameter       CAM_WIDTH                   = 8,
 
     parameter       WRITE_ADDRESS_ONEHOT        = 0,
     parameter       QUERY_ADDRESS_ONEHOT        = 0,
 
-    localparam      WRITE_ADDRESS_PORT_WIDTH    = WRITE_ADDRESS_ONEHOT ? CAM_DEPTH : (1 << $clog2(CAM_DEPTH)),
-    localparam      QUERY_ADDRESS_PORT_WIDTH    = QUERY_ADDRESS_ONEHOT ? CAM_DEPTH : (1 << $clog2(CAM_DEPTH))
+    localparam      WRITE_ADDRESS_PORT_WIDTH    = WRITE_ADDRESS_ONEHOT ? CAM_DEPTH : $clog2(CAM_DEPTH),
+    localparam      QUERY_ADDRESS_PORT_WIDTH    = QUERY_ADDRESS_ONEHOT ? CAM_DEPTH : $clog2(CAM_DEPTH)
 ) (
     input   wire                                    clk,
     input   wire                                    reset,
@@ -34,7 +34,8 @@ module common_dffcam_1a1w1qa #(
 
     //
     input   wire [CAM_WIDTH - 1:0]                  qdata,
-    output  wire [QUERY_ADDRESS_PORT_WIDTH - 1:0]   qaddr  
+    output  wire [QUERY_ADDRESS_PORT_WIDTH - 1:0]   qaddr,
+    output  wire                                    qvalid
 );
     //
     wire [(1 << $clog2(CAM_DEPTH)) - 1:0]   qaddr_1h;
@@ -85,7 +86,7 @@ module common_dffcam_1a1w1qa #(
             assign  dff_d   = wdata;
 
             //
-            assign  qaddr_1h[i] = dff_q == qdata;
+            assign  qaddr_1h[i] = dvalid[i] && (dff_q == qdata);
         end
     endgenerate
 
@@ -94,15 +95,23 @@ module common_dffcam_1a1w1qa #(
         
         if (QUERY_ADDRESS_ONEHOT) begin: GENERATED_QUERY_ADDRESS_PORT_ONEHOT
             
-            assign qaddr = qaddr_1h;
+            assign qaddr    = qaddr_1h;
+            assign qvalid   = 1'b1;
         end
         else begin: GENERATED_QUERY_ADDRESS_PORT_BINARY
             
             macro_encoder_onehot_bin #(
-                .OUTPUT_WIDTH(QUERY_ADDRESS_PORT_WIDTH)
+                .OUTPUT_WIDTH   (QUERY_ADDRESS_PORT_WIDTH)
             ) macro_encoder_onehot_bin_INST_qaddr (
-                .d  (qaddr_1h),
-                .q  (qaddr)
+                .d      (qaddr_1h),
+                .q      (qaddr)
+            );
+
+            macro_encoder_onehot_detect #(
+                .INPUT_WIDTH    (1 << $clog2(CAM_DEPTH))
+            ) macro_encoder_onehot_detect_INST_qvalid (
+                .d      (qaddr_1h),
+                .valid  (qvalid)
             );
         end
     endgenerate
