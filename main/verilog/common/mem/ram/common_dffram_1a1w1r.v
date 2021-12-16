@@ -10,16 +10,19 @@
 //
 
 module common_dffram_1a1w1r #(
-    parameter                                       RAM_DATA_WIDTH      = 1,
-    parameter                                       RAM_DEPTH           = 1,
-    parameter [RAM_DEPTH * RAM_DATA_WIDTH - 1:0]    RAM_RESET_VALUE     = { (RAM_DEPTH){ {(RAM_DATA_WIDTH){1'b0}} } },
+    parameter                                       RAM_WIDTH               = 1,
+    parameter                                       RAM_DEPTH               = 1,
+    parameter [RAM_DEPTH * RAM_WIDTH - 1:0]         RAM_RESET_VALUE         = { (RAM_DEPTH){ {(RAM_WIDTH){1'b0}} } },
 
-    parameter                                       ONEHOT_ADDRESSING   = 0,
-    parameter                                       BIT_WRITE_ENABLE    = 0,
+    parameter                                       ONEHOT_ADDRESSING       = 0,
+    parameter                                       BIT_WRITE_ENABLE        = 0,
+
+    parameter                                       DATA_COUPLED            = 0,
 
     //
-    localparam                                      RAM_PORT_ADDR_WIDTH = ONEHOT_ADDRESSING ? RAM_DEPTH : $clog2(RAM_DEPTH),
-    localparam                                      RAM_PORT_WE_WIDTH   = BIT_WRITE_ENABLE ? RAM_DATA_WIDTH : 1
+    localparam                                      RAM_PORT_ADDR_WIDTH     = ONEHOT_ADDRESSING ? RAM_DEPTH : $clog2(RAM_DEPTH),
+    localparam                                      RAM_PORT_WE_WIDTH       = BIT_WRITE_ENABLE ? RAM_WIDTH : 1,
+    localparam                                      RAM_PORT_TDATA_WIDTH    = DATA_COUPLED ? RAM_DEPTH * RAM_WIDTH : 1
 ) (
     input   wire                                clk,
     input   wire                                reset,
@@ -27,14 +30,17 @@ module common_dffram_1a1w1r #(
     //
     input   wire [RAM_PORT_ADDR_WIDTH - 1:0]    addr,
     input   wire                                en,
-    input   wire [RAM_PORT_WE_WIDTH - 1:0]      we, // TODO
+    input   wire [RAM_PORT_WE_WIDTH - 1:0]      we,
 
     //
-    input   wire [RAM_DATA_WIDTH - 1:0]         din,
-    output  wire [RAM_DATA_WIDTH - 1:0]         dout
+    input   wire [RAM_WIDTH - 1:0]              din,
+    output  wire [RAM_WIDTH - 1:0]              dout,
+
+    //
+    output  wire [RAM_PORT_TDATA_WIDTH - 1:0]   tdout
 );
     //
-    wire [RAM_DATA_WIDTH * RAM_DEPTH - 1:0]     dff_o_dout;
+    wire [RAM_WIDTH * RAM_DEPTH - 1:0]          dff_o_dout;
     wire [(1 << ($clog2(RAM_DEPTH))) - 1:0]     dff_i_addr;
 
     //
@@ -55,20 +61,27 @@ module common_dffram_1a1w1r #(
     endgenerate
 
     //
+    generate 
+        if (!DATA_COUPLED) begin :GENERATED_NOT_DATA_COUPLED
+            assign tdout = 'b0;
+        end
+    endgenerate
+
+    //
     genvar i;
     generate
         for (i = 0; i < RAM_DEPTH; i = i + 1) begin :GENERATED_RAM_DFFS
 
             //
-            wire [RAM_DATA_WIDTH - 1:0]     dff_q;
+            wire [RAM_WIDTH - 1:0]          dff_q;
             wire [RAM_PORT_WE_WIDTH - 1:0]  dff_we;
 
             //
             if (BIT_WRITE_ENABLE) begin
 
                 stdmacro_dffbe #(
-                    .DFF_WIDTH          (RAM_DATA_WIDTH),
-                    .DFF_RESET_VALUE    (RAM_RESET_VALUE[RAM_DATA_WIDTH * i +: RAM_DATA_WIDTH])
+                    .DFF_WIDTH          (RAM_WIDTH),
+                    .DFF_RESET_VALUE    (RAM_RESET_VALUE[RAM_WIDTH * i +: RAM_WIDTH])
                 ) stdmacro_dffbe_INST_dffram_dff (
                     .clk    (clk),
                     .reset  (reset),
@@ -79,13 +92,13 @@ module common_dffram_1a1w1r #(
                     .q      (dff_q)
                 );
 
-                assign dff_we  = we & { (RAM_DATA_WIDTH){en} } & { (RAM_DATA_WIDTH){ dff_i_addr[i] } };
+                assign dff_we  = we & { (RAM_WIDTH){en} } & { (RAM_WIDTH){ dff_i_addr[i] } };
             end
             else begin
 
                 stdmacro_dffe #(
-                    .DFF_WIDTH          (RAM_DATA_WIDTH),
-                    .DFF_RESET_VALUE    (RAM_RESET_VALUE[RAM_DATA_WIDTH * i +: RAM_DATA_WIDTH])
+                    .DFF_WIDTH          (RAM_WIDTH),
+                    .DFF_RESET_VALUE    (RAM_RESET_VALUE[RAM_WIDTH * i +: RAM_WIDTH])
                 ) stdmacro_dffe_INST_dffram_dff (
                     .clk    (clk),
                     .reset  (reset),
@@ -100,7 +113,12 @@ module common_dffram_1a1w1r #(
             end
 
             //
-            assign dff_o_dout[RAM_DATA_WIDTH * i +: RAM_DATA_WIDTH] = dff_q & {(RAM_DATA_WIDTH){ dff_i_addr[i] }};
+            assign dff_o_dout[RAM_WIDTH * i +: RAM_WIDTH] = dff_q & {(RAM_WIDTH){ dff_i_addr[i] }};
+
+            //
+            if (DATA_COUPLED) begin :GENERATED_DATA_COUPLED
+                assign tdout[RAM_WIDTH * i +: RAM_WIDTH]  = dff_q;
+            end
 
             //
         end
@@ -108,7 +126,7 @@ module common_dffram_1a1w1r #(
 
     //
     macro_reduction_or #(
-        .INPUT_WIDTH    (RAM_DATA_WIDTH),
+        .INPUT_WIDTH    (RAM_WIDTH),
         .INPUT_COUNT    (RAM_DEPTH)
     ) macro_reduction_or_INST_output (
         .d  (dff_o_dout),

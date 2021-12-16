@@ -24,12 +24,16 @@ module common_dffram_3a1w2r #(
 
     parameter                                       PORTC_ONEHOT_ADDRESSING = 0,
 
+    parameter                                       DATA_COUPLED            = 0,
+
     localparam                                      RAM_PORTA_ADDR_WIDTH    = PORTA_ONEHOT_ADDRESSING ? RAM_DEPTH : $clog2(RAM_DEPTH),
     localparam                                      RAM_PORTA_WE_WIDTH      = PORTA_BIT_WRITE_ENABLE ? RAM_DATA_WIDTH : 1,
 
     localparam                                      RAM_PORTB_ADDR_WIDTH    = PORTB_ONEHOT_ADDRESSING ? RAM_DEPTH : $clog2(RAM_DEPTH),
 
-    localparam                                      RAM_PORTC_ADDR_WIDTH    = PORTC_ONEHOT_ADDRESSING ? RAM_DEPTH : $clog2(RAM_DEPTH)
+    localparam                                      RAM_PORTC_ADDR_WIDTH    = PORTC_ONEHOT_ADDRESSING ? RAM_DEPTH : $clog2(RAM_DEPTH),
+
+    localparam                                      RAM_PORT_TDATA_WIDTH    = DATA_COUPLED ? RAM_DEPTH * RAM_DATA_WIDTH : 1
 ) (
     input  wire                             clk,
     input  wire                             reset,
@@ -49,7 +53,10 @@ module common_dffram_3a1w2r #(
     // Port C - read only
     input  wire [RAM_PORTC_ADDR_WIDTH - 1:0]    addrc,
     
-    output wire [RAM_DATA_WIDTH - 1:0]          doutc
+    output wire [RAM_DATA_WIDTH - 1:0]          doutc,
+
+    // Data coupled output
+    output wire [RAM_PORT_TDATA_WIDTH - 1:0]    tdout
 );
 
     //
@@ -105,6 +112,13 @@ module common_dffram_3a1w2r #(
     endgenerate
 
     //
+    generate
+        if (!DATA_COUPLED) begin :GENERATED_NOT_DATA_COUPLED
+            assign tdout = 'b0;
+        end
+    endgenerate
+
+    //
     genvar i;
     generate
         for (i = 0; i < RAM_DEPTH; i = i + 1) begin :GENERATED_RAM_DFFS
@@ -153,6 +167,11 @@ module common_dffram_3a1w2r #(
             assign dff_o_doutb[RAM_DATA_WIDTH * i +: RAM_DATA_WIDTH]    = dff_q & {(RAM_DATA_WIDTH){ dff_i_addrb[i] }};
 
             assign dff_o_doutc[RAM_DATA_WIDTH * i +: RAM_DATA_WIDTH]    = dff_q & {(RAM_DATA_WIDTH){ dff_i_addrc[i] }};
+
+            //
+            if (DATA_COUPLED) begin: GENERATED_DATA_COUPLED
+                assign tdout[RAM_DATA_WIDTH * i +: RAM_DATA_WIDTH]      = dff_q;
+            end
 
             //
         end

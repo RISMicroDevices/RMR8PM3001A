@@ -24,10 +24,14 @@ module common_dffram_2a1w2r #(
 
     parameter                                       PORTB_ONEHOT_ADDRESSING = 0,
 
+    parameter                                       DATA_COUPLED            = 0,
+
     localparam                                      RAM_PORTA_ADDR_WIDTH    = PORTA_ONEHOT_ADDRESSING ? RAM_DEPTH : $clog2(RAM_DEPTH),
     localparam                                      RAM_PORTA_WE_WIDTH      = PORTA_BIT_WRITE_ENABLE ? RAM_DATA_WIDTH : 1,
 
-    localparam                                      RAM_PORTB_ADDR_WIDTH    = PORTB_ONEHOT_ADDRESSING ? RAM_DEPTH : $clog2(RAM_DEPTH)
+    localparam                                      RAM_PORTB_ADDR_WIDTH    = PORTB_ONEHOT_ADDRESSING ? RAM_DEPTH : $clog2(RAM_DEPTH),
+
+    localparam                                      RAM_PORT_TDATA_WIDTH    = DATA_COUPLED ? RAM_DEPTH * RAM_DATA_WIDTH : 1
 ) (
     input  wire                                 clk,
     input  wire                                 reset,
@@ -43,7 +47,10 @@ module common_dffram_2a1w2r #(
     // Port B - read only
     input  wire [RAM_PORTB_ADDR_WIDTH - 1:0]    addrb,
 
-    output wire [RAM_DATA_WIDTH - 1:0]          doutb
+    output wire [RAM_DATA_WIDTH - 1:0]          doutb,
+
+    // Data coupled output
+    output wire [RAM_PORT_TDATA_WIDTH - 1:0]    tdout
 );
 
     //
@@ -80,6 +87,13 @@ module common_dffram_2a1w2r #(
                 .d  (addrb),
                 .q  (dff_i_addrb)
             );
+        end
+    endgenerate
+
+    //
+    generate
+        if (!DATA_COUPLED) begin: GENERATED_NOT_DATA_COUPLED
+            assign tdout = 'b0;
         end
     endgenerate
 
@@ -132,6 +146,11 @@ module common_dffram_2a1w2r #(
             assign dff_o_douta[RAM_DATA_WIDTH * i +: RAM_DATA_WIDTH]    = dff_q & {(RAM_DATA_WIDTH){ dff_i_addra[i] }};
 
             assign dff_o_doutb[RAM_DATA_WIDTH * i +: RAM_DATA_WIDTH]    = dff_q & {(RAM_DATA_WIDTH){ dff_i_addrb[i] }};
+
+            //
+            if (DATA_COUPLED) begin: GENERATED_DATA_COUPLED
+                assign tdout [RAM_DATA_WIDTH * i +: RAM_DATA_WIDTH]     = dff_q;
+            end
 
             //
         end
