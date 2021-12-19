@@ -32,6 +32,7 @@ namespace MEMU::Common {
         virtual void    Eval() override = 0;
     };
 
+    //
     template<typename __PayloadType>
     class NormalBypassBuffer final : public BypassBuffer<__PayloadType>
     {
@@ -62,6 +63,7 @@ namespace MEMU::Common {
         virtual void    Eval() override;
     };
 
+    //
     template<typename __PayloadType>
     class FlushableBypassBuffer final : public BypassBuffer<__PayloadType>
     {
@@ -96,6 +98,7 @@ namespace MEMU::Common {
         virtual void    Eval() override;
     };
 
+    //
     template<int __size_log2>
     class PseudoLRUSwap final : public MEMU::Emulated
     {
@@ -121,6 +124,7 @@ namespace MEMU::Common {
         virtual void    Eval() override;
     };
 
+    //
     template<int __size_log2>
     class PseudoLRUPick final : public MEMU::Emulated
     {
@@ -149,6 +153,46 @@ namespace MEMU::Common {
         void            ResetValid();
 
         virtual void    Eval() override;
+    };
+
+
+    // Single write port, read through
+    //
+    template<typename __PayloadType>
+    class W1RTRandomAccessMemory final : public MEMU::Emulated
+    {
+        private:
+            __PayloadType* memory;
+
+        public:
+            W1RTRandomAccessMemory(int size);
+            ~W1RTRandomAccessMemory();
+
+            int         GetSize() const;
+            bool        CheckBound(int address) const;
+
+            // TODO
+    };
+
+    // Dual write ports, read through
+    //
+    class W2RTRandomAccessMemory final : public MEMU::Emulated
+    {
+
+    };
+
+    // Single write port, read delayed
+    //
+    class W1RDRandomAccessMemory final : public MEMU::Emulated
+    {
+
+    };
+
+    // Dual write ports, read delayed
+    //
+    class W2RDRandomAccessMemory final : public MEMU::Emulated
+    {
+
     };
 }
 
