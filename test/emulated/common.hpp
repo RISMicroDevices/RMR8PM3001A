@@ -173,6 +173,8 @@ namespace MEMU::Common {
 
             void                                Reset();
 
+            bool                                IsValid() const;
+
             DelayedMemoryRead<__PayloadType>*   GetNext() const;
             void                                SetNext(DelayedMemoryRead<__PayloadType>* next);
 
@@ -809,6 +811,12 @@ namespace MEMU::Common {
     }
 
     template<typename __PayloadType>
+    inline bool DelayedMemoryRead<__PayloadType>::IsValid() const
+    {
+        return target_address >= 0;
+    }
+
+    template<typename __PayloadType>
     inline DelayedMemoryRead<__PayloadType>* DelayedMemoryRead<__PayloadType>::GetNext() const
     {
         return next;
@@ -940,6 +948,6 @@ namespace MEMU::Common {
 
 // class MEMU::Common::W1RDRandomAccessMemory
 namespace MEMU::Common {
-
+    
 }
 
