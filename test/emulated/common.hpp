@@ -156,6 +156,41 @@ namespace MEMU::Common {
         virtual void    Eval() override;
     };
 
+    // STRUCT Handle of Delayed Memory Read Operation
+    template<typename __PayloadType>
+    class DelayedMemoryRead final {
+        private:
+            DelayedMemoryRead<__PayloadType>*   next;
+
+            int                                 target_address;
+            __PayloadType*                      target_destination;
+
+        public:
+            DelayedMemoryRead();
+            DelayedMemoryRead(int addr, __PayloadType* dst);
+            DelayedMemoryRead(const DelayedMemoryRead& obj);
+            ~DelayedMemoryRead();
+
+            void                                Reset();
+
+            DelayedMemoryRead<__PayloadType>*   GetNext() const;
+            void                                SetNext(DelayedMemoryRead<__PayloadType>* next);
+
+            int                                 GetAddress() const;
+            __PayloadType*                      GetDestination() const;
+
+            void                                SetAddress(int addr);
+            void                                SetDestination(__PayloadType* dst);
+    };
+
+    // ENUM Memory Read Mode
+    //
+    typedef enum __tag_MemoryReadMode 
+    {
+        READ_FIRST = 0,
+        WRITE_FIRST
+
+    } MemoryReadMode;
 
     // Single write port, read through
     //
@@ -163,26 +198,28 @@ namespace MEMU::Common {
     class W1RTRandomAccessMemory final : public MEMU::Emulated
     {
         private:
-            __PayloadType*  memory;
-            const int       size;
+            __PayloadType*          memory;
+            const int               size;
+            const MemoryReadMode    rmode;
 
-            int             write_p0_address;
-            __PayloadType   write_p0_payload;
+            int                     write_p0_address;
+            __PayloadType           write_p0_payload;
 
         public:
-            W1RTRandomAccessMemory(int size);
+            W1RTRandomAccessMemory(const int size, const MemoryReadMode rmode);
             W1RTRandomAccessMemory(const W1RTRandomAccessMemory<__PayloadType>& obj);
             ~W1RTRandomAccessMemory();
 
-            int         GetSize() const;
-            bool        CheckBound(int address) const;
+            int             GetSize() const;
+            MemoryReadMode  GetReadMode() const;
+            bool            CheckBound(int address) const;
 
-            void        ReadThrough(int address, __PayloadType* dst) const;
+            void            ReadThrough(int address, __PayloadType* dst) const;
             
-            void        SetWrite(int address, __PayloadType src);
-            void        ResetWrite();
+            void            SetWrite(int address, __PayloadType src);
+            void            ResetWrite();
 
-            void        Eval() override;
+            void            Eval() override;
     };
 
     // Dual write ports, read through
@@ -211,8 +248,7 @@ namespace MEMU::Common {
             int             write_p0_address;
             __PayloadType   write_p0_payload;
 
-            int             read_p0_address;
-            __PayloadType*  read_p0_destination;
+            // TODO
 
         public:
             W1RDRandomAccessMemory(int size);
@@ -735,18 +771,96 @@ namespace MEMU::Common {
 }
 
 
-// class MEMU::Common::W1RTRandomAccessMemory
+// class MEMU::Common::DelayedMemoryRead
 namespace MEMU::Common {
     /*
-     __PayloadType* memory;
+    DelayedMemoryRead<__PayloadType>*   next;
 
-    int             write_p0_address;
-    __PayloadType   write_p0_payload;
+    int                                 target_address;
+    __PayloadType*                      target_destination;
     */
 
     template<typename __PayloadType>
-    W1RTRandomAccessMemory<__PayloadType>::W1RTRandomAccessMemory(int size)
+    DelayedMemoryRead<__PayloadType>::DelayedMemoryRead()
+        : next              (nullptr)
+        , target_address    (-1)
+        , target_destination(nullptr)
+    { }
+
+    template<typename __PayloadType>
+    DelayedMemoryRead<__PayloadType>::DelayedMemoryRead(int addr, __PayloadType* dst)
+        : next              (nullptr)
+        , target_address    (addr)
+        , target_destination(dst)
+    { }
+
+    template<typename __PayloadType>
+    DelayedMemoryRead<__PayloadType>::DelayedMemoryRead(const DelayedMemoryRead& obj)
+        : next              (nullptr)
+        , target_address    (obj.target_address)
+        , target_destination(obj.target_destination)
+    { }
+
+    template<typename __PayloadType>
+    inline void DelayedMemoryRead<__PayloadType>::Reset()
+    {
+        target_address      = -1;
+        target_destination  = nullptr;
+    }
+
+    template<typename __PayloadType>
+    inline DelayedMemoryRead<__PayloadType>* DelayedMemoryRead<__PayloadType>::GetNext() const
+    {
+        return next;
+    }
+
+    template<typename __PayloadType>
+    inline void DelayedMemoryRead<__PayloadType>::SetNext(DelayedMemoryRead<__PayloadType>* next)
+    {
+        this->next = next;
+    }
+
+    template<typename __PayloadType>
+    inline int DelayedMemoryRead<__PayloadType>::GetAddress() const
+    {
+        return target_address;
+    }
+
+    template<typename __PayloadType>
+    inline __PayloadType* DelayedMemoryRead<__PayloadType>::GetDestination() const
+    {
+        return target_destination;
+    }
+
+    template<typename __PayloadType>
+    inline void DelayedMemoryRead<__PayloadType>::SetAddress(int addr)
+    {
+        this->target_address = addr;
+    }
+
+    template<typename __PayloadType>
+    inline void DelayedMemoryRead<__PayloadType>::SetDestination(__PayloadType* dst)
+    {
+        this->target_destination = dst;
+    }
+}
+
+
+// class MEMU::Common::W1RTRandomAccessMemory
+namespace MEMU::Common {
+    /*
+    __PayloadType*          memory;
+    const int               size;
+    const MemoryReadMode    rmode;
+
+    int                     write_p0_address;
+    __PayloadType           write_p0_payload;
+    */
+
+    template<typename __PayloadType>
+    W1RTRandomAccessMemory<__PayloadType>::W1RTRandomAccessMemory(const int size, const MemoryReadMode rmode)
         : size              (size)
+        , rmode             (rmode)
         , memory            (new __PayloadType[size])
         , write_p0_address  (-1)
     { }
@@ -754,6 +868,7 @@ namespace MEMU::Common {
     template<typename __PayloadType>
     W1RTRandomAccessMemory<__PayloadType>::W1RTRandomAccessMemory(const W1RTRandomAccessMemory<__PayloadType>& obj)
         : size              (obj.size)
+        , rmode             (rmode)
         , memory            (new __PayloadType[size])
         , write_p0_address  (-1)
     { 
@@ -781,7 +896,22 @@ namespace MEMU::Common {
     template<typename __PayloadType>
     void W1RTRandomAccessMemory<__PayloadType>::ReadThrough(int address, __PayloadType* dst) const
     {
-        *dst = memory[address];
+        switch (rmode)
+        {
+            case READ_FIRST:
+                *dst = memory[address];
+                break;
+
+            case WRITE_FIRST:
+                if (address == write_p0_address)
+                    *dst = write_p0_payload;
+                else
+                    *dst = memory[address];
+                break;
+
+            default:
+                break;
+        }
     }
 
     template<typename __PayloadType>
@@ -810,6 +940,6 @@ namespace MEMU::Common {
 
 // class MEMU::Common::W1RDRandomAccessMemory
 namespace MEMU::Common {
-    
+
 }
 
