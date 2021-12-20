@@ -12,8 +12,8 @@
 `define     ADDR_WIDTH          (1 << $clog2(CAM_DEPTH))
 
 module common_dffcam_1a1w1r1qa #(
-    parameter                               CAM_DEPTH                   = 8,
-    parameter                               CAM_WIDTH                   = 8,
+    parameter                               CAM_DEPTH                   = 1,
+    parameter                               CAM_WIDTH                   = 1,
     parameter [CAM_DEPTH * CAM_WIDTH - 1:0] CAM_CONTENT_RESET_VALUE     = { (CAM_DEPTH){ {(CAM_WIDTH){1'b0}} } },
     parameter [CAM_DEPTH - 1:0]             CAM_VALID_RESET_VALUE       = { (CAM_DEPTH){ 1'b0 } },
 
