@@ -92,9 +92,6 @@ namespace MEMU::Core::Issue {
 
             bool                        GetValid(int index) const;
             void                        SetValid(int index, bool valid);
-
-            void                        operator=(const GlobalCheckpoint& obj);
-            bitset<gc_size>::reference& operator[](const int index);
         };
 
     private:
@@ -315,15 +312,10 @@ namespace MEMU::Core::Issue {
     {
         V[index] = valid;
     }
-
-    void RegisterAliasTable::GlobalCheckpoint::operator=(const RegisterAliasTable::GlobalCheckpoint& obj)
-    {
-        V = obj.V;
-    }
-
-    bitset<EMULATED_RAT_SIZE>::reference& RegisterAliasTable::GlobalCheckpoint::operator[](const int index)
-    {
-        return V[index];
-    }
 }
 
+
+// class MEMU::Core::Issue::RegisterAliasTable
+namespace MEMU::Core::Issue {
+    
+}
