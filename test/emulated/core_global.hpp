@@ -63,7 +63,7 @@ namespace MEMU::Core {
 
     GlobalCheckpointTable::GlobalCheckpointTable(const GlobalCheckpointTable& obj)
         : gc_valid      (obj.gc_valid)
-        , gc_next       (gc_next)
+        , gc_next       (obj.gc_next)
         , gc_eval_state (__MEMU_CORE_GCT_EVAL_STATE_NOP)
         , gc_eval_index (-1)
     { }
