@@ -31,8 +31,8 @@ module issue_prf (
 );
 
     common_dffram_3a1w2r #(
-        .RAM_DATA_WIDTH (64),
-        .RAM_ADDR_WIDTH (6)
+        .RAM_WIDTH  (64),
+        .RAM_DEPTH  (1 << 6)
     ) common_dffram_3a1w2r_INST_prfs (
         .clk    (clk),
         .reset  (reset),
@@ -46,7 +46,9 @@ module issue_prf (
         .doutb  (doutb),
 
         .addrc  (addrc),
-        .doutc  (doutc)
+        .doutc  (doutc),
+
+        .tdout  ()
     );
 
 endmodule
