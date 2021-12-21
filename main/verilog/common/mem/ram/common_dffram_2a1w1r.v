@@ -9,12 +9,10 @@
 // @author Kumonda221
 //
 
-`define     RAM_DEPTH       (1 << RAM_ADDR_WIDTH)
-
 module common_dffram_2a1w1r #(
-    parameter                                       RAM_DATA_WIDTH          = 1,
+    parameter                                       RAM_WIDTH               = 1,
     parameter                                       RAM_DEPTH               = 1,
-    parameter [RAM_DEPTH * RAM_DATA_WIDTH - 1:0]    RAM_RESET_VALUE         = { (RAM_DEPTH){ {(RAM_DATA_WIDTH){1'b0}} } },
+    parameter [RAM_DEPTH * RAM_WIDTH - 1:0]         RAM_RESET_VALUE         = { (RAM_DEPTH){ {(RAM_WIDTH){1'b0}} } },
 
     parameter                                       PORTA_ONEHOT_ADDRESSING = 0,
     parameter                                       PORTA_BIT_WRITE_ENABLE  = 0,
@@ -24,11 +22,11 @@ module common_dffram_2a1w1r #(
     parameter                                       DATA_COUPLED            = 0,
 
     localparam                                      RAM_PORTA_ADDR_WIDTH    = PORTA_ONEHOT_ADDRESSING ? RAM_DEPTH : $clog2(RAM_DEPTH),
-    localparam                                      RAM_PORTA_WE_WIDTH      = PORTA_BIT_WRITE_ENABLE ? RAM_DATA_WIDTH : 1,
+    localparam                                      RAM_PORTA_WE_WIDTH      = PORTA_BIT_WRITE_ENABLE ? RAM_WIDTH : 1,
 
     localparam                                      RAM_PORTB_ADDR_WIDTH    = PORTB_ONEHOT_ADDRESSING ? RAM_DEPTH : $clog2(RAM_DEPTH),
 
-    localparam                                      RAM_PORT_TDATA_WIDTH    = DATA_COUPLED ? RAM_DEPTH * RAM_DATA_WIDTH : 1
+    localparam                                      RAM_PORT_TDATA_WIDTH    = DATA_COUPLED ? RAM_DEPTH * RAM_WIDTH : 1
 ) (
     input  wire                                 clk,
     input  wire                                 reset,
@@ -38,18 +36,18 @@ module common_dffram_2a1w1r #(
     input  wire                                 ena,
     input  wire [RAM_PORTA_WE_WIDTH - 1:0]      wea,
 
-    input  wire [RAM_DATA_WIDTH - 1:0]          dina,
+    input  wire [RAM_WIDTH - 1:0]               dina,
 
     // Port B - read only
     input  wire [RAM_PORTB_ADDR_WIDTH - 1:0]    addrb,
 
-    output wire [RAM_DATA_WIDTH - 1:0]          doutb,
+    output wire [RAM_WIDTH - 1:0]               doutb,
 
     // Data coupled output
     output wire [RAM_PORT_TDATA_WIDTH - 1:0]    tdout
 );
     //
-    wire [RAM_DATA_WIDTH * RAM_DEPTH - 1:0]     dff_o_dout;
+    wire [RAM_WIDTH * RAM_DEPTH - 1:0]          dff_o_dout;
     wire [(1 << ($clog2(RAM_DEPTH))) - 1:0]     dff_i_addra;
     wire [(1 << ($clog2(RAM_DEPTH))) - 1:0]     dff_i_addrb;
 
@@ -97,15 +95,15 @@ module common_dffram_2a1w1r #(
         for (i = 0; i < RAM_DEPTH; i = i + 1) begin :GENERATED_RAM_DFFS
 
             //
-            wire [RAM_DATA_WIDTH - 1:0]     dff_q;
+            wire [RAM_WIDTH - 1:0]          dff_q;
             wire [RAM_PORTA_WE_WIDTH - 1:0] dff_we;
 
             //
             if (PORTA_BIT_WRITE_ENABLE) begin
 
                 stdmacro_dffbe #(
-                    .DFF_WIDTH          (RAM_DATA_WIDTH),
-                    .DFF_RESET_VALUE    (RAM_RESET_VALUE[RAM_DATA_WIDTH * i +: RAM_DATA_WIDTH])
+                    .DFF_WIDTH          (RAM_WIDTH),
+                    .DFF_RESET_VALUE    (RAM_RESET_VALUE[RAM_WIDTH * i +: RAM_WIDTH])
                 ) stdmacro_dffbe_INST_dffram_dff (
                     .clk    (clk),
                     .reset  (reset),
@@ -116,13 +114,13 @@ module common_dffram_2a1w1r #(
                     .q      (dff_q)
                 );
 
-                assign dff_we  = wea & { (RAM_DATA_WIDTH){ena} } & { (RAM_DATA_WIDTH){ dff_i_addra[i] } };
+                assign dff_we  = wea & { (RAM_WIDTH){ena} } & { (RAM_WIDTH){ dff_i_addra[i] } };
             end
             else begin
 
                 stdmacro_dffe #(
-                    .DFF_WIDTH          (RAM_DATA_WIDTH),
-                    .DFF_RESET_VALUE    (RAM_RESET_VALUE[RAM_DATA_WIDTH * i +: RAM_DATA_WIDTH])
+                    .DFF_WIDTH          (RAM_WIDTH),
+                    .DFF_RESET_VALUE    (RAM_RESET_VALUE[RAM_WIDTH * i +: RAM_WIDTH])
                 ) stdmacro_dffe_INST_dffram_dff (
                     .clk    (clk),
                     .reset  (reset),
@@ -137,11 +135,11 @@ module common_dffram_2a1w1r #(
             end
 
             //
-            assign dff_o_dout[RAM_DATA_WIDTH * i +: RAM_DATA_WIDTH] = dff_q & {(RAM_DATA_WIDTH){ dff_i_addrb[i] }};
+            assign dff_o_dout[RAM_WIDTH * i +: RAM_WIDTH] = dff_q & {(RAM_WIDTH){ dff_i_addrb[i] }};
 
             //
             if (DATA_COUPLED) begin :GENERATED_DATA_COUPLED
-                assign tdout[RAM_DATA_WIDTH * i +: RAM_DATA_WIDTH]  = dff_q;
+                assign tdout[RAM_WIDTH * i +: RAM_WIDTH]  = dff_q;
             end
 
             //
@@ -150,7 +148,7 @@ module common_dffram_2a1w1r #(
 
     //
     macro_reduction_or #(
-        .INPUT_WIDTH    (RAM_DATA_WIDTH),
+        .INPUT_WIDTH    (RAM_WIDTH),
         .INPUT_COUNT    (RAM_DEPTH)
     ) macro_reduction_or_INST_output (
         .d  (dff_o_dout),
