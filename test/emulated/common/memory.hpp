@@ -131,7 +131,7 @@ namespace MEMU::Common {
     // Interface of Read Through Random Access Memory
     // *pure virtual*
     template<typename __PayloadType>
-    class ReadThroughRandomAccessMemory
+    class ReadThroughRandomAccessable
     {
     public:
         virtual void    ReadThrough(int addr, __PayloadType* dst) const = 0;
@@ -140,7 +140,7 @@ namespace MEMU::Common {
     // Interface of Read Delayed Random Access Memory
     // *pure virtual*
     template<typename __PayloadType>
-    class ReadDelayedRandomAccessMemory
+    class ReadDelayedRandomAccessable
     {
     public:
         virtual void    ReadDelayed(int port, int addr, __PayloadType* dst) = 0;
@@ -149,7 +149,7 @@ namespace MEMU::Common {
     // Single write port, read through
     //
     template<typename __PayloadType>
-    class W1RTRandomAccessMemory final : public MEMU::Emulated, public ReadThroughRandomAccessMemory<__PayloadType>
+    class W1RTRandomAccessMemory final : public MEMU::Emulated, public ReadThroughRandomAccessable<__PayloadType>
     {
     private:
         __PayloadType*          memory;
@@ -196,7 +196,7 @@ namespace MEMU::Common {
     // Single write port, read delayed
     //
     template<typename __PayloadType>
-    class W1RDRandomAccessMemory final : public MEMU::Emulated, public ReadDelayedRandomAccessMemory<__PayloadType>
+    class W1RDRandomAccessMemory final : public MEMU::Emulated, public ReadDelayedRandomAccessable<__PayloadType>
     {
     private:
         __PayloadType*                      memory;
@@ -246,6 +246,39 @@ namespace MEMU::Common {
     class WnRDRandomAccessMemory final : public MEMU::Emulated
     {
         // not implemented
+    };
+
+    
+    // Content addressable memory (Read through)
+    // 
+    template<typename __PayloadType>
+    class ContentAddressableMemory final
+    {
+    private:
+        ReadThroughRandomAccessable<__PayloadType>* const   memory;
+        const int                                           memory_offset;
+        ReadThroughRandomAccessable<bool>* const            validf;
+        const int                                           validf_offset;
+
+        const int                                           size;
+
+    public:
+        ContentAddressableMemory(
+            ReadThroughRandomAccessable<__PayloadType>* memory, 
+            int                                         memory_offset,
+            ReadThroughRandomAccessable<__PayloadType>* validf,
+            int                                         validf_offset,
+            int                                         size);
+        
+        ~ContentAddressableMemory();
+
+        ReadThroughRandomAccessable<__PayloadType>* GetMemoryMedium() const;
+        ReadThroughRandomAccessable<bool>*          GetValidBitMedium() const;
+        int                                         GetMemoryOffset() const;
+        int                                         GetValidBitOffset() const;
+        int                                         GetSize() const;
+
+        int                                         QueryAddress(const __PayloadType& content) const;
     };
 }
 
@@ -980,5 +1013,84 @@ namespace MEMU::Common {
             memory[write_p0_address] = write_p0_payload;
 
         write_p0_address = -1;
+    }
+}
+
+
+// class MEMU::Common::ContentAddressableMemory
+namespace MEMU::Common {
+    /*
+    ReadThroughRandomAccessable<__PayloadType>* const   memory;
+    const int                                           memory_offset;
+    ReadThroughRandomAccessable<bool>* const            validf;
+    const int                                           validf_offset;
+
+    const int                                           size;
+    */
+
+    template<typename __PayloadType>
+    ContentAddressableMemory<__PayloadType>::ContentAddressableMemory(
+        ReadThroughRandomAccessable<__PayloadType>* const   memory, 
+        int                                         const   memory_offset,
+        ReadThroughRandomAccessable<__PayloadType>* const   validf,
+        int                                         const   validf_offset,
+        int                                         const   size)
+        : memory        (memory)
+        , memory_offset (memory_offset)
+        , validf        (validf)
+        , validf_offset (validf_offset)
+        , size          (size)
+    { }
+
+    template<typename __PayloadType>
+    ContentAddressableMemory<__PayloadType>::~ContentAddressableMemory()
+    { }
+
+    template<typename __PayloadType>
+    inline ReadThroughRandomAccessable<__PayloadType>* ContentAddressableMemory<__PayloadType>::GetMemoryMedium() const
+    {
+        return memory;
+    }
+
+    template<typename __PayloadType>
+    inline ReadThroughRandomAccessable<bool>* ContentAddressableMemory<__PayloadType>::GetValidBitMedium() const
+    {
+        return validf;
+    }
+
+    template<typename __PayloadType>
+    inline int ContentAddressableMemory<__PayloadType>::GetMemoryOffset() const
+    {
+        return memory_offset;
+    }
+
+    template<typename __PayloadType>
+    inline int ContentAddressableMemory<__PayloadType>::GetValidBitOffset() const
+    {
+        return validf_offset;
+    }
+
+    template<typename __PayloadType>
+    inline int ContentAddressableMemory<__PayloadType>::GetSize() const
+    {
+        return size;
+    }
+
+    template<typename __PayloadType>
+    int ContentAddressableMemory<__PayloadType>::QueryAddress(const __PayloadType& content) const
+    {
+        __PayloadType payload = { 0 };
+        bool          valid   = 0;
+
+        for (int i = 0; i < size; i++)
+        {
+            memory->ReadThrough(memory_offset + i, &payload);
+            validf->ReadThrough(validf_offset + i, &valid);
+
+            if (valid && payload == content)
+                return i;
+        }
+
+        return -1;
     }
 }
