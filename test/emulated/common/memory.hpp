@@ -177,7 +177,7 @@ namespace MEMU::Common {
         __PayloadType*  GetMedium() const;
         bool            CheckBound(int address) const;
 
-        virtual void    ReadThrough(int address, __PayloadType* dst) const override;
+        void            ReadThrough(int address, __PayloadType* dst) const override;
             
         void            SetWrite(int address, __PayloadType src);
         void            ResetWrite();
@@ -230,7 +230,7 @@ namespace MEMU::Common {
         __PayloadType*  GetMedium() const;
         bool            CheckBound(int address) const;
 
-        virtual void    ReadDelayed(int port, int address, __PayloadType* dst) override;
+        void            ReadDelayed(int port, int address, __PayloadType* dst) override;
         void            ResetReadPort(int port);
         void            ResetRead();
 
@@ -281,11 +281,11 @@ namespace MEMU::Common {
 
     template<typename __PayloadType>
     MemoryReadSnapshot<__PayloadType>::MemoryReadSnapshot(const MemoryReadSnapshot& obj)
-        : head      (obj.head)
-        , tail      (obj.tail)
+        : head      (nullptr)
+        , tail      (nullptr)
         , size      (0)
     {
-        const MemoryReadSnapshot<__PayloadType>::Entry* entry = this->head;
+        const MemoryReadSnapshot<__PayloadType>::Entry* entry = obj.head;
         if (entry)
         {
             // copy the entire singly link
@@ -293,7 +293,7 @@ namespace MEMU::Common {
             MemoryReadSnapshot<__PayloadType>::Entry* copied_entry
                 = new MemoryReadSnapshot<__PayloadType>::Entry(*entry);
 
-            this->head = copied_entry;
+            entry = this->head = copied_entry;
 
             while (!entry->GetNextEntry()->IsEnd())
             {
@@ -306,7 +306,7 @@ namespace MEMU::Common {
                 entry = copied_entry;
             }
 
-            ResetIteration();
+            this->tail = entry;
         }
     }
 
@@ -340,7 +340,23 @@ namespace MEMU::Common {
     template<typename __PayloadType>
     void MemoryReadSnapshot<__PayloadType>::AddEntry(int port, int address, __PayloadType* destination, __PayloadType payload)
     {
-        // TODO
+        MemoryReadSnapshot<__PayloadType>::Entry* new_entry
+            = new MemoryReadSnapshot<__PayloadType>::Entry(port, address, destination, payload);
+
+        new_entry->SetNextEntry(EndEntry());
+
+        if (!head)
+        {
+            head = new_entry;
+            tail = new_entry;
+        }
+        else
+        {
+            tail->SetNextEntry(new_entry);
+            tail = new_entry;
+        }
+
+        size++;
     }
 
     template<typename __PayloadType>
