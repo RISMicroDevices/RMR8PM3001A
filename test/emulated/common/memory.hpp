@@ -49,7 +49,7 @@ namespace MEMU::Common {
     public:
         class Entry final {
         private:
-            Entry*                      next;
+            const Entry*                next;
 
             const bool                  end;
 
@@ -65,10 +65,10 @@ namespace MEMU::Common {
             Entry(const Entry& obj);
             ~Entry();   
 
-            bool                    IsEnd() const;
+            const Entry*            GetNextEntry();
+            void                    SetNextEntry(const Entry* next);
 
-            Entry*                  GetNextEntry();
-            void                    SetNextEntry(Entry* next);
+            bool                    IsEnd() const;
 
             int                     GetPort() const;
             int                     GetAddress() const;
@@ -77,12 +77,32 @@ namespace MEMU::Common {
             __PayloadType           GetReadPayload() const;
         };
 
+        class Iterator final {
+        private:
+            const Entry*    current;
+
+        public:
+            Iterator(const Entry* head);
+            Iterator(const Iterator& obj);
+            ~Iterator();
+
+            const Entry&    GetEntry() const;
+            bool            HasEntry() const;
+            const Entry&    NextEntry();
+            bool            HasNextEntry() const;
+
+            Iterator&       operator++();
+            Iterator        operator++(int);
+
+            const Entry&    operator*();
+        };
+
     private:
         Entry*  head;
-        Entry*  current;
+        Entry*  tail;
         int     size;
 
-        static const Entry&     EndEntry();
+        static const Entry*     EndEntry();
 
     public:
         MemoryReadSnapshot();
@@ -92,20 +112,11 @@ namespace MEMU::Common {
         bool                    IsEmpty() const;
         int                     GetSize() const;
 
-        const Entry&            GetEntry();
-        bool                    HasEntry();
-        const Entry&            NextEntry();
-        bool                    HasNextEntry();
+        Iterator                GetIterator() const;
 
         void                    AddEntry(int port, int address, __PayloadType* destination, __PayloadType payload);
 
-        void                    ResetIteration();
-        void                    ResetSnapshot();
-
-        MemoryReadSnapshot&     operator++();
-        MemoryReadSnapshot      operator++(int);
-
-        const Entry&            operator*();
+        void                    Reset();
     };
 
     // Snapshot of Delayed Memory Write Operation
@@ -249,26 +260,120 @@ namespace MEMU::Common {
 namespace MEMU::Common {
     /*
     Entry*  head;
-    Entry*  current;
+    Entry*  tail;
     int     size;
     */
 
     template<typename __PayloadType>
-    static const MemoryReadSnapshot<__PayloadType>::Entry& MemoryReadSnapshot<__PayloadType>::EndEntry()
+    static const MemoryReadSnapshot<__PayloadType>::Entry* MemoryReadSnapshot<__PayloadType>::EndEntry()
     {
         static const Entry END_ENTRY;
 
-        return END_ENTRY;
+        return &END_ENTRY;
     }
 
+    template<typename __PayloadType>
+    MemoryReadSnapshot<__PayloadType>::MemoryReadSnapshot()
+        : head      (nullptr)
+        , tail      (nullptr)
+        , size      (0)
+    { }
 
+    template<typename __PayloadType>
+    MemoryReadSnapshot<__PayloadType>::MemoryReadSnapshot(const MemoryReadSnapshot& obj)
+        : head      (obj.head)
+        , tail      (obj.tail)
+        , size      (0)
+    {
+        const MemoryReadSnapshot<__PayloadType>::Entry* entry = this->head;
+        if (entry)
+        {
+            // copy the entire singly link
+
+            MemoryReadSnapshot<__PayloadType>::Entry* copied_entry
+                = new MemoryReadSnapshot<__PayloadType>::Entry(*entry);
+
+            this->head = copied_entry;
+
+            while (!entry->GetNextEntry()->IsEnd())
+            {
+                copied_entry 
+                    = new MemoryReadSnapshot<__PayloadType>::Entry(*(entry->GetNextEntry()));
+
+                entry->SetNextEntry(copied_entry);
+                copied_entry->SetNextEntry(entry->GetNextEntry()->GetNextEntry());
+
+                entry = copied_entry;
+            }
+
+            ResetIteration();
+        }
+    }
+
+    template<typename __PayloadType>
+    MemoryReadSnapshot<__PayloadType>::~MemoryReadSnapshot()
+    {
+        Reset();
+    }
+
+    template<typename __PayloadType>
+    inline bool MemoryReadSnapshot<__PayloadType>::IsEmpty() const
+    {
+        return !size;
+    }
+
+    template<typename __PayloadType>
+    inline int MemoryReadSnapshot<__PayloadType>::GetSize() const
+    {
+        return size;
+    }
+
+    template<typename __PayloadType>
+    MemoryReadSnapshot<__PayloadType>::Iterator MemoryReadSnapshot<__PayloadType>::GetIterator() const
+    {
+        if (head)
+            return Iterator(head);
+
+        return Iterator(EndEntry());            
+    }
+
+    template<typename __PayloadType>
+    void MemoryReadSnapshot<__PayloadType>::AddEntry(int port, int address, __PayloadType* destination, __PayloadType payload)
+    {
+        // TODO
+    }
+
+    template<typename __PayloadType>
+    void MemoryReadSnapshot<__PayloadType>::Reset()
+    {
+        // recycle the entire link
+
+        const MemoryReadSnapshot<__PayloadType>::Entry* entry = this->head;
+
+        if (entry)
+        {
+            do 
+            {
+                const MemoryReadSnapshot<__PayloadType>::Entry* next = entry->GetNextEntry();
+
+                delete entry;
+
+                entry = next;
+            }
+            while (!entry->IsEnd());
+
+            head = nullptr;
+            tail = nullptr;
+            size = 0;
+        }
+    }
 }
 
 
 // class MEMU::Common::MemoryReadSnapshot::Entry
 namespace MEMU::Common {
     /*
-    Entry*                      next;
+    const Entry*                next;
 
     const bool                  end;
 
@@ -281,7 +386,7 @@ namespace MEMU::Common {
 
     template<typename __PayloadType>
     MemoryReadSnapshot<__PayloadType>::Entry::Entry()
-        : next          (nullptr)
+        : next          (this)
         , end           (true)
         , port          (-1)
         , address       (-1)
@@ -312,11 +417,120 @@ namespace MEMU::Common {
     MemoryReadSnapshot<__PayloadType>::Entry::~Entry()
     { }
 
-    // TODO
+    template<typename __PayloadType>
+    inline const MemoryReadSnapshot<__PayloadType>::Entry* MemoryReadSnapshot<__PayloadType>::Entry::GetNextEntry()
+    {
+        return next;
+    }
+
+    template<typename __PayloadType>
+    inline void MemoryReadSnapshot<__PayloadType>::Entry::SetNextEntry(const MemoryReadSnapshot<__PayloadType>::Entry* const next)
+    {
+        this->next = next;
+    }
+
+    template<typename __PayloadType>
+    inline bool MemoryReadSnapshot<__PayloadType>::Entry::IsEnd() const
+    {
+        return end;
+    }
+
+    template<typename __PayloadType>
+    inline int MemoryReadSnapshot<__PayloadType>::Entry::GetPort() const
+    {
+        return port;
+    }
+
+    template<typename __PayloadType>
+    inline int MemoryReadSnapshot<__PayloadType>::Entry::GetAddress() const
+    {
+        return address;
+    }
+
+    template<typename __PayloadType>
+    inline __PayloadType* MemoryReadSnapshot<__PayloadType>::Entry::GetDestination() const
+    {
+        return destination;
+    }
+
+    template<typename __PayloadType>
+    inline __PayloadType MemoryReadSnapshot<__PayloadType>::Entry::GetReadPayload() const
+    {
+        return payload;
+    }
 }
 
 
-// class MEMU::Common::DelayedMemoryRead
+// class MEMU::Common::MemoryReadSnapshot::Iterator
+namespace MEMU::Common {
+    /*
+    const Entry*    current;
+    */
+
+    template<typename __PayloadType>
+    MemoryReadSnapshot<__PayloadType>::Iterator::Iterator(const Entry* head)
+        : current(head)
+    { }
+
+    template<typename __PayloadType>
+    MemoryReadSnapshot<__PayloadType>::Iterator::Iterator(const Iterator& obj)
+        : current(obj.current)
+    { }
+
+    template<typename __PayloadType>
+    MemoryReadSnapshot<__PayloadType>::Iterator::~Iterator()
+    { }
+
+    template<typename __PayloadType>
+    inline const MemoryReadSnapshot<__PayloadType>::Entry& MemoryReadSnapshot<__PayloadType>::Iterator::GetEntry() const
+    {
+        return *current;
+    }
+
+    template<typename __PayloadType>
+    inline bool MemoryReadSnapshot<__PayloadType>::Iterator::HasEntry() const
+    {
+        return !current->IsEnd();
+    }
+
+    template<typename __PayloadType>
+    const MemoryReadSnapshot<__PayloadType>::Entry& MemoryReadSnapshot<__PayloadType>::Iterator::NextEntry()
+    {
+        return *(current = current->GetNextEntry());
+    }
+
+    template<typename __PayloadType>
+    bool MemoryReadSnapshot<__PayloadType>::Iterator::HasNextEntry() const
+    {
+        return !current->GetNextEntry()->IsEnd();
+    }
+
+    template<typename __PayloadType>
+    MemoryReadSnapshot<__PayloadType>::Iterator& MemoryReadSnapshot<__PayloadType>::Iterator::operator++()
+    {
+        // post-iterate
+        NextEntry();
+        return *this;
+    }
+
+    template<typename __PayloadType>
+    MemoryReadSnapshot<__PayloadType>::Iterator MemoryReadSnapshot<__PayloadType>::Iterator::operator++(int)
+    {
+        // pre-iterate
+        MemoryReadSnapshot<__PayloadType>::Iterator preiter(*this);
+        NextEntry();
+        return preiter;
+    }
+
+    template<typename __PayloadType>
+    const MemoryReadSnapshot<__PayloadType>::Entry& MemoryReadSnapshot<__PayloadType>::Iterator::operator*()
+    {
+        return GetEntry();
+    }
+}
+
+
+// class MEMU::Common::DelayedMemoryRead (INTERNAL)
 namespace MEMU::Common {
     /*
     DelayedMemoryRead<__PayloadType>*   next;
