@@ -30,6 +30,9 @@ module common_fifo_ram_1w1r #(
     output  wire                        fifo_full
 );
 
+    //
+    localparam  FIFO_DEPTH  = 1 << FIFO_DEPTH_LOG2;
+
     // FIFO state signals 
     wire    s_overlap;
 
@@ -121,8 +124,8 @@ module common_fifo_ram_1w1r #(
     wire    ram_enb;
 
     common_dffram_2a1w1r #(
-        .RAM_DATA_WIDTH     (FIFO_WIDTH),
-        .RAM_ADDR_WIDTH     (FIFO_DEPTH_LOG2),
+        .RAM_WIDTH          (FIFO_WIDTH),
+        .RAM_DEPTH          (FIFO_DEPTH),
         .RAM_RESET_VALUE    (FIFO_RESET_VALUE)
     ) common_dffram_2a1w1r_INST_fifo_ram (
         .clk    (clk),
@@ -135,7 +138,9 @@ module common_fifo_ram_1w1r #(
 
         .addrb  (rptr_q[FIFO_DEPTH_LOG2 - 1:0]),
 //      .enb    (ram_enb),
-        .doutb  (dout)
+        .doutb  (dout),
+
+        .tdout  ()
     );
 
     assign ram_wen = p_hold | p_push; //
