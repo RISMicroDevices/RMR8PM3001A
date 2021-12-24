@@ -85,7 +85,7 @@ module common_dffram_2a1w1r #(
     // 
     generate
         if (!DATA_COUPLED) begin :GENERATED_NOT_DATA_COUPLED
-            assign tdata = 'b0;
+            assign tdout = 'b0;
         end
     endgenerate
 
