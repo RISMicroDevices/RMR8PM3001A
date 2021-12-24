@@ -119,6 +119,16 @@ namespace MEMU::Common {
         void                    Reset();
     };
 
+    // Snapshot of Delayed Memory Write Operation
+    //
+    template<typename __PayloadType>
+    using MemoryWriteSnapshot = MemoryOperationSnapshot<__PayloadType>;
+
+    // Snapshot of Delayed Memory Read Operation
+    //
+    template<typename __PayloadType>
+    using MemoryReadSnapshot  = MemoryOperationSnapshot<__PayloadType>;
+
     // ENUM Memory Read Mode
     //
     typedef enum __tag_MemoryReadMode 
@@ -177,6 +187,7 @@ namespace MEMU::Common {
         void            ResetWrite();
 
         void            Eval() override;
+        void            EvalEx(MemoryWriteSnapshot<__PayloadType>* wrsnpsht);
     };
 
     // Dual write ports, read through
@@ -210,8 +221,8 @@ namespace MEMU::Common {
         DelayedMemoryRead<__PayloadType>*   rop_head;
         DelayedMemoryRead<__PayloadType>*   rop_tail;
 
-        void            EvalRead();
-        void            EvalWrite();
+        void            EvalRead(MemoryReadSnapshot<__PayloadType>* rdsnpsht);
+        void            EvalWrite(MemoryWriteSnapshot<__PayloadType>* wrsnpsht);
 
     public:
         W1RDRandomAccessMemory(__PayloadType* const memory, const int size, const MemoryReadMode rmode);
@@ -232,6 +243,7 @@ namespace MEMU::Common {
         void            ResetWrite();
 
         void            Eval() override;
+        void            EvalEx(MemoryWriteSnapshot<__PayloadType>* wrsnpsht, MemoryReadSnapshot<__PayloadType>* rdsnpsht);
     };
 
     // Dual write ports, read delayed
@@ -780,8 +792,19 @@ namespace MEMU::Common {
     template<typename __PayloadType>
     void W1RTRandomAccessMemory<__PayloadType>::Eval()
     {
+        EvalEx(nullptr);
+    }
+
+    template<typename __PayloadType>
+    void W1RTRandomAccessMemory<__PayloadType>::EvalEx(MemoryWriteSnapshot<__PayloadType>* const wrsnpsht)
+    {
         if (write_p0_address >= 0)
+        {
             memory[write_p0_address] = write_p0_payload;
+
+            if (wrsnpsht)
+                wrsnpsht->AddEntry(0, write_p0_address, &write_p0_payload, write_p0_payload);
+        }
 
         write_p0_address = -1;
     }
@@ -961,16 +984,24 @@ namespace MEMU::Common {
     template<typename __PayloadType>
     void W1RDRandomAccessMemory<__PayloadType>::Eval()
     {
+        EvalEx(nullptr, nullptr);
+    }
+
+    template<typename __PayloadType>
+    void W1RDRandomAccessMemory<__PayloadType>::EvalEx(
+        MemoryWriteSnapshot<__PayloadType>* const wrsnpsht,
+        MemoryReadSnapshot<__PayloadType>*  const rdsnpsht)
+    {
         switch (rmode)
         {
             case READ_FIRST:
-                EvalRead();
-                EvalWrite();
+                EvalRead(rdsnpsht);
+                EvalWrite(wrsnpsht);
                 break;
 
             case WRITE_FIRST:
-                EvalWrite();
-                EvalRead();
+                EvalWrite(wrsnpsht);
+                EvalRead(rdsnpsht);
                 break;
 
             default:
@@ -980,7 +1011,7 @@ namespace MEMU::Common {
 
     // private:
     template<typename __PayloadType>
-    void W1RDRandomAccessMemory<__PayloadType>::EvalRead()
+    void W1RDRandomAccessMemory<__PayloadType>::EvalRead(MemoryReadSnapshot<__PayloadType>* const rdsnpsht)
     {
         DelayedMemoryRead<__PayloadType>* rop = rop_head;
 
@@ -990,7 +1021,12 @@ namespace MEMU::Common {
         {
             if (rop->IsValid())
             {
-                *(rop->GetSubject()) = memory[rop->GetAddress()]; 
+                __PayloadType* destination = rop->GetDestination();
+
+                *destination = memory[rop->GetAddress()]; 
+
+                if (rdsnpsht)
+                    rdsnpsht->AddEntry(rop->GetPort(), rop->GetAddress(), destination, *destination);
 
                 rop->Reset();
             }
@@ -1007,10 +1043,15 @@ namespace MEMU::Common {
 
     // private:
     template<typename __PayloadType>
-    void W1RDRandomAccessMemory<__PayloadType>::EvalWrite()
+    void W1RDRandomAccessMemory<__PayloadType>::EvalWrite(MemoryWriteSnapshot<__PayloadType>* const wrsnpsht)
     {
         if (write_p0_address >= 0)
+        {
             memory[write_p0_address] = write_p0_payload;
+
+            if (wrsnpsht)
+                wrsnpsht->AddEntry(0, write_p0_address, &write_p0_payload, write_p0_payload)
+        }
 
         write_p0_address = -1;
     }
