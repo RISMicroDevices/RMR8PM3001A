@@ -311,7 +311,7 @@ namespace MEMU::Common {
 
         MaskOperator<__PayloadType, __PayloadMaskType>*
                         GetMaskOperator(
-            typename std::enable_if<_t_is_maskable_optr>::type* = 0);
+            typename std::enable_if<_t_is_maskable_optr>::type* = 0) const;
 
         void            SetMaskOperator(MaskOperator<__PayloadType, __PayloadMaskType>* maskoptr,
             typename std::enable_if<_t_is_maskable_optr>::type* = 0);
@@ -356,7 +356,7 @@ namespace MEMU::Common {
 
     // Single write port, read delayed
     //
-    template<typename __PayloadType, typename __PayloadMasktype = void>
+    template<typename __PayloadType, typename __PayloadMaskType = void>
     class W1RDRandomAccessMemory final : public MEMU::Emulated, public ReadDelayedRandomAccessable<__PayloadType>
     {
     private:
@@ -371,62 +371,66 @@ namespace MEMU::Common {
 
         int                                 write_p0_address;
         __PayloadType                       write_p0_payload;
-    //  bool                                write_p0_masked;
-    //  __PayloadType                       write_p0_mask;
 
+    //  bool                                write_p0_masked;
         std::enable_if<_t_is_maskable, bool>::type
                                             write_p0_masked;
 
+    //  __PayloadType                       write_p0_mask;
         std::enable_if<_t_is_maskable, __PayloadType>::type
                                             write_p0_mask;
+
+    //  MaskOperator*                       maskoptr;
+        std::enable_if<_t_is_maskable, MaskOperator<__PayloadType, __PayloadMaskType>*>::type
+                                            maskoptr;
 
         DelayedMemoryRead<__PayloadType>*   rop_head;
         DelayedMemoryRead<__PayloadType>*   rop_tail;
 
         void            EvalRead(MemoryReadSnapshot<__PayloadType, __PayloadMaskType>* rdsnpsht);
 
-        template<std::enable_if<!_t_is_maskable>::type* = 0>
-        void            EvalReadSnapshot(MemoryReadSnapshot<__PayloadType, __PayloadMaskType>* rdsnpsht);
+        void            EvalReadSnapshot(MemoryReadSnapshot<__PayloadType, __PayloadMaskType>* rdsnpsht,
+            typename std::enable_if<!_t_is_maskable>::type* = 0);
 
-        template<std::enable_if<_t_is_maskable>::type* = 0>
-        void            EvalReadSnapshot(MemoryReadSnapshot<__PayloadType, __PayloadMaskType>* rdsnpsht);
+        void            EvalReadSnapshot(MemoryReadSnapshot<__PayloadType, __PayloadMaskType>* rdsnpsht,
+            typename std::enable_if<_t_is_maskable>::type* = 0);
 
-        template<std::enable_if<!_t_is_maskable>::type* = 0>
-        void            EvalWrite(MemoryWriteSnapshot<__PayloadType, __PayloadMaskType>* wrsnpsht);
+        void            EvalWrite(MemoryWriteSnapshot<__PayloadType, __PayloadMaskType>* wrsnpsht,
+            typename std::enable_if<!_t_is_maskable>::type* = 0);
 
-        template<std::enable_if<_t_is_maskable_optr>::type* = 0>
-        void            EvalWrite(MemoryWriteSnapshot<__PayloadType, __PayloadMaskType>* wrsnpsht);
+        void            EvalWrite(MemoryWriteSnapshot<__PayloadType, __PayloadMaskType>* wrsnpsht,
+            typename std::enable_if<_t_is_maskable_optr>::type* = 0);
 
-        template<std::enable_if<_t_is_maskable_dflt>::type* = 0>
-        void            EvalWrite(MemoryWriteSnapshot<__PayloadType, __PayloadMaskType>* wrsnpsht);
+        void            EvalWrite(MemoryWriteSnapshot<__PayloadType, __PayloadMaskType>* wrsnpsht,
+            typename std::enable_if<_t_is_maskable_dflt>::type* = 0);
 
     public:
-        template<std::enable_if<!_t_is_maskable>::type* = 0>
-        W1RDRandomAccessMemory(__PayloadType* memory, int size, MemoryReadMode rmode);
+        W1RDRandomAccessMemory(__PayloadType* memory, int size, MemoryReadMode rmode,
+            typename std::enable_if<!_t_is_maskable>::type* = 0);
 
-        template<std::enable_if<_t_is_maskable_optr>::type* = 0>
-        W1RDRandomAccessMemory(__PayloadType* memory, int size, MemoryReadMode rmode, MaskOperator<__PayloadType, __PayloadMaskType>* operator);
+        W1RDRandomAccessMemory(__PayloadType* memory, int size, MemoryReadMode rmode, MaskOperator<__PayloadType, __PayloadMaskType>* operator,
+            typename std::enable_if<_t_is_maskable_optr>::type* = 0);
 
-        template<std::enable_if<_t_is_maskable_dflt>::type* = 0>
-        W1RDRandomAccessMemory(__PayloadType* memory, int size, MemoryReadMode rmode);
+        W1RDRandomAccessMemory(__PayloadType* memory, int size, MemoryReadMode rmode,
+            typename std::enable_if<_t_is_maskable_dflt>::type* = 0);
 
-        template<std::enable_if<!_t_is_maskable>::type* = 0>
-        W1RDRandomAccessMemory(int size, MemoryReadMode rmode);
+        W1RDRandomAccessMemory(int size, MemoryReadMode rmode,
+            typename std::enable_if<!_t_is_maskable>::type* = 0);
 
-        template<std::enable_if<_t_is_maskable_optr>::type* = 0>
-        W1RDRandomAccessMemory(int size, MemoryReadMode rmode, MaskOperator<__PayloadType, __PayloadMaskType>* operator);
+        W1RDRandomAccessMemory(int size, MemoryReadMode rmode, MaskOperator<__PayloadType, __PayloadMaskType>* operator,
+            typename std::enable_if<_t_is_maskable_optr>::type* = 0);
 
-        template<std::enable_if<_t_is_maskable_dflt>::type* = 0>
-        W1RDRandomAccessMemory(int size, MemoryReadMode rmode);
+        W1RDRandomAccessMemory(int size, MemoryReadMode rmode,
+            typename std::enable_if<_t_is_maskable_dflt>::type* = 0);
 
-        template<std::enable_if<!_t_is_maskable>::type* = 0>
-        W1RDRandomAccessMemory(const W1RDRandomAccessMemory<__PayloadType, __PayloadMaskType>& obj);
+        W1RDRandomAccessMemory(const W1RDRandomAccessMemory<__PayloadType, __PayloadMaskType>& obj,
+            typename std::enable_if<!_t_is_maskable>::type* = 0);
 
-        template<std::enable_if<_t_is_maskable_optr>::type* = 0>
-        W1RDRandomAccessMemory(const W1RDRandomAccessMemory<__PayloadType, __PayloadMaskType>& obj);
+        W1RDRandomAccessMemory(const W1RDRandomAccessMemory<__PayloadType, __PayloadMaskType>& obj,
+            typename std::enable_if<_t_is_maskable_optr>::type* = 0);
 
-        template<std::enable_if<_t_is_maskable_dflt>::type* = 0>
-        W1RDRandomAccessMemory(const W1RDRandomAccessMemory<__PayloadType, __PayloadMaskType>& obj);
+        W1RDRandomAccessMemory(const W1RDRandomAccessMemory<__PayloadType, __PayloadMaskType>& obj,
+            typename std::enable_if<_t_is_maskable_dflt>::type* = 0);
 
         ~W1RDRandomAccessMemory();
 
@@ -435,27 +439,34 @@ namespace MEMU::Common {
         __PayloadType*  GetMedium() const;
         bool            CheckBound(int address) const;
 
+        MaskOperator<__PayloadType, __PayloadMaskType>*
+                        GetMaskOperator(
+            typename std::enable_if<_t_is_maskable_optr>::type* = 0) const;
+
+        void            SetMaskOperator(MaskOperator<__PayloadType, __PayloadMaskType>* maskoptr,
+            typename std::enable_if<_t_is_maskable_optr>::type* = 0);
+
         void            ReadDelayed(int port, int address, __PayloadType* dst) override;
         void            ResetReadPort(int port);
         void            ResetRead();
 
-        template<std::enable_if<!_t_is_maskable>::type* = 0>
-        void            SetWrite(int address, __PayloadType src);
+        void            SetWrite(int address, __PayloadType src,
+            typename std::enable_if<!_t_is_maskable>::type* = 0);
 
-        template<std::enable_if<_t_is_maskable>::type* = 0>
-        void            SetWrite(int address, __PayloadType src);
+        void            SetWrite(int address, __PayloadType src,
+            typename std::enable_if<_t_is_maskable>::type* = 0);
 
-        template<std::enable_if<_t_is_maskable_dflt>::type* = 0>
-        void            SetWriteWithMask(int address, __PayloadType src, __PayloadType mask);
+        void            SetWriteWithMask(int address, __PayloadType src, __PayloadType mask,
+            typename std::enable_if<_t_is_maskable_dflt>::type* = 0);
 
-        template<std::enable_if<_t_is_maskable_optr>::type* = 0>
-        void            SetWriteWithMask(int address, __PayloadType src, __PayloadMaskType mask);
+        void            SetWriteWithMask(int address, __PayloadType src, __PayloadMaskType mask,
+            typename std::enable_if<_t_is_maskable_optr>::type* = 0);
 
-        template<std::enable_if<!_t_is_maskable>::type* = 0>
-        void            ResetWrite();
+        void            ResetWrite(
+            typename std::enable_if<!_t_is_maskable>::type* = 0);
 
-        template<std::enable_if<_t_is_maskable>::type* = 0>
-        void            ResetWrite();
+        void            ResetWrite(
+            typename std::enable_if<_t_is_maskable>::type* = 0);
 
         void            Eval() override;
         void            EvalEx(MemoryWriteSnapshot<__PayloadType, __PayloadMaskType>* wrsnpsht, MemoryReadSnapshot<__PayloadType, __PayloadMaskType>* rdsnpsht);
@@ -1222,7 +1233,7 @@ namespace MEMU::Common {
 
     template<typename __PayloadType, typename __PayloadMaskType>
     inline MaskOperator<__PayloadType, __PayloadMaskType>* W1RTRandomAccessMemory<__PayloadType, __PayloadMaskType>::GetMaskOperator(
-        typename std::enable_if<_t_is_maskable_optr>::type* = 0)
+        typename std::enable_if<_t_is_maskable_optr>::type* = 0) const
     {
         return this->maskoptr;
     }
@@ -1387,8 +1398,8 @@ namespace MEMU::Common {
     DelayedMemoryRead<__PayloadType>*   rop_tail;
     */
 
-    template<typename __PayloadType>
-    W1RDRandomAccessMemory<__PayloadType>::W1RDRandomAccessMemory(__PayloadType* memory, const int size, const MemoryReadMode rmode)
+    template<typename __PayloadType, typename __PayloadMaskType>
+    W1RDRandomAccessMemory<__PayloadType, __PayloadMaskType>::W1RDRandomAccessMemory(__PayloadType* memory, const int size, const MemoryReadMode rmode)
         : size              (size)
         , rmode             (rmode)
         , memory            (memory)
