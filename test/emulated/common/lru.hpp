@@ -6,6 +6,8 @@
 
 #include <bitset>
 
+#include "base.hpp"
+
 using namespace std;
 
 namespace MEMU::Common {

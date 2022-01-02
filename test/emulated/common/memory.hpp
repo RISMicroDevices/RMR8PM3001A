@@ -13,17 +13,17 @@
 #include "base.hpp"
 
 #define MASKABLE_PAYLOAD_ASSERTIONS \
-    static constexpr inline bool    _t_is_integral      =  std::is_integral<__PayloadType>::value; \
-    static constexpr inline bool    _t_is_maskbase      = !std::is_same<__PayloadMaskType, void>::value; \
-    static constexpr inline bool    _t_is_maskable_dflt = _t_is_integral && !_t_is_maskbase; \
-    static constexpr inline bool    _t_is_maskable_optr = _t_is_maskbase; \
-    static constexpr inline bool    _t_is_maskable      = _t_is_integral || _t_is_maskbase; 
+    static constexpr /*inline*/ bool    _t_is_integral      =  std::is_integral<__PayloadType>::value; \
+    static constexpr /*inline*/ bool    _t_is_maskbase      = !std::is_same<__PayloadMaskType, void>::value; \
+    static constexpr /*inline*/ bool    _t_is_maskable_dflt = _t_is_integral && !_t_is_maskbase; \
+    static constexpr /*inline*/ bool    _t_is_maskable_optr = _t_is_maskbase; \
+    static constexpr /*inline*/ bool    _t_is_maskable      = _t_is_integral || _t_is_maskbase; 
 
 #define RAM_PAYLOAD_TYPE_ASSERTIONS \
-    static_assert(std::is_pod<__PayloadType>, "Payload type of RAM classes must be POD type");
+    static_assert(std::is_pod<__PayloadType>::value, "Payload type of RAM classes must be POD type");
 
 #define MASK_PAYLOAD_TYPE_ASSERTIONS \
-    static_assert(std::is_pod<__PayloadType>, "Payload type of Mask Operators must be POD type");
+    static_assert(std::is_pod<__PayloadType>::value, "Payload type of Mask Operators must be POD type");
 
 namespace MEMU::Common {
 
@@ -96,7 +96,7 @@ namespace MEMU::Common {
                                         payload_mask;
 
             typename std::enable_if<_t_is_maskable_optr, const __PayloadMaskType>::type  
-                                        payload_mask;
+                                        payload_mask_overrided;
 
         //  const bool                  payload_masked;
             typename std::enable_if<_t_is_maskable, const bool>::type
@@ -276,7 +276,7 @@ namespace MEMU::Common {
                                 write_p0_mask;
 
         typename std::enable_if<_t_is_maskable_optr, __PayloadMaskType>::type
-                                write_p0_mask;
+                                write_p0_mask_overrided;
 
         typename std::enable_if<_t_is_maskable_optr, MaskOperator<__PayloadType, __PayloadMaskType>*>::type
                                 maskoptr;
@@ -397,7 +397,7 @@ namespace MEMU::Common {
                                             write_p0_mask;
 
         typename std::enable_if<_t_is_maskable_optr, __PayloadMaskType>::type
-                                            write_p0_mask;
+                                            write_p0_mask_overrided;
 
     //  MaskOperator*                       maskoptr;
         typename std::enable_if<_t_is_maskable, MaskOperator<__PayloadType, __PayloadMaskType>*>::type
@@ -552,7 +552,7 @@ namespace MEMU::Common {
     */
 
     template<typename __PayloadType, typename __PayloadMaskType>
-    static const MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Entry* 
+    const typename MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Entry* 
         MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::EndEntry()
     {
         static const Entry END_ENTRY;
@@ -617,7 +617,7 @@ namespace MEMU::Common {
     }
 
     template<typename __PayloadType, typename __PayloadMaskType>
-    MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Iterator 
+    typename MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Iterator 
         MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::GetIterator() const
     {
         if (head)
@@ -870,7 +870,7 @@ namespace MEMU::Common {
     { }
 
     template<typename __PayloadType, typename __PayloadMaskType>
-    inline const MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Entry* 
+    inline const typename MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Entry* 
         MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Entry::GetNextEntry()
     {
         return next;
@@ -930,7 +930,7 @@ namespace MEMU::Common {
     inline __PayloadMaskType MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Entry::GetPayloadMask(
         typename std::enable_if<_t_is_maskable_optr>::type* = 0) const
     {
-        return payload_mask;
+        return payload_mask_overrided;
     }
 
     template<typename __PayloadType, typename __PayloadMaskType>
@@ -963,7 +963,7 @@ namespace MEMU::Common {
     { }
 
     template<typename __PayloadType, typename __PayloadMaskType>
-    inline const MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Entry& 
+    inline const typename MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Entry& 
         MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Iterator::GetEntry() const
     {
         return *current;
@@ -976,7 +976,7 @@ namespace MEMU::Common {
     }
 
     template<typename __PayloadType, typename __PayloadMaskType>
-    const MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Entry& 
+    const typename MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Entry& 
         MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Iterator::NextEntry()
     {
         return *(current = current->GetNextEntry());
@@ -989,7 +989,7 @@ namespace MEMU::Common {
     }
 
     template<typename __PayloadType, typename __PayloadMaskType>
-    MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Iterator& 
+    typename MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Iterator& 
         MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Iterator::operator++()
     {
         // post-iterate
@@ -998,7 +998,7 @@ namespace MEMU::Common {
     }
 
     template<typename __PayloadType, typename __PayloadMaskType>
-    MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Iterator 
+    typename MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Iterator 
         MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Iterator::operator++(int)
     {
         // pre-iterate
@@ -1008,7 +1008,7 @@ namespace MEMU::Common {
     }
 
     template<typename __PayloadType, typename __PayloadMaskType>
-    const MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Entry& 
+    const typename MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Entry& 
         MemoryOperationSnapshot<__PayloadType, __PayloadMaskType>::Iterator::operator*()
     {
         return GetEntry();
@@ -1356,10 +1356,10 @@ namespace MEMU::Common {
     void W1RTRandomAccessMemory<__PayloadType, __PayloadMaskType>::SetWriteWithMask(const int address, const __PayloadType src, const __PayloadMaskType mask,
         typename std::enable_if<_t_is_maskable_optr>::type* = 0)
     {
-        write_p0_address = address;
-        write_p0_payload = src;
-        write_p0_masked  = true;
-        write_p0_mask    = mask;
+        write_p0_address        = address;
+        write_p0_payload        = src;
+        write_p0_masked         = true;
+        write_p0_mask_overrided = mask;
     }
 
     template<typename __PayloadType, typename __PayloadMaskType>
@@ -1415,12 +1415,12 @@ namespace MEMU::Common {
             __PayloadType history = memory[write_p0_address];
 
             if (write_p0_masked)
-                memory[write_p0_address] = maskoptr->SetWithMask(memory[write_p0_address], write_p0_payload, write_p0_mask);
+                memory[write_p0_address] = maskoptr->SetWithMask(memory[write_p0_address], write_p0_payload, write_p0_mask_overrided);
             else
                 memory[write_p0_address] = write_p0_payload;
 
             if (wrsnpsht)
-                wrsnpsht->AddEntry(0, write_p0_address, &write_p0_payload, history, write_p0_payload, write_p0_mask, write_p0_masked, maskoptr);
+                wrsnpsht->AddEntry(0, write_p0_address, &write_p0_payload, history, write_p0_payload, write_p0_mask_overrided, write_p0_masked, maskoptr);
         }
 
         write_p0_address = -1;
@@ -1680,7 +1680,7 @@ namespace MEMU::Common {
             rop_tail->SetNext(rop_new = new DelayedMemoryRead<__PayloadType>);
 
         rop_new->SetPort(port);
-        rop_new->SetAddress(address);
+        rop_new->SetAddress(addr);
         rop_new->SetDestination(dst);
 
         rop_tail = rop_new;
@@ -1689,7 +1689,7 @@ namespace MEMU::Common {
     template<typename __PayloadType, typename __PayloadMaskType>
     void W1RDRandomAccessMemory<__PayloadType, __PayloadMaskType>::ResetReadPort(int port)
     {
-        if (!top_tail)
+        if (!rop_tail)
             return;
 
         DelayedMemoryRead<__PayloadType>* rop = rop_head;
@@ -1764,10 +1764,10 @@ namespace MEMU::Common {
     void W1RDRandomAccessMemory<__PayloadType, __PayloadMaskType>::SetWriteWithMask(int addr, __PayloadType src, __PayloadMaskType mask,
         typename std::enable_if<_t_is_maskable_optr>::type* = 0)
     {
-        write_p0_address = addr;
-        write_p0_payload = src;
-        write_p0_masked  = true;
-        write_p0_mask    = mask;
+        write_p0_address        = addr;
+        write_p0_payload        = src;
+        write_p0_masked         = true;
+        write_p0_mask_overrided = mask;
     }
 
     template<typename __PayloadType, typename __PayloadMaskType>
@@ -1829,7 +1829,7 @@ namespace MEMU::Common {
                 *destination = memory[rop->GetAddress()]; 
 
                 if (rdsnpsht)
-                    EvalReadSnapshot(rdsnpsht, port, address, destination, *destination);
+                    EvalReadSnapshot(rdsnpsht, rop->GetPort(), rop->GetAddress(), destination, *destination);
 
                 rop->Reset();
             }
@@ -1879,7 +1879,7 @@ namespace MEMU::Common {
             memory[write_p0_address] = write_p0_payload;
 
             if (wrsnpsht)
-                wrsnpsht->AddEntry(0, write_p0_address, &write_p0_payload, history, write_p0_payload)
+                wrsnpsht->AddEntry(0, write_p0_address, &write_p0_payload, history, write_p0_payload);
         }
 
         write_p0_address = -1;
@@ -1894,12 +1894,12 @@ namespace MEMU::Common {
             __PayloadType history = memory[write_p0_address];
 
             if (write_p0_masked)
-                memory[write_p0_address] = maskoptr->SetWithMask(memory[write_p0_address], write_p0_payload, write_p0_mask);
+                memory[write_p0_address] = maskoptr->SetWithMask(memory[write_p0_address], write_p0_payload, write_p0_mask_overrided);
             else
                 memory[write_p0_address] = write_p0_payload;
 
             if (wrsnpsht)
-                wrsnpsht->AddEntry(0, write_p0_address, &write_p0_payload, history, write_p0_payload, write_p0_mask, write_p0_masked, maskoptr)
+                wrsnpsht->AddEntry(0, write_p0_address, &write_p0_payload, history, write_p0_payload, write_p0_mask_overrided, write_p0_masked, maskoptr);
         }
 
         write_p0_address = -1;
@@ -1919,7 +1919,7 @@ namespace MEMU::Common {
                 memory[write_p0_address] = write_p0_payload;
 
             if (wrsnpsht)
-                wrsnpsht->AddEntry(0, write_p0_address, &write_p0_payload, history, write_p0_payload, write_p0_mask, write_p0_masked)
+                wrsnpsht->AddEntry(0, write_p0_address, &write_p0_payload, history, write_p0_payload, write_p0_mask, write_p0_masked);
         }
 
         write_p0_address = -1;
