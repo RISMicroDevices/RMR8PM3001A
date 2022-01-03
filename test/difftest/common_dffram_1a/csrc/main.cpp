@@ -59,6 +59,89 @@ void reset(int& t)
     printf("[##] \033[1;33mCircuit reset.\033[0m\n");
 }
 
+//
+int testbench_0(int& t)
+{
+    int error = 0;
+
+    // Testbench #0
+    // Verify post-reset state.
+    printf("[#0] Testbench #0\n");
+    printf("[#0] \033[1;33mStarting at clock edge %d (ps)\033[0m\n", t);
+    printf("[#0] Verify on post-reset state.\n");
+
+    // zero beat
+    dut_ptr->addr   = 0;
+    dut_ptr->en     = 0;
+    dut_ptr->we     = 0;
+    dut_ptr->din    = 0;
+
+    clkn_dumpgen(t);
+    clkp_dumpgen(t);
+
+    // scan memory
+    for (int i = 0; i < 32; i++)
+    {
+        dut_ptr->addr = i;
+
+        clkn_dumpgen(t);
+
+        if (dut_ptr->dout)
+        {
+            printf("[#0] Not zero after reset at address 0x%08x.\n", i);
+
+            error++;
+        }
+
+        clkp_dumpgen(t);
+    }
+
+    // scan coupled port
+    for (int i = 0; i < 32; i++)
+    {
+        if (dut_ptr->tdout[i])
+        {
+            printf("[#0] Not zero (data-coupled port) after reset at address 0x%08x.\n", i);
+
+            error++;
+        }
+    }
+
+    //
+    if (error)
+        printf("[#0] Testbench #0 \033[1;31mFAILED\033[0m !!!\n");
+    else
+        printf("[#0] Testbench #0 \033[1;32mPASSED\033[0m !!!\n");
+
+    return error;
+}
+
+int testbench_1(int& t)
+{
+    int error = 0;
+
+    // Testbench #1
+    // Random write emulated differential test.
+    printf("[#1] Testbench #1\n");
+    printf("[#1] \033[1;33mStarting at clock edge %d (ps)\033[0m\n", t);
+    printf("[#1] Random write emulated differential test.\n");
+
+    //
+    W1RTRandomAccessMemory<int>* emulated
+        = new W1RTRandomAccessMemory<int>(32, MemoryReadMode::READ_FIRST);
+
+    //
+    delete emulated;
+
+    //
+    if (error)
+        printf("[#1] Testbench #1 \033[1;31mFAILED\033[0m !!!\n");
+    else
+        printf("[#1] Testbench #1 \033[1;32mPASSED\033[0m !!!\n");
+
+    return error;
+}
+
 
 //
 void test()
@@ -78,13 +161,13 @@ void test()
 
     printf("[--] ----------------------------------------\n");
 
-    // e += testbench_0(t);
+    e += testbench_0(t);
 
-    // printf("[--] ----------------------------------------\n");
+    printf("[--] ----------------------------------------\n");
 
-    // e += testbench_1(t);
+    e += testbench_1(t);
 
-    // printf("[--] ----------------------------------------\n");
+    printf("[--] ----------------------------------------\n");
 
     printf("Test ");
 
