@@ -127,8 +127,111 @@ int testbench_1(int& t)
     printf("[#1] Random write emulated differential test.\n");
 
     //
+    int c = 65535;
+
+    printf("[#1] \033[1;30mDifferential payload count: %d\033[0m\n", c);
+
+    int size = 32;
+
+    printf("[#1] \033[1;30mConfigurated memory capacity: %d\033[0m\n", size);
+
+    //
     W1RTRandomAccessMemory<int>* emulated
-        = new W1RTRandomAccessMemory<int>(32, MemoryReadMode::READ_FIRST);
+        = new W1RTRandomAccessMemory<int>(size, MemoryReadMode::READ_FIRST);
+
+    for (int i = 0; i < c; i++)
+    {
+        int wen   = rand() % 2;
+        int waddr = rand() % 32;
+        int wdata = rand() | (rand() << 16);
+
+        dut_ptr->addr = waddr;
+        dut_ptr->en   = 1;
+        dut_ptr->we   = wen;
+        dut_ptr->din  = wdata;
+
+        if (wen)
+            emulated->SetWrite(waddr, wdata);
+
+        clkn_dumpgen(t);
+
+        // scan coupled memory
+        for (int j = 0; j < size; j++)
+        {
+            int emu_read;
+            int dut_read;
+
+            emulated->ReadThrough(j, &emu_read);
+
+            dut_read = dut_ptr->tdout[j];
+
+            if (dut_read != emu_read)
+            {
+                printf("[#1] \033[1;31mMemory content differs\033[0m at address 0x%08x.\n", j);
+                printf("[#1] \033[1;31mDumping memory contents\033[0m ...\n");
+
+                // dump to console
+                printf("[#1] Memory content of DUT:\n");
+                for (int dump_k = 0; dump_k < size; dump_k++)
+                {
+                    int dut_dump;
+                    int emu_dump;
+
+                    emulated->ReadThrough(dump_k, &emu_dump);
+
+                    dut_dump = dut_ptr->tdout[dump_k];
+
+                    if (!(dump_k & 0x0007))
+                    {
+                        if (dump_k)
+                            printf("\n");
+                        
+                        printf("[#1] 0x%08x ", dump_k);
+                    }
+
+                    if (dut_dump != emu_dump)
+                        printf("\033[1;31m%08x \033[0m", dut_dump);
+                    else
+                        printf("%08x ", dut_dump);
+                }
+
+                printf("\n");
+
+                printf("[#1] Memory content of Emulation:\n");
+                for (int dump_k = 0; dump_k < size; dump_k++)
+                {
+                    int dut_dump;
+                    int emu_dump;
+
+                    emulated->ReadThrough(dump_k, &emu_dump);
+
+                    dut_dump = dut_ptr->tdout[dump_k];
+
+                    if (!(dump_k & 0x0007))
+                    {
+                        if (dump_k)
+                            printf("\n");
+                        
+                        printf("[#1] 0x%08x ", dump_k);
+                    }
+
+                    if (dut_dump != emu_dump)
+                        printf("\033[1;31m%08x \033[0m", emu_dump);
+                    else
+                        printf("%08x ", emu_dump);
+                }
+
+                printf("\n");
+
+                error++;
+                break;
+            }
+        }
+
+        clkp_dumpgen(t);
+
+        emulated->Eval();
+    }
 
     //
     delete emulated;
