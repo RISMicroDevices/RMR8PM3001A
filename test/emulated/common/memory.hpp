@@ -550,7 +550,7 @@ namespace MEMU::Common {
         ContentAddressableMemory(
             ReadThroughRandomAccessable<__PayloadType>* memory, 
             int                                         memory_offset,
-            ReadThroughRandomAccessable<__PayloadType>* validf,
+            ReadThroughRandomAccessable<bool>*          validf,
             int                                         validf_offset,
             int                                         size);
         
@@ -2143,7 +2143,7 @@ namespace MEMU::Common {
     ContentAddressableMemory<__PayloadType>::ContentAddressableMemory(
         ReadThroughRandomAccessable<__PayloadType>* const   memory, 
         int                                         const   memory_offset,
-        ReadThroughRandomAccessable<__PayloadType>* const   validf,
+        ReadThroughRandomAccessable<bool>*          const   validf,
         int                                         const   validf_offset,
         int                                         const   size)
         : memory        (memory)
