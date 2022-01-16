@@ -98,8 +98,8 @@ namespace MEMU::Core::Issue {
         constexpr static int    rat_size     = EMULATED_RAT_SIZE;
         constexpr static int    rat_gc_count = EMULATED_RAT_GC_COUNT;
 
-        Entry                   entries     [rat_size];
-        GlobalCheckpoint        checkpoints [rat_gc_count];   
+        Entry*                  entries     /*[rat_size]*/;
+        GlobalCheckpoint*       checkpoints /*[rat_gc_count]*/;   
 
     public:
         RegisterAliasTable();
@@ -111,11 +111,11 @@ namespace MEMU::Core::Issue {
 
         Entry*              GetEntryReference(int index);
         Entry               GetEntry(int index) const;
-        void                SetEntry(int index, Entry entry);
+        void                SetEntry(int index, const Entry& entry);
 
         GlobalCheckpoint*   GetCheckpointReference(int index);
         GlobalCheckpoint    GetCheckpoint(int index) const;
-        void                SetCheckpoint(int index, GlobalCheckpoint checkpoint);
+        void                SetCheckpoint(int index, const GlobalCheckpoint& checkpoint);
 
 
         // TODO
@@ -317,5 +317,72 @@ namespace MEMU::Core::Issue {
 
 // class MEMU::Core::Issue::RegisterAliasTable
 namespace MEMU::Core::Issue {
+    /*
+    constexpr static int    rat_size     = EMULATED_RAT_SIZE;
+    constexpr static int    rat_gc_count = EMULATED_RAT_GC_COUNT;
+
+    Entry*                  entries     //[rat_size];
+    GlobalCheckpoint*       checkpoints //[rat_gc_count];  
+    */
+
+    RegisterAliasTable::RegisterAliasTable()
+        : entries(new Entry[rat_size]())
+        , checkpoints(new GlobalCheckpoint[rat_gc_count]())
+    { }    
+
+    RegisterAliasTable::RegisterAliasTable(const RegisterAliasTable& obj)
+        : entries(new Entry[rat_size])
+        , checkpoints(new GlobalCheckpoint[rat_gc_count])
+    {
+        memcpy(entries, obj.entries, rat_size * sizeof(Entry));
+        memcpy(checkpoints, obj.checkpoints, rat_gc_count * sizeof(GlobalCheckpoint));
+    }
     
+    RegisterAliasTable::~RegisterAliasTable()
+    {
+        delete[] entries;
+        delete[] checkpoints;
+    }
+
+    constexpr int RegisterAliasTable::GetSize() const
+    {
+        return rat_size;
+    }
+
+    constexpr int RegisterAliasTable::GetCheckpointCount() const
+    {
+        return rat_gc_count;
+    }
+
+    RegisterAliasTable::Entry* RegisterAliasTable::GetEntryReference(int index)
+    {
+        return &entries[index];
+    }
+
+    RegisterAliasTable::Entry RegisterAliasTable::GetEntry(int index) const
+    {
+        return entries[index];
+    }
+
+    void RegisterAliasTable::SetEntry(int index, const Entry& entry)
+    {
+        entries[index] = entry;
+    }
+
+    RegisterAliasTable::GlobalCheckpoint* RegisterAliasTable::GetCheckpointReference(int index)
+    {
+        return &checkpoints[index];
+    }
+
+    RegisterAliasTable::GlobalCheckpoint RegisterAliasTable::GetCheckpoint(int index) const
+    {
+        return checkpoints[index];
+    }
+
+    void RegisterAliasTable::SetCheckpoint(int index, const GlobalCheckpoint& checkpoint)
+    {
+        checkpoints[index] = checkpoint;
+    }
+
+    // TODO
 }
