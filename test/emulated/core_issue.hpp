@@ -47,7 +47,7 @@ namespace MEMU::Core::Issue {
     {
     public:
         class Entry {
-        public:
+        private:
             int     FID;   // Instruction Fetch ID
             bool    FV;    // Instruction On-flight Valid
             bool    NRA;   // Not reallocate-able Flag
@@ -56,6 +56,7 @@ namespace MEMU::Core::Issue {
             int     ARF;   // ARF (Architectural Register File) mapping address
             bool    V;     // Mapping entry Valid
 
+        public:
             Entry();
             Entry(const Entry& obj);
             ~Entry();
@@ -77,13 +78,33 @@ namespace MEMU::Core::Issue {
             void    operator=(const Entry& obj);
         };
 
+        class EntryModification {
+        private:
+            int     index;
+            Entry   entry;
+
+        public:
+            EntryModification(int index, const Entry& base);
+            EntryModification(const EntryModification& obj);
+            ~EntryModification();
+
+            int             GetIndex() const;
+            void            SetIndex(int index);
+
+            const Entry&    GetEntry() const;
+            Entry&          GetEntry();
+            void            SetEntry(const Entry& entry);
+
+            void            Apply(Entry& dst) const;
+        };
+
         class GlobalCheckpoint {
         private:
             constexpr static int    gc_size = EMULATED_RAT_SIZE;
 
-        public:
             bitset<gc_size>         V; // Saved Mapping entry Valid
 
+        public:
             GlobalCheckpoint();
             GlobalCheckpoint(const GlobalCheckpoint& obj);
             ~GlobalCheckpoint();
@@ -92,6 +113,9 @@ namespace MEMU::Core::Issue {
 
             bool                        GetValid(int index) const;
             void                        SetValid(int index, bool valid);
+
+            void                        SetAll();
+            void                        ResetAll();
         };
 
     private:
@@ -99,7 +123,9 @@ namespace MEMU::Core::Issue {
         constexpr static int    rat_gc_count = EMULATED_RAT_GC_COUNT;
 
         Entry*                  entries     /*[rat_size]*/;
-        GlobalCheckpoint*       checkpoints /*[rat_gc_count]*/;   
+        GlobalCheckpoint*       checkpoints /*[rat_gc_count]*/;  
+
+        list<EntryModification> modified; 
 
     public:
         RegisterAliasTable();
@@ -117,8 +143,19 @@ namespace MEMU::Core::Issue {
         GlobalCheckpoint    GetCheckpoint(int index) const;
         void                SetCheckpoint(int index, const GlobalCheckpoint& checkpoint);
 
+        bool                IsFull() const;
 
-        // TODO
+        bool                TouchAndCommit(int FID, int PRF, int ARF);
+        bool                TouchAndWriteback(int FID, int PRF, int ARF);
+        bool                Touch(int FID, int PRF, int ARF);
+        bool                Commit(int FID, int PRF, int ARF);
+        bool                Writeback(int FID, int PRF, int ARF);
+
+        void                WriteCheckpoint(int GC);
+
+        void                Rollback(int GC);
+
+        void                ResetInput();
 
         virtual void        Eval() override;
     };
@@ -312,6 +349,68 @@ namespace MEMU::Core::Issue {
     {
         V[index] = valid;
     }
+
+    inline void RegisterAliasTable::GlobalCheckpoint::SetAll()
+    {
+        V.set();
+    }
+
+    inline void RegisterAliasTable::GlobalCheckpoint::ResetAll()
+    {
+        V.reset();
+    }
+}
+
+
+// class MEMU::Core::Issue::RegisterAliasTable::EntryModification
+namespace MEMU::Core::Issue {
+    /*
+    int     index;
+    Entry   entry;
+    */
+
+    RegisterAliasTable::EntryModification::EntryModification(int index, const Entry& base)
+        : index (index)
+        , entry (base)
+    { }
+
+    RegisterAliasTable::EntryModification::EntryModification(const EntryModification& obj)
+        : index (obj.index)
+        , entry (obj.entry)
+    { }
+
+    RegisterAliasTable::EntryModification::~EntryModification()
+    { }
+
+    inline int RegisterAliasTable::EntryModification::GetIndex() const
+    {
+        return index;
+    }
+
+    inline void RegisterAliasTable::EntryModification::SetIndex(int index)
+    {
+        this->index = index;
+    }
+
+    inline const RegisterAliasTable::Entry& RegisterAliasTable::EntryModification::GetEntry() const
+    {
+        return entry;
+    }
+
+    inline RegisterAliasTable::Entry& RegisterAliasTable::EntryModification::GetEntry()
+    {
+        return entry;
+    }
+
+    inline void RegisterAliasTable::EntryModification::SetEntry(const Entry& entry)
+    {
+        this->entry = entry;
+    }
+
+    inline void RegisterAliasTable::EntryModification::Apply(Entry& dst) const
+    {
+        dst = entry;
+    }
 }
 
 
@@ -323,16 +422,20 @@ namespace MEMU::Core::Issue {
 
     Entry*                  entries     //[rat_size];
     GlobalCheckpoint*       checkpoints //[rat_gc_count];  
+
+    list<EntryModification> modified;
     */
 
     RegisterAliasTable::RegisterAliasTable()
-        : entries(new Entry[rat_size]())
-        , checkpoints(new GlobalCheckpoint[rat_gc_count]())
+        : entries       (new Entry[rat_size]())
+        , checkpoints   (new GlobalCheckpoint[rat_gc_count]())
+        , modified      (list<EntryModification>())
     { }    
 
     RegisterAliasTable::RegisterAliasTable(const RegisterAliasTable& obj)
-        : entries(new Entry[rat_size])
-        , checkpoints(new GlobalCheckpoint[rat_gc_count])
+        : entries       (new Entry[rat_size])
+        , checkpoints   (new GlobalCheckpoint[rat_gc_count])
+        , modified      (list<EntryModification>())
     {
         memcpy(entries, obj.entries, rat_size * sizeof(Entry));
         memcpy(checkpoints, obj.checkpoints, rat_gc_count * sizeof(GlobalCheckpoint));
@@ -383,6 +486,17 @@ namespace MEMU::Core::Issue {
     {
         checkpoints[index] = checkpoint;
     }
+
+    bool RegisterAliasTable::IsFull() const
+    {
+        for (int i = 0; i < rat_size; i++)
+            if (!entries[i].GetNRA())
+                return false;
+
+        return true;
+    }
+
+
 
     // TODO
 }
