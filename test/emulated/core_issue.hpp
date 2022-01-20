@@ -78,6 +78,8 @@ namespace MEMU::Core::Issue {
             void    operator=(const Entry& obj);
         };
 
+        // *NOTICE: Indicating only one operation could be applied to a single entry
+        //          in a single eval() clock.
         class EntryModification {
         private:
             int     index;
@@ -126,6 +128,18 @@ namespace MEMU::Core::Issue {
         GlobalCheckpoint*       checkpoints /*[rat_gc_count]*/;  
 
         list<EntryModification> modified; 
+        int                     rollback;
+        int                     snapshot;
+
+    private:
+        int                 GetNextEntry() const;
+        void                Invalidate(int ARF);
+        void                TakeOffAndLand(int ARF);
+        void                Release(int ARF);
+
+        bool                __Touch(bool FV, int FID, int ARF, int* PRF);
+        void                __Writeback(bool FV, int FID);
+        void                __Commit(int FID);
 
     public:
         RegisterAliasTable();
@@ -145,11 +159,12 @@ namespace MEMU::Core::Issue {
 
         bool                IsFull() const;
 
-        bool                TouchAndCommit(int FID, int PRF, int ARF);
-        bool                TouchAndWriteback(int FID, int PRF, int ARF);
-        bool                Touch(int FID, int PRF, int ARF);
-        bool                Commit(int FID, int PRF, int ARF);
-        bool                Writeback(int FID, int PRF, int ARF);
+        bool                Touch(int FID, int ARF, int* PRF = 0);
+        bool                TouchOnFlight(int FID, int ARF, int* PRF = 0);
+        void                Writeback(int FID);
+        void                Commit(int FID);
+        bool                TouchAndWriteback(int FID, int ARF, int* PRF = 0);
+        bool                TouchAndCommit(int FID, int ARF, int* PRF = 0);
 
         void                WriteCheckpoint(int GC);
 
@@ -424,18 +439,23 @@ namespace MEMU::Core::Issue {
     GlobalCheckpoint*       checkpoints //[rat_gc_count];  
 
     list<EntryModification> modified;
+    int                     rollback;
     */
 
     RegisterAliasTable::RegisterAliasTable()
         : entries       (new Entry[rat_size]())
         , checkpoints   (new GlobalCheckpoint[rat_gc_count]())
         , modified      (list<EntryModification>())
+        , rollback      (-1)
+        , snapshot      (-1)
     { }    
 
     RegisterAliasTable::RegisterAliasTable(const RegisterAliasTable& obj)
         : entries       (new Entry[rat_size])
         , checkpoints   (new GlobalCheckpoint[rat_gc_count])
         , modified      (list<EntryModification>())
+        , rollback      (-1)
+        , snapshot      (-1)
     {
         memcpy(entries, obj.entries, rat_size * sizeof(Entry));
         memcpy(checkpoints, obj.checkpoints, rat_gc_count * sizeof(GlobalCheckpoint));
@@ -496,7 +516,173 @@ namespace MEMU::Core::Issue {
         return true;
     }
 
+    int RegisterAliasTable::GetNextEntry() const
+    {
+        for (int i = 0; i < rat_size; i++)
+            if (!entries[i].GetNRA())
+                return i;
 
+        return -1;
+    }
 
-    // TODO
+    void RegisterAliasTable::Invalidate(int ARF)
+    {
+        for (int i = 0; i < rat_size; i++)
+            if (entries[i].GetARF() == ARF)
+            {
+                Entry entry = entries[i];
+                entry.SetValid(false);
+
+                modified.push_back(EntryModification(i, entry));
+
+                break;
+            }
+    }
+
+    void RegisterAliasTable::Release(int ARF)
+    {
+        for (int i = 0; i < rat_size; i++)
+            if (entries[i].GetARF() == ARF)
+            {
+                Entry entry = entries[i];
+                entry.SetNRA(false);
+
+                modified.push_back(EntryModification(i, entry));
+                
+                // *NOTICE: Multiple NRA allowed, shouldn't break
+                //break;
+            }
+    }
+
+    void RegisterAliasTable::TakeOffAndLand(int FID)
+    {
+        for (int i = 0; i < rat_size; i++)
+            if (entries[i].GetFID() == FID)
+            {
+                Entry entry = entries[i];
+                entry.SetFV(false);
+
+                modified.push_back(EntryModification(i, entry));
+
+                break;
+            }
+    }
+
+    bool RegisterAliasTable::__Touch(bool FV, int FID, int ARF, int* PRF)
+    {
+        int index = GetNextEntry();
+
+        if (index < 0)
+            return false;
+
+        // Invalidate existed same-ARF entry
+        Invalidate(ARF);
+
+        // Pre-touch means instruction on flight
+        Entry entry = entries[index];
+        entry.SetFID    (FID);
+        entry.SetFV     (FV);
+        entry.SetNRA    (true);
+        entry.SetARF    (ARF);
+        entry.SetValid  (true);
+
+        if (PRF)
+            *PRF = entry.GetPRF();
+
+        //
+        modified.push_back(EntryModification(index, entry));
+
+        return true;
+    }
+
+    inline void RegisterAliasTable::__Writeback(bool FV, int FID)
+    {
+        if (FV)
+            TakeOffAndLand(FID);
+    }
+
+    inline void RegisterAliasTable::__Commit(int FID)
+    {
+        Release(FID);
+    }
+
+    inline bool RegisterAliasTable::Touch(int FID, int ARF, int* PRF = 0)
+    {
+        return __Touch(false, FID, ARF, PRF);
+    }
+
+    inline bool RegisterAliasTable::TouchOnFlight(int FID, int ARF, int* PRF = 0)
+    {
+        return __Touch(true, FID, ARF, PRF);
+    }
+
+    void RegisterAliasTable::Writeback(int FID)
+    {
+        __Writeback(true, FID);
+    }
+
+    void RegisterAliasTable::Commit(int FID)
+    {
+        __Commit(FID);
+    }
+
+    bool RegisterAliasTable::TouchAndWriteback(int FID, int ARF, int* PRF = 0)
+    {
+        if (!__Touch(false, FID, ARF, PRF))
+            return false;
+
+        __Writeback(false, FID);
+
+        return true;
+    }
+
+    bool RegisterAliasTable::TouchAndCommit(int FID, int ARF, int* PRF = 0)
+    {
+        if (!__Touch(false, FID, ARF, PRF))
+            return false;
+
+        __Writeback(false, FID);
+        __Commit(FID);
+
+        return true;
+    }
+
+    void RegisterAliasTable::WriteCheckpoint(int GC)
+    {
+        snapshot = GC;
+    }
+
+    void RegisterAliasTable::Rollback(int GC)
+    {
+        rollback = GC;
+    }
+
+    void RegisterAliasTable::ResetInput()
+    {
+        modified.clear();
+        rollback = -1;
+        snapshot = -1;
+    }
+
+    void RegisterAliasTable::Eval()
+    {
+        // Write checkpoint
+        if (snapshot >= 0)
+        {
+            for (int i = 0; i < rat_size; i++)
+                checkpoints[snapshot].SetValid(i, entries[i].GetValid());
+        }
+
+        // Recovery from checkpoint
+        if (rollback >= 0)
+        {
+            for (int i = 0; i < rat_size; i++)
+                entries[i].SetValid(checkpoints[rollback].GetValid(i));
+        }
+        
+        // Write entries
+        list<EntryModification>::iterator iter = modified.begin();
+        while (iter != modified.end())
+            entries[(*iter).GetIndex()] = (*iter).GetEntry();
+    }
 }
