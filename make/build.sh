@@ -118,21 +118,21 @@ build_diff_proj() {
     compile_difftest
 }
 
-create_memu_soft_link()
-{
-    for MELASRC_FILE in ${MELASRC_LIST[@]}
-    do
-        eval "cp -lf \"$MELASRC_FILE\" \"$PROJECT_PATH/$CSRC_FOLDER/${MELASRC_FILE##*/}\" 2>&1"
-    done
-}
+#create_memu_soft_link()
+# {
+#    for MELASRC_FILE in ${MELASRC_LIST[@]}
+#    do
+#        eval "cp -lf \"$MELASRC_FILE\" \"$PROJECT_PATH/$CSRC_FOLDER/${MELASRC_FILE##*/}\" 2>&1"
+#    done
+# }
 
-finalize_memu_soft_link()
-{
-    for MELASRC_FILE in ${MELASRC_LIST[@]}
-    do
-        eval "rm -rf \"$PROJECT_PATH/$CSRC_FOLDER/${MELASRC_FILE##*/}\""
-    done
-}
+#finalize_memu_soft_link()
+# {
+#    for MELASRC_FILE in ${MELASRC_LIST[@]}
+#    do
+#        eval "rm -rf \"$PROJECT_PATH/$CSRC_FOLDER/${MELASRC_FILE##*/}\""
+#    done
+# }
 
 build_proj() {
     cd $PROJECT_PATH
@@ -176,20 +176,21 @@ build_proj() {
         do
             CSRC_FILES="$CSRC_FILES $PROJECT_PATH/$CSRC_FOLDER/${MELASRC_CPP_FILE##*/}"
         done
+    
     fi
 
     # compile
-    create_memu_soft_link
+    #create_memu_soft_link
     mkdir $BUILD_FOLDER 1>/dev/null 2>&1
     eval "verilator --x-assign unique --cc --exe --trace --assert $VERILATOR_PARAM  -O3 -CFLAGS \"-std=c++11 -Wall $INCLUDE_CSRC_FOLDERS $CFLAGS\" $LDFLAGS -o $PROJECT_PATH/$BUILD_FOLDER/$EMU_FILE \
         -Mdir $PROJECT_PATH/$BUILD_FOLDER/emu-compile $INCLUDE_EXT_VSRC_FOLDERS $INCLUDE_VSRC_FOLDERS --build $V_TOP_FILE $CSRC_FILES"
     if [ $? -ne 0 ]; then
         echo "Failed to run verilator!!!"
-        finalize_memu_soft_link
+        #finalize_memu_soft_link
         exit 1
     fi
 
-    finalize_memu_soft_link
+    #finalize_memu_soft_link
 
     cd $OSCPU_PATH
 }
