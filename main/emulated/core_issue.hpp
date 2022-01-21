@@ -606,12 +606,12 @@ namespace MEMU::Core::Issue {
         Release(FID);
     }
 
-    inline bool RegisterAliasTable::Touch(int FID, int ARF, int* PRF = 0)
+    inline bool RegisterAliasTable::Touch(int FID, int ARF, int* PRF)
     {
         return __Touch(false, FID, ARF, PRF);
     }
 
-    inline bool RegisterAliasTable::TouchOnFlight(int FID, int ARF, int* PRF = 0)
+    inline bool RegisterAliasTable::TouchOnFlight(int FID, int ARF, int* PRF)
     {
         return __Touch(true, FID, ARF, PRF);
     }
@@ -626,7 +626,7 @@ namespace MEMU::Core::Issue {
         __Commit(FID);
     }
 
-    bool RegisterAliasTable::TouchAndWriteback(int FID, int ARF, int* PRF = 0)
+    bool RegisterAliasTable::TouchAndWriteback(int FID, int ARF, int* PRF)
     {
         if (!__Touch(false, FID, ARF, PRF))
             return false;
@@ -636,7 +636,7 @@ namespace MEMU::Core::Issue {
         return true;
     }
 
-    bool RegisterAliasTable::TouchAndCommit(int FID, int ARF, int* PRF = 0)
+    bool RegisterAliasTable::TouchAndCommit(int FID, int ARF, int* PRF)
     {
         if (!__Touch(false, FID, ARF, PRF))
             return false;
