@@ -12,6 +12,7 @@ help() {
     echo "-c: Specify the compiler. \"g++\" by default."
     echo "-e: Specify the verification case name. For example: -e dut."
     echo "-p: Specify the mixed emulation components root directory."
+    echo "-i: Specify external VMC include path."
     echo "-a: Parameters passed to the verification program. For example: -a \"1 2 3 ......\"."
     echo "-o: Specify the working directory."
     exit 0
@@ -27,15 +28,17 @@ COMPILER="g++"
 CASE_FOLDER="dut_example"
 MEMU_FOLDER=
 PARAMETERS=
+VMC_INCLUDE_FOLDER=
 INCLUDE_FOLDERS=
 
 # Check input parameters
-while getopts 'hc:e:p:a:o:' OPT; do
+while getopts 'hc:e:p:i:a:o:' OPT; do
     case $OPT in
         h) help;;
         c) COMPILER="$OPTARG";;
         e) CASE_FOLDER="$OPTARG";;
         p) MEMU_FOLDER="$OPTARG";;
+        i) VMC_INCLUDE_FOLDER="$OPTARG";;
         a) PARAMETERS="$OPTARG";;
         o) WORKSPACE_PATH="$OPTARG";;
         ?) help;;
@@ -70,11 +73,17 @@ else
     exit 1
 fi
 
+# VMC include path
+if [[ -n "$VMC_INCLUDE_FOLDER" ]]; then
+    INCLUDE_FOLDERS="$INCLUDE_FOLDERS -I$VMC_INCLUDE_FOLDER"
+fi
+
 # Build and run
 eval "mkdir $BUILD_PATH"
 echo "Ready to compile MEMU verification payload."
 
-echo "[compile task] \"$COMPILER main.cpp $INCLUDE_FOLDERS -o $BUILD_FILE\""
+cd $CASE_PATH
+echo "[compile task] $COMPILER main.cpp $INCLUDE_FOLDERS -o $BUILD_FILE"
 eval "$COMPILER main.cpp $INCLUDE_FOLDERS -o $BUILD_FILE"
 if [ $? -ne 0 ]; then
     echo "Failed at compilation."
