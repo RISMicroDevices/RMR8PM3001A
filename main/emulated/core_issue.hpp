@@ -683,6 +683,6 @@ namespace MEMU::Core::Issue {
         // Write entries
         list<EntryModification>::iterator iter = modified.begin();
         while (iter != modified.end())
-            entries[(*iter).GetIndex()] = (*iter).GetEntry();
+            entries[(*iter).GetIndex()] = (*iter++).GetEntry();
     }
 }
