@@ -10,6 +10,8 @@
 
 #define EMULATED_GC_COUNT               8
 
+#define EMULATED_ARF_SIZE               32
+
 using namespace std;
 
 namespace MEMU::Core {
