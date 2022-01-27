@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdio>
+#include <cstdint>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -87,6 +88,10 @@ namespace VMC::RAT {
         void            Eval();
     };
 
+    static constexpr unsigned int   RAND_MAX_REG_VALUE_MAX  = UINT32_MAX;
+
+    static constexpr unsigned int   RAND_MAX_REG_INDEX_MAX  = EMULATED_ARF_SIZE;
+
     typedef struct {
 
         SimReOrderBuffer    ROB                         = SimReOrderBuffer();
@@ -98,6 +103,10 @@ namespace VMC::RAT {
         bool                FlagStepInfo                = false;
 
         bool                FlagARF0Conv                = true;
+
+        unsigned int        RandMaxRegValue             = RAND_MAX_REG_VALUE_MAX;
+
+        unsigned int        RandMaxRegIndex             = RAND_MAX_REG_INDEX_MAX;
 
     } SimContext, *SimHandle;
 }
@@ -148,13 +157,20 @@ namespace VMC::RAT {
     std::cout << "RAT0 simulation command usages:" << std::endl; \
     std::cout << "- rat0.info.bystep [true|false]     Toggle by-step info of RAT0 simulation (\'false\' by default)" << std::endl; \
     std::cout << "- rat0.arf0conv [true|false]        Toggle ARF0-zero conversion (\'true\' by default)" << std::endl; \
+    std::cout << "- rat0.rand.reg.value [(uint)max_value|@DEFAULT]" << std::endl; \
+    std::cout << "                                    Get/set the maximum value of random register value" << std::endl; \
+    std::cout << "- rat0.rand.reg.index [(uint)max_value|@DEFAULT]" << std::endl; \
+    std::cout << "                                    Get/set the maximum value of random register index" << std::endl; \
     std::cout << "- rat0.rat.ls [-V|+V|-NRA|+NRA|-FV|+FV] " << std::endl; \
     std::cout << "                                    List all RAT entries (with optional filter)" << std::endl; \
     std::cout << "- rat0.arf.ls.ref [-Z]              List all reference ARF register values (with optional filter)" << std::endl; \
     std::cout << "- rat0.arf.ls [-Z|-U]               List all values of ARF register mapped by RAT (with optional filter)" << std::endl; \
-    std::cout << "- rat0.arf.set <index> <value>      Set specified ARF register value" << std::endl; \
-    std::cout << "- rat0.arf.set.random [index]       Set specified/random ARF register with random value" << std::endl; \
-    std::cout << "- rat0.arf.get <index>              Get specified ARF register value" << std::endl;
+    std::cout << "- rat0.arf.set <index> <value> [-F] Set specified ARF register value" << std::endl; \
+    std::cout << "- rat0.arf.set.randomval <index> [-F]" << std::endl; \
+    std::cout << "                                    Set specified ARF register with random value" << std::endl; \
+    std::cout << "- rat0.arf.set.random [-F]          Set random ARF register with random value" << std::endl; \
+    std::cout << "- rat0.arf.get <index>              Get specified ARF register value" << std::endl;  \
+    std::cout << "- rat0.prf.ls [-Z|-U]               List all values of PRF register (with optional filter)" << std::endl;
 
     // rat0.info.bystep [true|false]
     bool _RAT0_INFO_BYSTEP(void* handle, const std::string& cmd,
@@ -202,6 +218,102 @@ namespace VMC::RAT {
         return true;
     }
 
+    // rat0.rand.reg.value [max_value|@DEFAULT]
+    bool _RAT0_RAND_REG_VALUE(void* handle, const std::string& cmd,
+                                            const std::string& paramline,
+                                            const std::vector<std::string>& params)
+    {
+        if (params.size() > 1)
+        {
+            std::cout << "Too much or too less parameter(s) for \'rat0.rand.reg.value\'." << std::endl;
+            return false;
+        }
+
+        if (!params.empty())
+        {
+            int val = -1;
+
+            if (params[0].compare("@DEFAULT") == 0)
+                val = RAND_MAX_REG_VALUE_MAX;
+            else
+                std::istringstream(params[0]) >> val;
+
+            if (val < 0)
+            {
+                std::cout << "Param 0 \'" << params[0] << "\' is not a unsigned integer." << std::endl;
+                return false;
+            }
+
+            unsigned int uval = *(unsigned int*)(&val);
+
+            if (uval > RAND_MAX_REG_VALUE_MAX)
+            {
+                std::cout << "Param 0 \'" << uval << "\' is invalid";
+                printf(" [Max %u (0x%08x)].\n", RAND_MAX_REG_VALUE_MAX, RAND_MAX_REG_VALUE_MAX);
+                return false;
+            }
+
+            GetCurrentHandle()->RandMaxRegValue = uval;
+
+            std::cout << "Set: ";
+        }
+
+        std::cout << "RAT0.rand.max.regvalue = ";
+        printf("%u (0x%08x) ", GetCurrentHandle()->RandMaxRegValue, GetCurrentHandle()->RandMaxRegValue);
+        printf(" [Max %u (0x%08x)]\n", RAND_MAX_REG_VALUE_MAX, RAND_MAX_REG_VALUE_MAX);
+
+        return true;
+    }
+
+
+    // rat0.rand.reg.index [max_value|@DEFAULT]
+    bool _RAT0_RAND_REG_INDEX(void* handle, const std::string& cmd,
+                                            const std::string& paramline,
+                                            const std::vector<std::string>& params)
+    {
+        if (params.size() > 1)
+        {
+            std::cout << "Too much or too less parameter(s) for \'rat0.rand.reg.index\'." << std::endl;
+            return false;
+        }
+
+        if (!params.empty())
+        {
+            int val = -1;
+
+            if (params[0].compare("@DEFAULT") == 0)
+                val = RAND_MAX_REG_INDEX_MAX;
+            else 
+                std::istringstream(params[0]) >> val;
+            
+            if (val < 0)
+            {
+                std::cout << "Param 0 \'" << params[0] << "\' is not a unsigned integer." << std::endl;
+                return false;
+            }
+
+            unsigned int uval = *(unsigned int*)(&val);
+
+            if (uval > RAND_MAX_REG_INDEX_MAX)
+            {
+                std::cout << "Param 0 \'" << uval << "\' is invalid";
+                printf(" [Max %u (0x%08x)].\n", RAND_MAX_REG_INDEX_MAX, RAND_MAX_REG_INDEX_MAX);
+                return false;
+            }
+
+            GetCurrentHandle()->RandMaxRegIndex = uval;
+
+            std::cout << "Set: ";
+        }
+
+        std::cout << "RAT0.rand.max.regindex = ";
+        printf("%u (0x%08x) ", GetCurrentHandle()->RandMaxRegIndex, GetCurrentHandle()->RandMaxRegIndex);
+        printf(" [Max %u (0x%08x)]\n", RAND_MAX_REG_INDEX_MAX, RAND_MAX_REG_INDEX_MAX);
+
+        return true;
+    }
+
+
     // rat0.arf.ls.ref [-Z]
     bool _RAT0_ARF_LS_REF(void* handle, const std::string& cmd,
                                         const std::string& paramline,
@@ -232,7 +344,7 @@ namespace VMC::RAT {
         std::cout << "Architectural registers:" << std::endl;
 
         if (nonzero)
-            std::cout << "(\'-Z\': Listing all non-zero registers)" << std::endl;
+            std::cout << "(\'-Z\': Not listing zero registers)" << std::endl;
 
         std::cout << "Type         Index         Value" << std::endl;
         std::cout << "-----        ------        -----------" << std::endl;
@@ -264,13 +376,27 @@ namespace VMC::RAT {
     }
 
 
-    // rat0.arf.set <index> <value>
+    // rat0.arf.set <index> <value> [-F]
 
     
-    // rat0.arf.set.random <index>
+    // rat0.arf.set.randomval <index> [-F]
+
+
+    // rat0.arf.set.random [-F]
 
     
     // rat0.arf.get <index>
+
+    
+    // rat0.prf.ls [-Z|-U]
+    bool _RAT0_PRF_LS(void* handle, const std::string& cmd,
+                                    const std::string& paramline,
+                                    const std::vector<std::string>& params)
+    {
+        // TODO
+
+        return true;
+    }
 
 
     // rat0.rat.ls [-V|+V|-NRA|+NRA|-FV|+FV]
@@ -278,6 +404,82 @@ namespace VMC::RAT {
                                     const std::string& paramline,
                                     const std::vector<std::string>& params)
     {
+        bool enFilterV   = false, filterV;
+        bool enFilterNRA = false, filterNRA;
+        bool enFilterFV  = false, filterFV;
+
+        for (int i = 0; i < params.size(); i++)
+        {
+            std::string param = params[i];
+
+            bool filterFlag;
+
+            if (param.length() < 2)
+            {
+                std::cout << "Param " << i << " \'" << param << "\' is too short." << std::endl;
+                return false;
+            }
+
+            char prefix = param.at(0);
+            if (prefix == '-')
+                filterFlag = false;
+            else if (prefix == '+')
+                filterFlag = true;
+            else
+            {
+                std::cout << "Param " << i << " \'" << params[i] << "\' is invalid." << std::endl;
+                return false;
+            }
+
+            std::string suffix = param.substr(1, param.length() - 1);
+            if (suffix.compare("V") == 0)
+            {
+                enFilterV   = true;
+                filterV     = filterFlag;
+            }
+            else if (suffix.compare("NRA") == 0)
+            {
+                enFilterNRA = true;
+                filterNRA   = filterFlag;
+            }
+            else if (suffix.compare("FV") == 0)
+            {
+                enFilterFV  = true;
+                filterFV    = filterFlag;
+            }
+            else
+            {
+                std::cout << "Param " << i << " \'" << params[i] << "\' is invalid." << std::endl;
+                return false;
+            }
+        }
+
+        cout << "Register Alias Table entries:" << endl;
+
+        if (enFilterV)
+        {
+            if (filterV)
+                std::cout << "(\'+V\':   Listing all entries with V flag of 1)" << std::endl;
+            else
+                std::cout << "(\'-V\':   Listing all entries with V flag of 0)" << std::endl;
+        }
+
+        if (enFilterNRA)
+        {
+            if (filterNRA)
+                std::cout << "(\'+NRA\': Listing all entries with NRA flag of 1)" << std::endl;
+            else
+                std::cout << "(\'-NRA\': Listing all entries with NRA flag of 0)" << std::endl;
+        }
+
+        if (enFilterFV)
+        {
+            if (filterFV)
+                std::cout << "(\'+FV\':  Listing all entries with FV flag of 1)" << std::endl;
+            else
+                std::cout << "(\'-FV\':  Listing all entries with FV flag of 0)" << std::endl;
+        }
+
         // TODO
 
         return true;
@@ -291,10 +493,12 @@ namespace VMC::RAT {
 
     void SetupCommands(VMCHandle handle)
     {
-        handle->handlers.push_back(CommandHandler{ std::string("rat0.info.bystep"), &_RAT0_INFO_BYSTEP });
-        handle->handlers.push_back(CommandHandler{ std::string("rat0.arf0conv")   , &_RAT0_ARF0CONV });
-        handle->handlers.push_back(CommandHandler{ std::string("rat0.rat.ls")     , &_RAT0_RAT_LS });
-        handle->handlers.push_back(CommandHandler{ std::string("rat0.arf.ls.ref") , &_RAT0_ARF_LS_REF });
+        handle->handlers.push_back(CommandHandler{ std::string("rat0.info.bystep")      , &_RAT0_INFO_BYSTEP });
+        handle->handlers.push_back(CommandHandler{ std::string("rat0.arf0conv")         , &_RAT0_ARF0CONV });
+        handle->handlers.push_back(CommandHandler{ std::string("rat0.rand.reg.value")   , &_RAT0_RAND_REG_VALUE });
+        handle->handlers.push_back(CommandHandler{ std::string("rat0.rand.reg.index")   , &_RAT0_RAND_REG_INDEX });
+        handle->handlers.push_back(CommandHandler{ std::string("rat0.rat.ls")           , &_RAT0_RAT_LS });
+        handle->handlers.push_back(CommandHandler{ std::string("rat0.arf.ls.ref")       , &_RAT0_ARF_LS_REF });
     }
 }
 
