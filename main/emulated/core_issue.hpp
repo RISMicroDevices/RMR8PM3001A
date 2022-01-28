@@ -148,36 +148,34 @@ namespace MEMU::Core::Issue {
         RegisterAliasTable(const RegisterAliasTable& obj);
         ~RegisterAliasTable();
 
-        constexpr int       GetSize() const;
-        constexpr int       GetCheckpointCount() const;
+        constexpr int           GetSize() const;
+        constexpr int           GetCheckpointCount() const;
 
-        Entry*              GetEntryReference(int index);
-        Entry               GetEntry(int index) const;
-        void                SetEntry(int index, const Entry& entry);
+        const Entry&            GetEntry(int index) const;
+        void                    SetEntry(int index, const Entry& entry);
 
-        GlobalCheckpoint*   GetCheckpointReference(int index);
-        GlobalCheckpoint    GetCheckpoint(int index) const;
-        void                SetCheckpoint(int index, const GlobalCheckpoint& checkpoint);
+        const GlobalCheckpoint& GetCheckpoint(int index) const;
+        void                    SetCheckpoint(int index, const GlobalCheckpoint& checkpoint);
 
-        int                 GetAliasPRF(int arf);
+        int                     GetAliasPRF(int arf);
 
-        void                Clear();
-        bool                IsFull() const;
+        void                    Clear();
+        bool                    IsFull() const;
 
-        bool                Touch(int FID, int ARF, int* PRF = 0);
-        bool                TouchOnFlight(int FID, int ARF, int* PRF = 0);
-        void                Writeback(int FID);
-        void                Commit(int FID);
-        bool                TouchAndWriteback(int FID, int ARF, int* PRF = 0);
-        bool                TouchAndCommit(int FID, int ARF, int* PRF = 0);
+        bool                    Touch(int FID, int ARF, int* PRF = 0);
+        bool                    TouchOnFlight(int FID, int ARF, int* PRF = 0);
+        void                    Writeback(int FID);
+        void                    Commit(int FID);
+        bool                    TouchAndWriteback(int FID, int ARF, int* PRF = 0);
+        bool                    TouchAndCommit(int FID, int ARF, int* PRF = 0);
 
-        void                WriteCheckpoint(int GC);
+        void                    WriteCheckpoint(int GC);
 
-        void                Rollback(int GC);
+        void                    Rollback(int GC);
 
-        void                ResetInput();
+        void                    ResetInput();
 
-        virtual void        Eval() override;
+        virtual void            Eval() override;
     };
 }
 
@@ -463,7 +461,10 @@ namespace MEMU::Core::Issue {
         , modified      (list<EntryModification>())
         , rollback      (-1)
         , snapshot      (-1)
-    { }    
+    { 
+        for (int i = 0; i < rat_size; i++)
+            entries[i].SetPRF(i);
+    }    
 
     RegisterAliasTable::RegisterAliasTable(const RegisterAliasTable& obj)
         : entries       (new Entry[rat_size])
@@ -492,12 +493,7 @@ namespace MEMU::Core::Issue {
         return rat_gc_count;
     }
 
-    RegisterAliasTable::Entry* RegisterAliasTable::GetEntryReference(int index)
-    {
-        return &entries[index];
-    }
-
-    RegisterAliasTable::Entry RegisterAliasTable::GetEntry(int index) const
+    const RegisterAliasTable::Entry& RegisterAliasTable::GetEntry(int index) const
     {
         return entries[index];
     }
@@ -507,12 +503,7 @@ namespace MEMU::Core::Issue {
         entries[index] = entry;
     }
 
-    RegisterAliasTable::GlobalCheckpoint* RegisterAliasTable::GetCheckpointReference(int index)
-    {
-        return &checkpoints[index];
-    }
-
-    RegisterAliasTable::GlobalCheckpoint RegisterAliasTable::GetCheckpoint(int index) const
+    const RegisterAliasTable::GlobalCheckpoint& RegisterAliasTable::GetCheckpoint(int index) const
     {
         return checkpoints[index];
     }
@@ -534,7 +525,10 @@ namespace MEMU::Core::Issue {
     void RegisterAliasTable::Clear()
     {
         for (int i = 0; i < rat_size; i++)
+        {
             entries[i].Clear();
+            entries[i].SetPRF(i);
+        }
     }
 
     bool RegisterAliasTable::IsFull() const
