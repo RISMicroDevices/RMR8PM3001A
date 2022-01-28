@@ -13,6 +13,8 @@
 #include "core_issue.hpp"
 
 
+using namespace MEMU::Core::Issue;
+
 namespace VMC::RAT {
 
     static constexpr int INSN_CODE_NOP      = 0;
@@ -94,19 +96,21 @@ namespace VMC::RAT {
 
     typedef struct {
 
-        SimReOrderBuffer    ROB                         = SimReOrderBuffer();
+        RegisterAliasTable      RAT                         = RegisterAliasTable();
 
-        int                 PRF[EMULATED_PRF_SIZE]      = { 0 };
+        PhysicalRegisterFile    PRF                         = PhysicalRegisterFile();
 
-        int                 RefARF[EMULATED_ARF_SIZE]   = { 0 };
+        SimReOrderBuffer        ROB                         = SimReOrderBuffer();
 
-        bool                FlagStepInfo                = false;
+        int                     RefARF[EMULATED_ARF_SIZE]   = { 0 };
 
-        bool                FlagARF0Conv                = true;
+        bool                    FlagStepInfo                = false;
 
-        unsigned int        RandMaxRegValue             = RAND_MAX_REG_VALUE_MAX;
+        bool                    FlagARF0Conv                = true;
 
-        unsigned int        RandMaxRegIndex             = RAND_MAX_REG_INDEX_MAX;
+        unsigned int            RandMaxRegValue             = RAND_MAX_REG_VALUE_MAX;
+
+        unsigned int            RandMaxRegIndex             = RAND_MAX_REG_INDEX_MAX;
 
     } SimContext, *SimHandle;
 }
@@ -480,7 +484,30 @@ namespace VMC::RAT {
                 std::cout << "(\'-FV\':  Listing all entries with FV flag of 0)" << std::endl;
         }
 
-        // TODO
+        std::cout << "PRF        ARF        V        NRA        FID        FV" << std::endl;
+        std::cout << "-----      -----      ---      -----      -----      ----" << std::endl;
+
+        SimHandle csim = GetCurrentHandle();
+        for (int i = 0; i < csim->RAT.GetSize(); i++)
+        {
+            const RegisterAliasTable::Entry& entry = csim->RAT.GetEntry(i);
+            
+            if (enFilterV && filterV != entry.GetValid())
+                continue;
+
+            if (enFilterNRA && filterNRA != entry.GetNRA())
+                continue;
+
+            if (enFilterFV && filterFV != entry.GetFV())
+                continue;
+
+            printf("%-5d      ", entry.GetPRF());
+            printf("%-5d      ", entry.GetARF());
+            printf("%-3d      ", entry.GetValid());
+            printf("%-5d      ", entry.GetNRA());
+            printf("%-5d      ", entry.GetFID());
+            printf("%-4d    \n", entry.GetFV());
+        }
 
         return true;
     }
