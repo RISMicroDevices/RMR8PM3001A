@@ -61,6 +61,8 @@ namespace MEMU::Core::Issue {
             Entry(const Entry& obj);
             ~Entry();
 
+            void    Clear();
+
             int     GetFID() const;
             bool    GetFV() const;
             bool    GetNRA() const;
@@ -157,6 +159,9 @@ namespace MEMU::Core::Issue {
         GlobalCheckpoint    GetCheckpoint(int index) const;
         void                SetCheckpoint(int index, const GlobalCheckpoint& checkpoint);
 
+        int                 GetAliasPRF(int arf);
+
+        void                Clear();
         bool                IsFull() const;
 
         bool                Touch(int FID, int ARF, int* PRF = 0);
@@ -259,6 +264,16 @@ namespace MEMU::Core::Issue {
 
     RegisterAliasTable::Entry::~Entry()
     { }
+
+    void RegisterAliasTable::Entry::Clear()
+    {
+        FID = 0;
+        FV  = false;
+        NRA = false;
+        PRF = 0;
+        ARF = 0;
+        V   = false;
+    }
 
     inline int RegisterAliasTable::Entry::GetFID() const
     {
@@ -505,6 +520,21 @@ namespace MEMU::Core::Issue {
     void RegisterAliasTable::SetCheckpoint(int index, const GlobalCheckpoint& checkpoint)
     {
         checkpoints[index] = checkpoint;
+    }
+
+    int RegisterAliasTable::GetAliasPRF(int arf)
+    {
+        for (int i = 0; i < rat_size; i++)
+            if (entries[i].GetValid() && (entries[i].GetARF() == arf))
+                return entries[i].GetPRF();
+
+        return -1;
+    }
+
+    void RegisterAliasTable::Clear()
+    {
+        for (int i = 0; i < rat_size; i++)
+            entries[i].Clear();
     }
 
     bool RegisterAliasTable::IsFull() const
