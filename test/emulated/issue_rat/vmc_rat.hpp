@@ -150,6 +150,46 @@ namespace VMC::RAT {
         return CURRENT_HANDLE;
     }
 
+    inline int GetRefARF(SimHandle handle, int arf)
+    {
+        if (handle->FlagARF0Conv && !arf)
+            return 0;
+        
+        return handle->RefARF[arf];
+    }
+
+    inline void SetRefARF(SimHandle handle, int arf, int val)
+    {
+        if (handle->FlagARF0Conv && !arf)
+            return;
+
+        handle->RefARF[arf] = val;
+    }
+
+    inline int GetARF(SimHandle handle, int arf, bool* out_mapped = 0, int* out_mappedPRF = 0)
+    {
+        if (handle->FlagARF0Conv && !arf)
+            return 0;
+
+        int  mappedPRF = handle->RAT.GetAliasPRF(arf);
+        bool mapped    = mappedPRF >= 0;
+
+        if (out_mapped)
+            *out_mapped = mapped;
+
+        if (out_mappedPRF)
+            *out_mappedPRF = mappedPRF;
+
+        return mapped ? handle->PRF.Get(mappedPRF) : 0;
+    }
+
+    inline bool SetARF(SimHandle handle, int arf, int val)
+    {
+        // TODO
+
+        return true;
+    }
+
     //
 }
 
@@ -165,16 +205,15 @@ namespace VMC::RAT {
     std::cout << "                                    Get/set the maximum value of random register value" << std::endl; \
     std::cout << "- rat0.rand.reg.index [(uint)max_value|@DEFAULT]" << std::endl; \
     std::cout << "                                    Get/set the maximum value of random register index" << std::endl; \
-    std::cout << "- rat0.rat.ls [-V|+V|-NRA|+NRA|-FV|+FV] " << std::endl; \
-    std::cout << "                                    List all RAT entries (with optional filter)" << std::endl; \
+    std::cout << "- rat0.prf.ls [-V|+V|-NRA|+NRA|-FV|+FV|-Z|+Z] " << std::endl; \
+    std::cout << "                                    List all RAT entries and related PRF (with optional filter)" << std::endl; \
     std::cout << "- rat0.arf.ls.ref [-Z]              List all reference ARF register values (with optional filter)" << std::endl; \
     std::cout << "- rat0.arf.ls [-Z|-U]               List all values of ARF register mapped by RAT (with optional filter)" << std::endl; \
     std::cout << "- rat0.arf.set <index> <value> [-F] Set specified ARF register value" << std::endl; \
     std::cout << "- rat0.arf.set.randomval <index> [-F]" << std::endl; \
     std::cout << "                                    Set specified ARF register with random value" << std::endl; \
     std::cout << "- rat0.arf.set.random [-F]          Set random ARF register with random value" << std::endl; \
-    std::cout << "- rat0.arf.get <index>              Get specified ARF register value" << std::endl;  \
-    std::cout << "- rat0.prf.ls [-Z|-U]               List all values of PRF register (with optional filter)" << std::endl;
+    std::cout << "- rat0.arf.get <index> [-NEQ|-U]    Get specified ARF register value" << std::endl;  \
 
     // rat0.info.bystep [true|false]
     bool _RAT0_INFO_BYSTEP(void* handle, const std::string& cmd,
@@ -356,13 +395,13 @@ namespace VMC::RAT {
         for (int i = 0; i < EMULATED_ARF_SIZE; i++)
         {
             if (nonzero)
-                if (!GetCurrentHandle()->RefARF[i])
+                if (!GetRefARF(GetCurrentHandle(), i))
                     continue;
 
             std::cout << "rARF         ";
             printf("%3d", i);
             std::cout << "           ";
-            printf("0x%08x\n", GetCurrentHandle()->RefARF[i]);
+            printf("0x%08x\n", GetRefARF(GetCurrentHandle(), i));
         }
 
         return true;
@@ -374,13 +413,75 @@ namespace VMC::RAT {
                                     const std::string& paramline,
                                     const std::vector<std::string>& params)
     {
-        // TODO
+        bool filterZ = false;
+        bool filterU = false;
+
+        for (int i = 0; i < params.size(); i++)
+        {
+            std::string param = params[i];
+
+            if (param.compare("-Z") == 0)
+                filterZ = true;
+            else if (param.compare("-U") == 0)
+                filterU = true;
+            else
+            {
+                std::cout << "Param " << i << " \'" << param << "\' is invalid." << std::endl;
+                return false;
+            }
+        }
+
+        SimHandle csim = GetCurrentHandle();
+
+        if (filterZ)
+            std::cout << "('-Z': Listing all non-zero ARFs)" << std::endl;
+
+        if (filterU)
+            std::cout << "('-U': Listing all mapped ARFs)" << std::endl;
+
+        std::cout << "ARF        PRF        Value(PRF)      Value(Ref)" << std::endl;
+        std::cout << "-----      -----      ----------      ----------" << std::endl;
+
+        for (int i = 0; i < EMULATED_ARF_SIZE; i++)
+        {
+            bool mapped;
+            int  mappedPRF;
+
+            int val = GetARF(csim, i, &mapped, &mappedPRF);
+
+            if (filterU && !mapped)
+                continue;
+
+            if (filterZ && !val)
+                continue;
+
+            //
+            printf("%-5d      ", i);
+
+            if (csim->FlagARF0Conv && !i)
+                printf("ZERO       ");
+            else if (mapped)
+                printf("%-5d      ", mappedPRF);
+            else
+                printf("-          ");
+
+            printf("0x%08x      ", val);
+            printf("0x%08x\n"    , GetRefARF(csim, i));
+        }
 
         return true;
     }
 
 
     // rat0.arf.set <index> <value> [-F]
+    bool _RAT0_ARF_SET(void* handle, const std::string& cmd,
+                                     const std::string& paramline,
+                                     const std::vector<std::string>& params)
+    {
+        // TODO
+
+        return true;
+    }
 
     
     // rat0.arf.set.randomval <index> [-F]
@@ -389,28 +490,88 @@ namespace VMC::RAT {
     // rat0.arf.set.random [-F]
 
     
-    // rat0.arf.get <index>
-
-    
-    // rat0.prf.ls [-Z|-U]
-    bool _RAT0_PRF_LS(void* handle, const std::string& cmd,
-                                    const std::string& paramline,
-                                    const std::vector<std::string>& params)
+    // rat0.arf.get <index> [-EQ]
+    bool _RAT0_ARF_GET(void* handle, const std::string& cmd,
+                                     const std::string& paramline,
+                                     const std::vector<std::string>& params)
     {
-        // TODO
+        //
+        if (params.empty())
+        {
+            std::cout << "Too much or too less parameter(s) for \'rat0.arf.get\'" << std::endl;
+            return false;
+        }
 
+        //
+        bool flagEQ = false;
+        bool flagU  = false;
+
+        int index;
+        std::istringstream(params[0]) >> index;
+
+        for (int i = 1; i < params.size(); i++)
+        {
+            std::string param = params[i];
+
+            if (param.compare("-NEQ") == 0)
+                flagEQ = true;
+            else if (param.compare("-U") == 0)
+                flagU = true;
+            else 
+            {
+                std::cout << "Param " << i << " \'" << param <<  "\' is invalid." << std::endl;
+                return false;
+            }
+        }
+
+        //
+        SimHandle csim = GetCurrentHandle();
+
+        int ref;
+        int val;
+
+        bool mapped;
+        int  mappedPRF;
+
+        ref = GetRefARF(csim, index);
+        val = GetARF(csim, index, &mapped, &mappedPRF);
+
+        //
+        std::cout << "ARF        PRF        Value(PRF)      Value(Ref)" << std::endl;
+        std::cout << "-----      -----      ----------      ----------" << std::endl;
+
+        printf("%-5d      ", index);
+
+        if (csim->FlagARF0Conv && !index)
+            printf("ZERO       ");
+        else if (mapped)
+            printf("%-5d      ", mappedPRF);
+        else
+            printf("-          ");
+
+        printf("0x%08x      ", val);
+        printf("0x%08x\n"    , ref);
+
+        //
+        if (flagEQ && val != ref)
+            return false;
+
+        if (!flagU || mapped)
+            SetLastReturnInt((VMCHandle) handle, val);
+        
         return true;
     }
 
-
-    // rat0.rat.ls [-V|+V|-NRA|+NRA|-FV|+FV]
-    bool _RAT0_RAT_LS(void* handle, const std::string& cmd,
+    
+    // rat0.prf.ls [-V|+V|-NRA|+NRA|-FV|+FV|-Z|+Z]
+    bool _RAT0_PRF_LS(void* handle, const std::string& cmd,
                                     const std::string& paramline,
                                     const std::vector<std::string>& params)
     {
         bool enFilterV   = false, filterV;
         bool enFilterNRA = false, filterNRA;
         bool enFilterFV  = false, filterFV;
+        bool enFilterZ   = false, filterZ;
 
         for (int i = 0; i < params.size(); i++)
         {
@@ -451,6 +612,11 @@ namespace VMC::RAT {
                 enFilterFV  = true;
                 filterFV    = filterFlag;
             }
+            else if (suffix.compare("Z") == 0)
+            {
+                enFilterZ   = true;
+                filterZ     = filterFlag;
+            }
             else
             {
                 std::cout << "Param " << i << " \'" << params[i] << "\' is invalid." << std::endl;
@@ -484,8 +650,16 @@ namespace VMC::RAT {
                 std::cout << "(\'-FV\':  Listing all entries with FV flag of 0)" << std::endl;
         }
 
-        std::cout << "PRF        ARF        V        NRA        FID        FV" << std::endl;
-        std::cout << "-----      -----      ---      -----      -----      ----" << std::endl;
+        if (enFilterZ)
+        {
+            if (filterZ)
+                std::cout << "(\'+Z\':   Listing all entries with zero PRF)" << std::endl;
+            else
+                std::cout << "(\'-Z\':   Listing all entries with non-zero PRF)" << std::endl;
+        }
+
+        std::cout << "PRF        ARF        V        NRA        FID        FV        Value" << std::endl;
+        std::cout << "-----      -----      ---      -----      -----      ----      ----------" << std::endl;
 
         SimHandle csim = GetCurrentHandle();
         for (int i = 0; i < csim->RAT.GetSize(); i++)
@@ -501,12 +675,16 @@ namespace VMC::RAT {
             if (enFilterFV && filterFV != entry.GetFV())
                 continue;
 
+            if (enFilterZ && filterZ == (bool)entry.GetValue(csim->PRF))
+                continue;
+
             printf("%-5d      ", entry.GetPRF());
             printf("%-5d      ", entry.GetARF());
             printf("%-3d      ", entry.GetValid());
             printf("%-5d      ", entry.GetNRA());
             printf("%-5d      ", entry.GetFID());
-            printf("%-4d    \n", entry.GetFV());
+            printf("%-4d      ", entry.GetFV());
+            printf("0x%08x\n"  , entry.GetValue(csim->PRF));
         }
 
         return true;
@@ -524,8 +702,10 @@ namespace VMC::RAT {
         handle->handlers.push_back(CommandHandler{ std::string("rat0.arf0conv")         , &_RAT0_ARF0CONV });
         handle->handlers.push_back(CommandHandler{ std::string("rat0.rand.reg.value")   , &_RAT0_RAND_REG_VALUE });
         handle->handlers.push_back(CommandHandler{ std::string("rat0.rand.reg.index")   , &_RAT0_RAND_REG_INDEX });
-        handle->handlers.push_back(CommandHandler{ std::string("rat0.rat.ls")           , &_RAT0_RAT_LS });
+        handle->handlers.push_back(CommandHandler{ std::string("rat0.prf.ls")           , &_RAT0_PRF_LS });
         handle->handlers.push_back(CommandHandler{ std::string("rat0.arf.ls.ref")       , &_RAT0_ARF_LS_REF });
+        handle->handlers.push_back(CommandHandler{ std::string("rat0.arf.ls")           , &_RAT0_ARF_LS});
+        handle->handlers.push_back(CommandHandler{ std::string("rat0.arf.get")          , &_RAT0_ARF_GET});
     }
 }
 

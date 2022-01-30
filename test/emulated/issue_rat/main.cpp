@@ -38,14 +38,15 @@ void InitBasicCommands(VMC::VMCHandle handle)
 int main()
 {
     InitBasicCommands(&con);
-
+    
+    VMC::Setup(&con);
     VMC::RAT::Setup(&con);
 
     ECHO_COUT_VMC_VERSION
     std::cout << std::endl;
 
     while (1)
-        VMC::Next(&con);
+        VMC::Next(&con, std::cin);
 
     return 0;
 }
