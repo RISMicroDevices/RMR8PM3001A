@@ -77,6 +77,9 @@ namespace MEMU::Core::Issue {
             void    SetARF(int val);
             void    SetValid(bool val);
 
+            int     GetValue(const PhysicalRegisterFile& prf) const;
+            void    SetValue(PhysicalRegisterFile& prf, int val);
+
             void    operator=(const Entry& obj);
         };
 
@@ -331,6 +334,16 @@ namespace MEMU::Core::Issue {
     inline void RegisterAliasTable::Entry::SetValid(bool val)
     {
         V = val;
+    }
+
+    inline int RegisterAliasTable::Entry::GetValue(const PhysicalRegisterFile& prf) const
+    {
+        return prf.Get(PRF);
+    }
+
+    inline void RegisterAliasTable::Entry::SetValue(PhysicalRegisterFile& prf, int val)
+    {
+        prf.Set(PRF, val);
     }
 
     void RegisterAliasTable::Entry::operator=(const RegisterAliasTable::Entry& obj)
