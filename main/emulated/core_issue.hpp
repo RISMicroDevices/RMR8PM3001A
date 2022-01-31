@@ -168,7 +168,8 @@ namespace MEMU::Core::Issue {
         bool                    Touch(int FID, int ARF, int* PRF = 0);
         bool                    TouchOnFlight(int FID, int ARF, int* PRF = 0);
         void                    Writeback(int FID);
-        void                    Commit(int FID);
+        void                    Commit(int ARF);
+        bool                    CommitFID(int FID);
         bool                    TouchAndWriteback(int FID, int ARF, int* PRF = 0);
         bool                    TouchAndCommit(int FID, int ARF, int* PRF = 0);
 
@@ -585,7 +586,7 @@ namespace MEMU::Core::Issue {
                 entry.SetNRA(false);
 
                 modified.push_back(EntryModification(i, entry));
-                
+
                 // *NOTICE: Multiple NRA allowed, shouldn't break
                 //break;
             }
@@ -594,7 +595,7 @@ namespace MEMU::Core::Issue {
     void RegisterAliasTable::TakeOffAndLand(int FID)
     {
         for (int i = 0; i < rat_size; i++)
-            if (entries[i].GetFID() == FID)
+            if (entries[i].GetFID() == FID && entries[i].GetFV())
             {
                 Entry entry = entries[i];
                 entry.SetFV(false);
@@ -638,9 +639,9 @@ namespace MEMU::Core::Issue {
             TakeOffAndLand(FID);
     }
 
-    inline void RegisterAliasTable::__Commit(int FID)
+    inline void RegisterAliasTable::__Commit(int ARF)
     {
-        Release(FID);
+        Release(ARF);
     }
 
     inline bool RegisterAliasTable::Touch(int FID, int ARF, int* PRF)
@@ -658,9 +659,29 @@ namespace MEMU::Core::Issue {
         __Writeback(true, FID);
     }
 
-    void RegisterAliasTable::Commit(int FID)
+    void RegisterAliasTable::Commit(int ARF)
     {
-        __Commit(FID);
+        __Commit(ARF);
+    }
+
+    /* DEPRECATED */
+    bool RegisterAliasTable::CommitFID(int FID)
+    {
+        int ARF = -1;
+
+        for (int i = 0; i < rat_size; i++)
+            if (entries[i].GetFID() == FID && entries[i].GetNRA())
+            {
+                ARF = i;
+                break;
+            }
+
+        if (ARF == -1)
+            return false;
+
+        __Commit(ARF);
+
+        return true;
     }
 
     bool RegisterAliasTable::TouchAndWriteback(int FID, int ARF, int* PRF)
@@ -679,7 +700,7 @@ namespace MEMU::Core::Issue {
             return false;
 
         __Writeback(false, FID);
-        __Commit(FID);
+        __Commit(ARF);
 
         return true;
     }
@@ -720,6 +741,12 @@ namespace MEMU::Core::Issue {
         // Write entries
         list<EntryModification>::iterator iter = modified.begin();
         while (iter != modified.end())
-            entries[(*iter).GetIndex()] = (*iter++).GetEntry();
+        {
+            entries[iter->GetIndex()] = iter->GetEntry();
+            iter++;
+        }
+
+        //
+        ResetInput();
     }
 }
