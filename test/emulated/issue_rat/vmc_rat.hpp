@@ -102,7 +102,9 @@ namespace VMC::RAT {
 
         SimReOrderBuffer        ROB                         = SimReOrderBuffer();
 
-        int                     RefARF[EMULATED_ARF_SIZE]   = { 0 };
+        int64_t                 RefARF[EMULATED_ARF_SIZE]   = { 0 };
+
+        int                     GlobalFID                   = 0;
 
         bool                    FlagStepInfo                = false;
 
@@ -136,7 +138,7 @@ namespace VMC::RAT {
     void Setup(VMCHandle handle)
     {
         CURRENT_HANDLE = NewHandle();
-        
+
         SetupCommands(handle);
     }
     
@@ -166,7 +168,7 @@ namespace VMC::RAT {
         handle->RefARF[arf] = val;
     }
 
-    inline int GetARF(SimHandle handle, int arf, bool* out_mapped = 0, int* out_mappedPRF = 0)
+    inline int GetMappedARF(SimHandle handle, int arf, bool* out_mapped = 0, int* out_mappedPRF = 0)
     {
         if (handle->FlagARF0Conv && !arf)
             return 0;
@@ -183,9 +185,30 @@ namespace VMC::RAT {
         return mapped ? handle->PRF.Get(mappedPRF) : 0;
     }
 
-    inline bool SetARF(SimHandle handle, int arf, int val)
+    inline bool SetMappedARF(SimHandle handle, int arf, int val, int* out_prf = 0)
     {
-        // TODO
+        if (handle->FlagARF0Conv && !arf)
+            return true;
+
+        int prf;
+        if (!handle->RAT.TouchAndCommit(handle->GlobalFID++, arf, &prf))
+            return false;
+
+        handle->PRF.Set(prf, val);
+
+        if (out_prf)
+            *out_prf = prf;
+
+        return true;
+    }
+
+    inline bool SetMappedARFAndEval(SimHandle handle, int arf, int val, int* out_prf = 0)
+    {
+        if (!SetMappedARF(handle, arf, val, out_prf))
+            return false;
+
+        handle->RAT.Eval();
+        handle->PRF.Eval();
 
         return true;
     }
@@ -447,7 +470,8 @@ namespace VMC::RAT {
             bool mapped;
             int  mappedPRF;
 
-            int val = GetARF(csim, i, &mapped, &mappedPRF);
+            int val = GetMappedARF(csim, i, &mapped, &mappedPRF);
+            int ref = GetRefARF(csim, i);
 
             if (filterU && !mapped)
                 continue;
@@ -456,6 +480,14 @@ namespace VMC::RAT {
                 continue;
 
             //
+            if (mapped && !(i == 0 && csim->FlagARF0Conv))
+            {
+                if (val != ref)
+                    printf("\033[1;31m");
+                else
+                    printf("\033[1;32m");
+            }
+
             printf("%-5d      ", i);
 
             if (csim->FlagARF0Conv && !i)
@@ -466,7 +498,7 @@ namespace VMC::RAT {
                 printf("-          ");
 
             printf("0x%08x      ", val);
-            printf("0x%08x\n"    , GetRefARF(csim, i));
+            printf("0x%08x\033[0m\n", GetRefARF(csim, i));
         }
 
         return true;
@@ -478,7 +510,48 @@ namespace VMC::RAT {
                                      const std::string& paramline,
                                      const std::vector<std::string>& params)
     {
-        // TODO
+        if (params.size() < 2)
+        {
+            std::cout << "Too much or too less parameter(s) for \'rat0.arf.set\'" << std::endl;
+            return false;
+        }
+
+        //
+        int index;
+        int value;
+
+        std::istringstream(params[0]) >> index;
+        std::istringstream(params[1]) >> value;
+
+        //
+        bool flagF = false;
+
+        for (int i = 2; i < params.size(); i++)
+        {
+            std::string param = params[i];
+
+            if (param.compare("-F") == 0)
+                flagF = true;
+            else
+            {
+                std::cout << "Param " << i << " \'" << param << "\' is invalid." << std::endl;
+                return false;
+            }
+        }
+
+        //
+        VMCHandle vmc = (VMCHandle) handle;
+        SimHandle csim = GetCurrentHandle();
+
+        if (!SetMappedARFAndEval(csim, index, value))
+        {
+            if (vmc->bWarnOnFalse)
+                std::cout << "Failed to allocate entry in RAT for ARF ." << index << std::endl;
+            
+            return flagF ? false : true;
+        }
+
+        SetRefARF(csim, index, value);
 
         return true;
     }
@@ -534,7 +607,7 @@ namespace VMC::RAT {
         int  mappedPRF;
 
         ref = GetRefARF(csim, index);
-        val = GetARF(csim, index, &mapped, &mappedPRF);
+        val = GetMappedARF(csim, index, &mapped, &mappedPRF);
 
         //
         std::cout << "ARF        PRF        Value(PRF)      Value(Ref)" << std::endl;
@@ -705,6 +778,7 @@ namespace VMC::RAT {
         handle->handlers.push_back(CommandHandler{ std::string("rat0.prf.ls")           , &_RAT0_PRF_LS });
         handle->handlers.push_back(CommandHandler{ std::string("rat0.arf.ls.ref")       , &_RAT0_ARF_LS_REF });
         handle->handlers.push_back(CommandHandler{ std::string("rat0.arf.ls")           , &_RAT0_ARF_LS});
+        handle->handlers.push_back(CommandHandler{ std::string("rat0.arf.set")          , &_RAT0_ARF_SET});
         handle->handlers.push_back(CommandHandler{ std::string("rat0.arf.get")          , &_RAT0_ARF_GET});
     }
 }
