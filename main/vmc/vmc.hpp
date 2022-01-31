@@ -41,6 +41,9 @@ namespace VMC {
         std::vector<CommandHandler> handlers    = std::vector<CommandHandler>();
 
         //
+        bool                        last_mute   = false;
+
+        //
         std::map<std::string, BoolVariable> mapBoolVars     = std::map<std::string, BoolVariable>();
 
         std::map<std::string, IntVariable>  mapIntVars      = std::map<std::string, IntVariable>();
@@ -156,10 +159,15 @@ namespace VMC {
 
         bool success = (*executor)(handle, cmd, paramline, params);
 
-        SetLastReturnBool(handle, success);
+        if (!handle->last_mute)
+        {
+            SetLastReturnBool(handle, success);
 
-        if (handle->bWarnOnFalse && !success)
-            std::cout << "Command \'" << cmd << "\' exited abnormally maybe." << std::endl;
+            if (handle->bWarnOnFalse && !success)
+                std::cout << "Command \'" << cmd << "\' exited abnormally maybe." << std::endl;
+        }
+        else
+            handle->last_mute = false;
 
         return true;
     }
@@ -173,16 +181,30 @@ namespace VMC::Basic {
     std::cout << "- version                           Display version of VMC console " << std::endl; \
     std::cout << "- exit                              Exit VMC console               " << std::endl; \
     std::cout << "- echo <content...>                 Display information on console " << std::endl; \
-    std::cout << "- setbool [name] [value]            Set or list boolean variables  " << std::endl; \
+    std::cout << "- setbool [name] [value] [-N]       Set or list boolean variables  " << std::endl; \
+    std::cout << "- movbool <dst> <src> [-N]          Get boolean variable           " << std::endl; \
     std::cout << "- delbool <name>                    Delete boolean variable        " << std::endl; \
-    std::cout << "- setivar [name] [value]            Set or list integer variables  " << std::endl; \
+    std::cout << "- setivar [name] [value] [-N]       Set or list integer variables  " << std::endl; \
+    std::cout << "- movivar <dst> <src> [-N]          Get integer variable           " << std::endl; \
     std::cout << "- delivar <name>                    Delete integer variable        " << std::endl; \
+
+    //
+    bool Nop(void* handle, const std::string& cmd, 
+                           const std::string& paramline, 
+                           const std::vector<std::string>& params)
+    {
+        ((VMCHandle) handle)->last_mute = true;
+
+        return true;
+    }
 
     //
     bool Version(void* handle, const std::string& cmd, 
                                const std::string& paramline, 
                                const std::vector<std::string>& params)
     {
+        ((VMCHandle) handle)->last_mute = true;
+
         ECHO_COUT_VMC_VERSION
         return true;
     }
@@ -210,7 +232,134 @@ namespace VMC::Basic {
                                const std::string& paramline, 
                                const std::vector<std::string>& params)
     {
-        // TODO
+        VMCHandle vmc = (VMCHandle) handle;
+
+        if (params.empty())
+        {
+            std::cout << "Listing all boolean variables:" << std::endl;
+
+            std::map<std::string, BoolVariable>::iterator iter = vmc->mapBoolVars.begin();
+            while (iter != vmc->mapBoolVars.end())
+            {
+                std::cout << iter->first << " = " << iter->second.Get() << std::endl;
+                iter++;
+            }
+
+            return true;
+        }
+        else if (params.size() == 1)
+        {
+            std::string name = params[0];
+
+            std::map<std::string, BoolVariable>::iterator iter = vmc->mapBoolVars.find(name);
+            if (iter == vmc->mapBoolVars.end())
+            {
+                if (vmc->bWarnOnFalse)
+                    std::cout << "No such boolean variable: \'" << name << "\'." << std::endl;
+
+                return false;
+            }
+
+            std::cout << iter->first << " = " << iter->second.Get() << std::endl;
+
+            return true;
+        }
+        else
+        {
+            std::string name = params[0];
+            std::string sval = params[1];
+
+            bool bval;
+            std::istringstream(sval) >> std::boolalpha >> bval;
+
+            bool flagN = false;
+
+            for (int i = 2; i < params.size(); i++)
+            {
+                std::string param = params[i];
+
+                if (param.compare("-N") == 0)
+                    flagN = true;
+                else
+                {
+                    std::cout << "Param " << i << " \'" << param << "\' is invalid." << std::endl;
+                    return false;
+                }
+            }
+
+            if (flagN)
+            {
+                std::map<std::string, BoolVariable>::iterator iter = vmc->mapBoolVars.find(name);
+                if (iter != vmc->mapBoolVars.end())
+                {
+                    if (vmc->bWarnOnFalse)
+                        std::cout << "Boolean variable \'" << name << "\' already exists." << std::endl;
+
+                    return false;
+                }
+            }
+
+            vmc->mapBoolVars[name] = bval;
+
+            std::cout << "Set: " << name << " = " << bval << std::endl;
+
+            return true;
+        }
+    }
+
+    //
+    bool MovBool(void* handle, const std::string& cmd, 
+                               const std::string& paramline, 
+                               const std::vector<std::string>& params)
+    {
+        if (params.size() < 2)
+        {
+            std::cout << "Too much or too less parameter(s) for \'movbool\'" << std::endl;
+            return false;
+        }
+
+        VMCHandle vmc = (VMCHandle) handle;
+
+        std::string dst = params[0];
+        std::string src = params[1];
+
+        bool flagN = false;
+
+        for (int i = 2; i < params.size(); i++)
+        {
+            std::string param = params[i];
+
+            if (param.compare("-N") == 0)
+                flagN = true;
+            else
+            {
+                std::cout << "Param " << i << " \'" << param << "\' is invalid." << std::endl;
+                return false;
+            }
+        }
+
+        if (flagN)
+        {
+            std::map<std::string, BoolVariable>::iterator iter = vmc->mapBoolVars.find(dst);
+            if (iter != vmc->mapBoolVars.end())
+            {
+                if (vmc->bWarnOnFalse)
+                    std::cout << "Boolean variable \'" << dst << "\' already exists." << std::endl;
+
+                return false;
+            }
+        }
+
+        std::map<std::string, BoolVariable>::iterator iter = vmc->mapBoolVars.find(src);
+        if (iter == vmc->mapBoolVars.end())
+        {
+            std::cout << "Boolean variable \'" << src << "\' does not exist." << std::endl;
+            return false;
+        }
+
+        vmc->mapBoolVars[dst] = iter->second;
+
+        std::cout << "Set: " << dst << " = " << iter->second.Get() << std::endl;
 
         return true;
     }
@@ -220,7 +369,19 @@ namespace VMC::Basic {
                                const std::string& paramline, 
                                const std::vector<std::string>& params)
     {
-        // TODO
+        if (params.size() != 1)
+        {
+            std::cout << "Too much or too less parameter(s) for \'delbool\'" << std::endl;
+            return false;
+        }
+
+        VMCHandle vmc = (VMCHandle) handle;
+
+        std::string name = params[0];
+
+        vmc->mapBoolVars.erase(name);
+
+        std::cout << "Deleted boolean variable \'" << name << "\'." << std::endl;
 
         return true;
     }
@@ -230,7 +391,134 @@ namespace VMC::Basic {
                                const std::string& paramline, 
                                const std::vector<std::string>& params)
     {
-        // TODO
+        VMCHandle vmc = (VMCHandle) handle;
+
+        if (params.empty())
+        {
+            std::cout << "Listing all integer variables:" << std::endl;
+
+            std::map<std::string, IntVariable>::iterator iter = vmc->mapIntVars.begin();
+            while (iter != vmc->mapIntVars.end())
+            {
+                std::cout << iter->first << " = " << iter->second.Get() << std::endl;
+                iter++;
+            }
+
+            return true;
+        }
+        else if (params.size() == 1)
+        {
+            std::string name = params[0];
+
+            std::map<std::string, IntVariable>::iterator iter = vmc->mapIntVars.find(name);
+            if (iter == vmc->mapIntVars.end())
+            {
+                if (vmc->bWarnOnFalse)
+                    std::cout << "No such integer variable: \'" << name << "\'." << std::endl;
+
+                return false;
+            }
+
+            std::cout << iter->first << " = " << iter->second.Get() << std::endl;
+
+            return true;
+        }
+        else
+        {
+            std::string name = params[0];
+            std::string sval = params[1];
+
+            int ival;
+            std::istringstream(sval) >> ival;
+
+            bool flagN = false;
+
+            for (int i = 2; i < params.size(); i++)
+            {
+                std::string param = params[i];
+
+                if (param.compare("-N") == 0)
+                    flagN = true;
+                else
+                {
+                    std::cout << "Param " << i << " \'" << param << "\' is invalid." << std::endl;
+                    return false;
+                }
+            }
+
+            if (flagN)
+            {
+                std::map<std::string, IntVariable>::iterator iter = vmc->mapIntVars.find(name);
+                if (iter != vmc->mapIntVars.end())
+                {
+                    if (vmc->bWarnOnFalse)
+                        std::cout << "Integer variable \'" << name << "\' already exists." << std::endl;
+
+                    return false;
+                }
+            }
+
+            vmc->mapIntVars[name] = ival;
+
+            std::cout << "Set: " << name << " = " << ival << std::endl;
+
+            return true;
+        }
+    }
+
+    //
+    bool MovIVar(void* handle, const std::string& cmd, 
+                               const std::string& paramline, 
+                               const std::vector<std::string>& params)
+    {
+        if (params.size() < 2)
+        {
+            std::cout << "Too much or too less parameter(s) for \'movivar\'" << std::endl;
+            return false;
+        }
+
+        VMCHandle vmc = (VMCHandle) handle;
+
+        std::string dst = params[0];
+        std::string src = params[1];
+
+        bool flagN = false;
+
+        for (int i = 2; i < params.size(); i++)
+        {
+            std::string param = params[i];
+
+            if (param.compare("-N") == 0)
+                flagN = true;
+            else
+            {
+                std::cout << "Param " << i << " \'" << param << "\' is invalid." << std::endl;
+                return false;
+            }
+        }
+
+        if (flagN)
+        {
+            std::map<std::string, IntVariable>::iterator iter = vmc->mapIntVars.find(dst);
+            if (iter != vmc->mapIntVars.end())
+            {
+                if (vmc->bWarnOnFalse)
+                    std::cout << "Integer variable \'" << dst << "\' already exists." << std::endl;
+
+                return false;
+            }
+        }
+
+        std::map<std::string, IntVariable>::iterator iter = vmc->mapIntVars.find(src);
+        if (iter == vmc->mapIntVars.end())
+        {
+            std::cout << "Integer variable \'" << src << "\' does not exist." << std::endl;
+            return false;
+        }
+
+        vmc->mapIntVars[dst] = iter->second;
+
+        std::cout << "Set: " << dst << " = " << iter->second.Get() << std::endl;
 
         return true;
     }
@@ -240,7 +528,19 @@ namespace VMC::Basic {
                                const std::string& paramline, 
                                const std::vector<std::string>& params)
     {
-        // TODO
+        if (params.size() != 1)
+        {
+            std::cout << "Too much or too less parameter(s) for \'delivar\'" << std::endl;
+            return false;
+        }
+
+        VMCHandle vmc = (VMCHandle) handle;
+
+        std::string name = params[0];
+
+        vmc->mapIntVars.erase(name);
+
+        std::cout << "Deleted integer variable \'" << name << "\'." << std::endl;
 
         return true;
     }
@@ -249,9 +549,18 @@ namespace VMC::Basic {
     //
     void SetupCommands(VMCHandle handle)
     {
+        handle->handlers.push_back(VMC::CommandHandler { std::string("#")      , &Nop     });
+        handle->handlers.push_back(VMC::CommandHandler { std::string("nop")    , &Nop     });
+        handle->handlers.push_back(VMC::CommandHandler { std::string("rem")    , &Nop     });
         handle->handlers.push_back(VMC::CommandHandler { std::string("version"), &Version });
         handle->handlers.push_back(VMC::CommandHandler { std::string("exit")   , &Exit });
         handle->handlers.push_back(VMC::CommandHandler { std::string("echo")   , &Echo }); 
+        handle->handlers.push_back(VMC::CommandHandler { std::string("setbool"), &SetBool });
+        handle->handlers.push_back(VMC::CommandHandler { std::string("movbool"), &MovBool });
+        handle->handlers.push_back(VMC::CommandHandler { std::string("delbool"), &DelBool });
+        handle->handlers.push_back(VMC::CommandHandler { std::string("setivar"), &SetIVar });
+        handle->handlers.push_back(VMC::CommandHandler { std::string("movivar"), &MovIVar });
+        handle->handlers.push_back(VMC::CommandHandler { std::string("delivar"), &DelIVar });
     }
     
 }
