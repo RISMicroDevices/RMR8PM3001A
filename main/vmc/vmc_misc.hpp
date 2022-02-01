@@ -24,7 +24,7 @@ namespace VMC {
     };
 
     //
-    using IntVariable  = Variable<int>;
+    using IntVariable  = Variable<uint64_t>;
 
     using BoolVariable = Variable<bool>;
 

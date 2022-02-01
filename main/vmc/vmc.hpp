@@ -16,7 +16,7 @@ namespace VMC {
 #define VMC_VARNAME_LAST_RETURN                                 "$0"
 
 #define VMC_VAR_DEFAULT_LAST_RETURN_BOOL                        false
-#define VMC_VAR_DEFAULT_LAST_RETURN_INT                         0
+#define VMC_VAR_DEFAULT_LAST_RETURN_INT                         (uint64_t)0
 
 #define ECHO_COUT_VMC_VERSION \
     std::cout << "RISMD VMC (Verification Module Console) v0.1" << std::endl; \
@@ -51,6 +51,11 @@ namespace VMC {
         bool                                bWarnOnFalse    = true;
     } VMCEntity, *VMCHandle;
 
+    
+    inline void RegisterCommand(VMCHandle handle, const CommandHandler&& command)
+    {
+        handle->handlers.push_back(command);
+    }
 
     inline bool GetLastReturnBool(VMCHandle handle)
     {
@@ -79,7 +84,7 @@ namespace VMC {
         return *(iter->second);
     }
 
-    inline void SetLastReturnInt(VMCHandle handle, int val)
+    inline void SetLastReturnInt(VMCHandle handle, uint64_t val)
     {
         handle->mapIntVars[VMC_VARNAME_LAST_RETURN] = IntVariable(val);
     }
@@ -88,8 +93,8 @@ namespace VMC {
     void Setup(VMCHandle handle)
     {
         //
-        handle->mapBoolVars[VMC_VARNAME_LAST_RETURN] = BoolVariable(true);
-        handle->mapIntVars [VMC_VARNAME_LAST_RETURN] = IntVariable(0);
+        handle->mapBoolVars[VMC_VARNAME_LAST_RETURN] = BoolVariable(VMC_VAR_DEFAULT_LAST_RETURN_BOOL);
+        handle->mapIntVars [VMC_VARNAME_LAST_RETURN] = IntVariable(VMC_VAR_DEFAULT_LAST_RETURN_INT);
         
         //
         handle->mapBoolVars["vmc.WarnOnFalse"] = BoolVariable(&(handle->bWarnOnFalse));
@@ -187,6 +192,7 @@ namespace VMC::Basic {
     std::cout << "- setivar [name] [value] [-N]       Set or list integer variables  " << std::endl; \
     std::cout << "- movivar <dst> <src> [-N]          Get integer variable           " << std::endl; \
     std::cout << "- delivar <name>                    Delete integer variable        " << std::endl; \
+    std::cout << "- srand [value]                     Set global random seed         " << std::endl; \
 
     //
     bool Nop(void* handle, const std::string& cmd, 
@@ -428,7 +434,7 @@ namespace VMC::Basic {
             std::string name = params[0];
             std::string sval = params[1];
 
-            int ival;
+            int64_t ival;
             std::istringstream(sval) >> ival;
 
             bool flagN = false;
@@ -545,22 +551,32 @@ namespace VMC::Basic {
         return true;
     }
 
+    //
+    bool Srand(void* handle, const std::string& cmd, 
+                             const std::string& paramline, 
+                             const std::vector<std::string>& params)
+    {
+        // TODO
+
+        return true;
+    }
 
     //
     void SetupCommands(VMCHandle handle)
     {
-        handle->handlers.push_back(VMC::CommandHandler { std::string("#")      , &Nop     });
-        handle->handlers.push_back(VMC::CommandHandler { std::string("nop")    , &Nop     });
-        handle->handlers.push_back(VMC::CommandHandler { std::string("rem")    , &Nop     });
-        handle->handlers.push_back(VMC::CommandHandler { std::string("version"), &Version });
-        handle->handlers.push_back(VMC::CommandHandler { std::string("exit")   , &Exit });
-        handle->handlers.push_back(VMC::CommandHandler { std::string("echo")   , &Echo }); 
-        handle->handlers.push_back(VMC::CommandHandler { std::string("setbool"), &SetBool });
-        handle->handlers.push_back(VMC::CommandHandler { std::string("movbool"), &MovBool });
-        handle->handlers.push_back(VMC::CommandHandler { std::string("delbool"), &DelBool });
-        handle->handlers.push_back(VMC::CommandHandler { std::string("setivar"), &SetIVar });
-        handle->handlers.push_back(VMC::CommandHandler { std::string("movivar"), &MovIVar });
-        handle->handlers.push_back(VMC::CommandHandler { std::string("delivar"), &DelIVar });
+        RegisterCommand(handle, VMC::CommandHandler { std::string("#")      , &Nop     });
+        RegisterCommand(handle, VMC::CommandHandler { std::string("nop")    , &Nop     });
+        RegisterCommand(handle, VMC::CommandHandler { std::string("rem")    , &Nop     });
+        RegisterCommand(handle, VMC::CommandHandler { std::string("version"), &Version });
+        RegisterCommand(handle, VMC::CommandHandler { std::string("exit")   , &Exit });
+        RegisterCommand(handle, VMC::CommandHandler { std::string("echo")   , &Echo }); 
+        RegisterCommand(handle, VMC::CommandHandler { std::string("setbool"), &SetBool });
+        RegisterCommand(handle, VMC::CommandHandler { std::string("movbool"), &MovBool });
+        RegisterCommand(handle, VMC::CommandHandler { std::string("delbool"), &DelBool });
+        RegisterCommand(handle, VMC::CommandHandler { std::string("setivar"), &SetIVar });
+        RegisterCommand(handle, VMC::CommandHandler { std::string("movivar"), &MovIVar });
+        RegisterCommand(handle, VMC::CommandHandler { std::string("delivar"), &DelIVar });
+        RegisterCommand(handle, VMC::CommandHandler { std::string("srand"),   &Srand });
     }
     
 }
