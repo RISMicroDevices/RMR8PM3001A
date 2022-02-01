@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstdint>
+#include <cstdlib>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -90,9 +91,19 @@ namespace VMC::RAT {
         void            Eval();
     };
 
-    static constexpr unsigned int   RAND_MAX_REG_VALUE_MAX  = UINT32_MAX;
+    //
+    static constexpr uint64_t       RAND_MAX_REG_VALUE_MAX  = UINT64_MAX;
 
     static constexpr unsigned int   RAND_MAX_REG_INDEX_MAX  = EMULATED_ARF_SIZE;
+
+    //
+    static constexpr bool           SIM_DEFAULT_FLAG_STEPINFO       = false;
+
+    static constexpr bool           SIM_DEFAULT_FLAG_ARF0CONV       = true;
+
+    static constexpr uint64_t       SIM_DEFAULT_RAND_MAX_REG_VALUE  = 0;
+
+    static constexpr int            SIM_DEFAULT_RAND_MAX_REG_INDEX  = RAND_MAX_REG_INDEX_MAX;
 
     typedef struct {
 
@@ -102,17 +113,17 @@ namespace VMC::RAT {
 
         SimReOrderBuffer        ROB                         = SimReOrderBuffer();
 
-        int64_t                 RefARF[EMULATED_ARF_SIZE]   = { 0 };
+        uint64_t                RefARF[EMULATED_ARF_SIZE]   = { 0 };
 
         int                     GlobalFID                   = 0;
 
-        bool                    FlagStepInfo                = false;
+        bool                    FlagStepInfo                = SIM_DEFAULT_FLAG_STEPINFO;
 
-        bool                    FlagARF0Conv                = true;
+        bool                    FlagARF0Conv                = SIM_DEFAULT_FLAG_ARF0CONV;
 
-        unsigned int            RandMaxRegValue             = RAND_MAX_REG_VALUE_MAX;
+        uint64_t                RandMaxRegValue             = SIM_DEFAULT_RAND_MAX_REG_VALUE;
 
-        unsigned int            RandMaxRegIndex             = RAND_MAX_REG_INDEX_MAX;
+        unsigned int            RandMaxRegIndex             = SIM_DEFAULT_RAND_MAX_REG_INDEX;
 
     } SimContext, *SimHandle;
 }
@@ -152,7 +163,31 @@ namespace VMC::RAT {
         return CURRENT_HANDLE;
     }
 
-    inline int GetRefARF(SimHandle handle, int arf)
+    uint64_t RandRegValue(SimHandle handle)
+    {
+        uint64_t val = rand() 
+                     ^ ((uint64_t)rand() << 16) 
+                     ^ ((uint64_t)rand() << 32) 
+                     ^ ((uint64_t)rand() << 48);
+
+        uint64_t orb = rand();
+        uint64_t orc =  (orb & 0x0000000F)
+                     | ((orb & 0x000000F0) << 12)
+                     | ((orb & 0x00000F00) << 24)
+                     | ((orb & 0x00007000) << 36);
+        
+        if (handle->RandMaxRegValue)
+            return (val ^ orc) % handle->RandMaxRegValue;
+        else
+            return val ^ orc;
+    }
+
+    int RandRegIndex(SimHandle handle)
+    {
+        return rand() % handle->RandMaxRegIndex;
+    }
+
+    inline uint64_t GetRefARF(SimHandle handle, int arf)
     {
         if (handle->FlagARF0Conv && !arf)
             return 0;
@@ -160,7 +195,7 @@ namespace VMC::RAT {
         return handle->RefARF[arf];
     }
 
-    inline void SetRefARF(SimHandle handle, int arf, int val)
+    inline void SetRefARF(SimHandle handle, int arf, uint64_t val)
     {
         if (handle->FlagARF0Conv && !arf)
             return;
@@ -168,7 +203,7 @@ namespace VMC::RAT {
         handle->RefARF[arf] = val;
     }
 
-    inline int GetMappedARF(SimHandle handle, int arf, bool* out_mapped = 0, int* out_mappedPRF = 0)
+    inline uint64_t GetMappedARF(SimHandle handle, int arf, bool* out_mapped = 0, int* out_mappedPRF = 0)
     {
         if (handle->FlagARF0Conv && !arf)
             return 0;
@@ -185,7 +220,7 @@ namespace VMC::RAT {
         return mapped ? handle->PRF.Get(mappedPRF) : 0;
     }
 
-    inline bool SetMappedARF(SimHandle handle, int arf, int val, int* out_prf = 0)
+    inline bool SetMappedARF(SimHandle handle, int arf, uint64_t val, int* out_prf = 0)
     {
         if (handle->FlagARF0Conv && !arf)
             return true;
@@ -202,7 +237,7 @@ namespace VMC::RAT {
         return true;
     }
 
-    inline bool SetMappedARFAndEval(SimHandle handle, int arf, int val, int* out_prf = 0)
+    inline bool SetMappedARFAndEval(SimHandle handle, int arf, uint64_t val, int* out_prf = 0)
     {
         if (!SetMappedARF(handle, arf, val, out_prf))
             return false;
@@ -222,7 +257,7 @@ namespace VMC::RAT {
 
 #define ECHO_COUT_VMC_RAT_HELP \
     std::cout << "RAT0 simulation command usages:" << std::endl; \
-    std::cout << "- rat0.info.bystep [true|false]     Toggle by-step info of RAT0 simulation (\'false\' by default)" << std::endl; \
+    std::cout << "- rat0.infobystep [true|false]      Toggle by-step info of RAT0 simulation (\'false\' by default)" << std::endl; \
     std::cout << "- rat0.arf0conv [true|false]        Toggle ARF0-zero conversion (\'true\' by default)" << std::endl; \
     std::cout << "- rat0.rand.reg.value [(uint)max_value|@DEFAULT]" << std::endl; \
     std::cout << "                                    Get/set the maximum value of random register value" << std::endl; \
@@ -232,20 +267,21 @@ namespace VMC::RAT {
     std::cout << "                                    List all RAT entries and related PRF (with optional filter)" << std::endl; \
     std::cout << "- rat0.arf.ls.ref [-Z]              List all reference ARF register values (with optional filter)" << std::endl; \
     std::cout << "- rat0.arf.ls [-Z|-U]               List all values of ARF register mapped by RAT (with optional filter)" << std::endl; \
-    std::cout << "- rat0.arf.set <index> <value> [-F] Set specified ARF register value" << std::endl; \
-    std::cout << "- rat0.arf.set.randomval <index> [-F]" << std::endl; \
+    std::cout << "- rat0.arf.set <index> <value> [-F|-S|-NEQ] " << std::endl; \
+    std::cout << "                                    Set specified ARF register value" << std::endl; \
+    std::cout << "- rat0.arf.set.randomval <index> [-F|-S|-NEQ]" << std::endl; \
     std::cout << "                                    Set specified ARF register with random value" << std::endl; \
-    std::cout << "- rat0.arf.set.random [-F]          Set random ARF register with random value" << std::endl; \
-    std::cout << "- rat0.arf.get <index> [-NEQ|-U]    Get specified ARF register value" << std::endl;  \
+    std::cout << "- rat0.arf.set.random [-F|-S|-NEQ]  Set random ARF register with random value" << std::endl; \
+    std::cout << "- rat0.arf.get <index> [-U|-S|-NEQ] Get specified ARF register value" << std::endl;  \
 
-    // rat0.info.bystep [true|false]
-    bool _RAT0_INFO_BYSTEP(void* handle, const std::string& cmd,
+    // rat0.infobystep [true|false]
+    bool _RAT0_INFOBYSTEP(void* handle, const std::string& cmd,
                                          const std::string& paramline,
                                          const std::vector<std::string>& params)
     {
         if (params.size() > 1)
         {
-            std::cout << "Too much or too less parameter(s) for \'rat0.info.bystep\'." << std::endl;
+            std::cout << "Too much or too less parameter(s) for \'rat0.infobystep\'." << std::endl;
             return false;
         }
 
@@ -297,36 +333,28 @@ namespace VMC::RAT {
 
         if (!params.empty())
         {
-            int val = -1;
+            uint64_t val;
 
             if (params[0].compare("@DEFAULT") == 0)
-                val = RAND_MAX_REG_VALUE_MAX;
+                val = SIM_DEFAULT_RAND_MAX_REG_VALUE;
             else
                 std::istringstream(params[0]) >> val;
 
-            if (val < 0)
+            if (val > RAND_MAX_REG_VALUE_MAX)
             {
-                std::cout << "Param 0 \'" << params[0] << "\' is not a unsigned integer." << std::endl;
+                std::cout << "Param 0 \'" << val << "\' is invalid";
+                printf(" [Max %lu (0x%016lx)].\n", RAND_MAX_REG_VALUE_MAX, RAND_MAX_REG_VALUE_MAX);
                 return false;
             }
 
-            unsigned int uval = *(unsigned int*)(&val);
-
-            if (uval > RAND_MAX_REG_VALUE_MAX)
-            {
-                std::cout << "Param 0 \'" << uval << "\' is invalid";
-                printf(" [Max %u (0x%08x)].\n", RAND_MAX_REG_VALUE_MAX, RAND_MAX_REG_VALUE_MAX);
-                return false;
-            }
-
-            GetCurrentHandle()->RandMaxRegValue = uval;
+            GetCurrentHandle()->RandMaxRegValue = val;
 
             std::cout << "Set: ";
         }
 
         std::cout << "RAT0.rand.max.regvalue = ";
-        printf("%u (0x%08x) ", GetCurrentHandle()->RandMaxRegValue, GetCurrentHandle()->RandMaxRegValue);
-        printf(" [Max %u (0x%08x)]\n", RAND_MAX_REG_VALUE_MAX, RAND_MAX_REG_VALUE_MAX);
+        printf("%lu (0x%016lx) ", GetCurrentHandle()->RandMaxRegValue, GetCurrentHandle()->RandMaxRegValue);
+        printf(" [Max %lu (0x%016lx)]\n", RAND_MAX_REG_VALUE_MAX, RAND_MAX_REG_VALUE_MAX);
 
         return true;
     }
@@ -348,7 +376,7 @@ namespace VMC::RAT {
             int val = -1;
 
             if (params[0].compare("@DEFAULT") == 0)
-                val = RAND_MAX_REG_INDEX_MAX;
+                val = SIM_DEFAULT_RAND_MAX_REG_INDEX;
             else 
                 std::istringstream(params[0]) >> val;
             
@@ -413,7 +441,7 @@ namespace VMC::RAT {
             std::cout << "(\'-Z\': Not listing zero registers)" << std::endl;
 
         std::cout << "Type         Index         Value" << std::endl;
-        std::cout << "-----        ------        -----------" << std::endl;
+        std::cout << "-----        ------        ------------------" << std::endl;
 
         for (int i = 0; i < EMULATED_ARF_SIZE; i++)
         {
@@ -424,7 +452,7 @@ namespace VMC::RAT {
             std::cout << "rARF         ";
             printf("%3d", i);
             std::cout << "           ";
-            printf("0x%08x\n", GetRefARF(GetCurrentHandle(), i));
+            printf("0x%016lx\n", GetRefARF(GetCurrentHandle(), i));
         }
 
         return true;
@@ -462,16 +490,16 @@ namespace VMC::RAT {
         if (filterU)
             std::cout << "('-U': Listing all mapped ARFs)" << std::endl;
 
-        std::cout << "ARF        PRF        Value(PRF)      Value(Ref)" << std::endl;
-        std::cout << "-----      -----      ----------      ----------" << std::endl;
+        std::cout << "ARF        PRF        Value(PRF)              Value(Ref)" << std::endl;
+        std::cout << "-----      -----      ------------------      ------------------" << std::endl;
 
         for (int i = 0; i < EMULATED_ARF_SIZE; i++)
         {
             bool mapped;
             int  mappedPRF;
 
-            int val = GetMappedARF(csim, i, &mapped, &mappedPRF);
-            int ref = GetRefARF(csim, i);
+            uint64_t val = GetMappedARF(csim, i, &mapped, &mappedPRF);
+            uint64_t ref = GetRefARF(csim, i);
 
             if (filterU && !mapped)
                 continue;
@@ -497,15 +525,75 @@ namespace VMC::RAT {
             else
                 printf("-          ");
 
-            printf("0x%08x      ", val);
-            printf("0x%08x\033[0m\n", GetRefARF(csim, i));
+            printf("0x%016lx      ", val);
+            printf("0x%016lx\033[0m\n", GetRefARF(csim, i));
         }
 
         return true;
     }
 
 
-    // rat0.arf.set <index> <value> [-F]
+    // 
+    bool _common_RAT0_ARF_SET(VMCHandle vmc, int index, uint64_t value,
+                        const std::vector<std::string>& params, int param_offset)
+    {
+        //
+        bool flagF   = false;
+        bool flagS   = false;
+        bool flagNEQ = false;
+
+        for (int i = param_offset; i < params.size(); i++)
+        {
+            std::string param = params[i];
+
+            if (param.compare("-F") == 0)
+                flagF = true;
+            else if (param.compare("-S") == 0)
+                flagS = true;
+            else if (param.compare("-NEQ") == 0)
+                flagNEQ = true;
+            else
+            {
+                std::cout << "Param " << i << " \'" << param << "\' is invalid." << std::endl;
+                return false;
+            }
+        }
+
+        //
+        SimHandle csim = GetCurrentHandle();
+
+        int prf;
+
+        if (!SetMappedARFAndEval(csim, index, value, &prf))
+        {
+            if (vmc->bWarnOnFalse)
+                std::cout << "Failed to allocate entry in RAT for ARF ." << index << std::endl;
+            
+            return flagF ? false : true;
+        }
+
+        SetRefARF(csim, index, value);
+
+        //
+        uint64_t mARF = GetMappedARF(csim, index);
+        uint64_t Ref  = csim->RefARF[index];
+
+        if (!flagS)
+        {
+            if (mARF == Ref)
+                printf("\033[1;32m");
+            else
+                printf("\033[1;31m");
+
+            printf("ARF register #%d set. PRF #%d: 0x%016lx. mARF:0x%016lx. Ref: 0x%016lx.\033[0m\n",
+                index, prf, csim->PRF.Get(prf), mARF, Ref);
+        }
+
+        return flagNEQ ? mARF == Ref : true;
+    }
+
+
+    // rat0.arf.set <index> <value> [-F|-S|-NEQ]
     bool _RAT0_ARF_SET(void* handle, const std::string& cmd,
                                      const std::string& paramline,
                                      const std::vector<std::string>& params)
@@ -517,53 +605,58 @@ namespace VMC::RAT {
         }
 
         //
-        int index;
-        int value;
+        int      index;
+        uint64_t value;
 
         std::istringstream(params[0]) >> index;
         std::istringstream(params[1]) >> value;
 
         //
-        bool flagF = false;
-
-        for (int i = 2; i < params.size(); i++)
-        {
-            std::string param = params[i];
-
-            if (param.compare("-F") == 0)
-                flagF = true;
-            else
-            {
-                std::cout << "Param " << i << " \'" << param << "\' is invalid." << std::endl;
-                return false;
-            }
-        }
-
-        //
-        VMCHandle vmc = (VMCHandle) handle;
-        SimHandle csim = GetCurrentHandle();
-
-        if (!SetMappedARFAndEval(csim, index, value))
-        {
-            if (vmc->bWarnOnFalse)
-                std::cout << "Failed to allocate entry in RAT for ARF ." << index << std::endl;
-            
-            return flagF ? false : true;
-        }
-
-        SetRefARF(csim, index, value);
-
-        return true;
+        return _common_RAT0_ARF_SET((VMCHandle) handle, index, value, params, 2);
     }
 
     
-    // rat0.arf.set.randomval <index> [-F]
+    // rat0.arf.set.randomval <index> [-F|-S|-NEQ]
+    bool _RAT0_ARF_SET_RANDOMVAL(void* handle, const std::string& cmd,
+                                               const std::string& paramline,
+                                               const std::vector<std::string>& params)
+    {
+        if (params.size() < 1)
+        {
+            std::cout << "Too much or too less parameter(s) for \'rat0.arf.set.randomval\'" << std::endl;
+            return false;
+        }
+
+        //
+        int      index;
+        uint64_t value;
+
+        std::istringstream(params[0]) >> index;
+        value = RandRegValue(GetCurrentHandle());
+
+        //
+        return _common_RAT0_ARF_SET((VMCHandle) handle, index, value, params, 1);
+    }
 
 
-    // rat0.arf.set.random [-F]
+    // rat0.arf.set.random [-F|-S|-NEQ]
+    bool _RAT0_ARF_SET_RANDOM(void* handle, const std::string& cmd,
+                                            const std::string& paramline,
+                                            const std::vector<std::string>& params)
+    {
+        //
+        int      index;
+        uint64_t value;
+
+        index = RandRegIndex(GetCurrentHandle());
+        value = RandRegValue(GetCurrentHandle());
+
+        //
+        return _common_RAT0_ARF_SET((VMCHandle) handle, index, value, params, 0);
+    }
 
     
-    // rat0.arf.get <index> [-EQ]
+    // rat0.arf.get <index> [-NEQ|-U|-S]
     bool _RAT0_ARF_GET(void* handle, const std::string& cmd,
                                      const std::string& paramline,
                                      const std::vector<std::string>& params)
@@ -578,6 +671,7 @@ namespace VMC::RAT {
         //
         bool flagEQ = false;
         bool flagU  = false;
+        bool flagS  = false;
 
         int index;
         std::istringstream(params[0]) >> index;
@@ -590,6 +684,8 @@ namespace VMC::RAT {
                 flagEQ = true;
             else if (param.compare("-U") == 0)
                 flagU = true;
+            else if (param.compare("-S") == 0)
+                flagS = true;
             else 
             {
                 std::cout << "Param " << i << " \'" << param <<  "\' is invalid." << std::endl;
@@ -600,8 +696,8 @@ namespace VMC::RAT {
         //
         SimHandle csim = GetCurrentHandle();
 
-        int ref;
-        int val;
+        uint64_t ref;
+        uint64_t val;
 
         bool mapped;
         int  mappedPRF;
@@ -610,20 +706,23 @@ namespace VMC::RAT {
         val = GetMappedARF(csim, index, &mapped, &mappedPRF);
 
         //
-        std::cout << "ARF        PRF        Value(PRF)      Value(Ref)" << std::endl;
-        std::cout << "-----      -----      ----------      ----------" << std::endl;
+        if (!flagS)
+        {
+            std::cout << "ARF        PRF        Value(PRF)              Value(Ref)" << std::endl;
+            std::cout << "-----      -----      ------------------      ------------------" << std::endl;
 
-        printf("%-5d      ", index);
+            printf("%-5d      ", index);
 
-        if (csim->FlagARF0Conv && !index)
-            printf("ZERO       ");
-        else if (mapped)
-            printf("%-5d      ", mappedPRF);
-        else
-            printf("-          ");
+            if (csim->FlagARF0Conv && !index)
+                printf("ZERO       ");
+            else if (mapped)
+                printf("%-5d      ", mappedPRF);
+            else
+                printf("-          ");
 
-        printf("0x%08x      ", val);
-        printf("0x%08x\n"    , ref);
+            printf("0x%016lx      ", val);
+            printf("0x%016lx\n"    , ref);
+        }
 
         //
         if (flagEQ && val != ref)
@@ -732,7 +831,7 @@ namespace VMC::RAT {
         }
 
         std::cout << "PRF        ARF        V        NRA        FID        FV        Value" << std::endl;
-        std::cout << "-----      -----      ---      -----      -----      ----      ----------" << std::endl;
+        std::cout << "-----      -----      ---      -----      -----      ----      ------------------" << std::endl;
 
         SimHandle csim = GetCurrentHandle();
         for (int i = 0; i < csim->RAT.GetSize(); i++)
@@ -757,11 +856,15 @@ namespace VMC::RAT {
             printf("%-5d      ", entry.GetNRA());
             printf("%-5d      ", entry.GetFID());
             printf("%-4d      ", entry.GetFV());
-            printf("0x%08x\n"  , entry.GetValue(csim->PRF));
+            printf("0x%016lx\n"  , entry.GetValue(csim->PRF));
         }
 
         return true;
     }
+
+
+    // rat0.diffsim.arf.set.random <count>
+
 
     // rat0.diffsim.insn <insncode> [delay] [dstARF] [srcARF1] [srcARF2]
 
@@ -771,15 +874,17 @@ namespace VMC::RAT {
 
     void SetupCommands(VMCHandle handle)
     {
-        handle->handlers.push_back(CommandHandler{ std::string("rat0.info.bystep")      , &_RAT0_INFO_BYSTEP });
-        handle->handlers.push_back(CommandHandler{ std::string("rat0.arf0conv")         , &_RAT0_ARF0CONV });
-        handle->handlers.push_back(CommandHandler{ std::string("rat0.rand.reg.value")   , &_RAT0_RAND_REG_VALUE });
-        handle->handlers.push_back(CommandHandler{ std::string("rat0.rand.reg.index")   , &_RAT0_RAND_REG_INDEX });
-        handle->handlers.push_back(CommandHandler{ std::string("rat0.prf.ls")           , &_RAT0_PRF_LS });
-        handle->handlers.push_back(CommandHandler{ std::string("rat0.arf.ls.ref")       , &_RAT0_ARF_LS_REF });
-        handle->handlers.push_back(CommandHandler{ std::string("rat0.arf.ls")           , &_RAT0_ARF_LS});
-        handle->handlers.push_back(CommandHandler{ std::string("rat0.arf.set")          , &_RAT0_ARF_SET});
-        handle->handlers.push_back(CommandHandler{ std::string("rat0.arf.get")          , &_RAT0_ARF_GET});
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.infobystep")       , &_RAT0_INFOBYSTEP });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf0conv")         , &_RAT0_ARF0CONV });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.rand.reg.value")   , &_RAT0_RAND_REG_VALUE });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.rand.reg.index")   , &_RAT0_RAND_REG_INDEX });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.prf.ls")           , &_RAT0_PRF_LS });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.ls.ref")       , &_RAT0_ARF_LS_REF });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.ls")           , &_RAT0_ARF_LS});
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.set")          , &_RAT0_ARF_SET});
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.set.randomval"), &_RAT0_ARF_SET_RANDOMVAL });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.set.random")   , &_RAT0_ARF_SET_RANDOM });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.get")          , &_RAT0_ARF_GET});
     }
 }
 
