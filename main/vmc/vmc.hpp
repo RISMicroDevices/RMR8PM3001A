@@ -7,6 +7,7 @@
 #include <map>
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <algorithm>
 
 #include "vmc_misc.hpp"
@@ -192,7 +193,7 @@ namespace VMC::Basic {
     std::cout << "- setivar [name] [value] [-N]       Set or list integer variables  " << std::endl; \
     std::cout << "- movivar <dst> <src> [-N]          Get integer variable           " << std::endl; \
     std::cout << "- delivar <name>                    Delete integer variable        " << std::endl; \
-    std::cout << "- srand [value]                     Set global random seed         " << std::endl; \
+    std::cout << "- srand <value>                     Set global random seed         " << std::endl; \
 
     //
     bool Nop(void* handle, const std::string& cmd, 
@@ -556,7 +557,21 @@ namespace VMC::Basic {
                              const std::string& paramline, 
                              const std::vector<std::string>& params)
     {
-        // TODO
+        if (params.size() != 1)
+        {
+            std::cout << "Too much or too less parameter(s) for \'srand\'" << std::endl;
+            return false;
+        }
+
+        std::string param = params[0];
+        uint32_t seed;
+
+        if (param.compare("$time") == 0)
+            seed = time(NULL);
+        else
+            std::istringstream(param) >> seed;
+
+        printf("Random seed set: %u (0x%08x)\n", seed, seed);
 
         return true;
     }
