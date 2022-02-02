@@ -35,60 +35,64 @@ namespace VMC::RAT {
     class SimInstruction
     {
     private:
+        int     FID;
         int     clkDelay;
-        int     dstARF;
-        int     srcARF1;
-        int     srcARF2;
+        int     dst;
+        int     src1;
+        int     src2;
         int     insncode;
 
     public:
-        SimInstruction();
-        SimInstruction(int clkDelay, int dstARF);
-        SimInstruction(int clkDelay, int dstARF, int srcARF1, int srcARF2);
-        SimInstruction(int clkDelay, int dstARF, int srcARF1, int srcARF2, int insncode);
+        SimInstruction(int FID, int clkDelay, int dst);
+        SimInstruction(int FID, int clkDelay, int dst, int src1, int src2);
+        SimInstruction(int FID, int clkDelay, int dst, int src1, int src2, int insncode);
         SimInstruction(const SimInstruction& obj);
         ~SimInstruction();
 
-        int     GetRemainingClkDelay() const;
-        int     GetDstARF() const;
-        int     GetSrcARF1() const;
-        int     GetSrcARF2() const;
-
-        void    SetInsnCode(int insncode);
+        int     GetFID() const;
+        int     GetClkDelay() const;
+        int     GetDst() const;
+        int     GetSrc1() const;
+        int     GetSrc2() const;
         int     GetInsnCode() const;
 
-        bool    Immediate() const;
+        void    SetDst(int dst);
+        void    SetSrc1(int src1);
+        void    SetSrc2(int src2);
+        void    SetInsnCode(int insncode);
+    };
 
-        void    Eval();
+    class SimScoreboard
+    {
+    private:
+        const int   size;
+
+        bool* const busy;
+        int*  const FID;
+
+    public:
+        SimScoreboard(int size);
+        SimScoreboard(const SimScoreboard& obj);
+        ~SimScoreboard();
+
+        void    Clear();
+
+        int     GetFID(int index) const;
+        bool    IsBusy(int index) const;
+        void    SetBusy(int index, int FID);
+        void    Release(int FID);
+
+        void    operator=(const SimScoreboard& obj) = delete;
+    };
+
+    class SimReservation
+    {
+
     };
 
     class SimReOrderBuffer
     {
-    private:
-        list<SimInstruction>    insnBuffer;
-        SimInstruction          insnReady;
-        bool                    insnReadyFlag;
-        SimInstruction          insnPush;
-        bool                    insnPushFlag;
-        bool                    insnPopFlag;
-
-    public:
-        SimReOrderBuffer();
-        ~SimReOrderBuffer();
-
-        bool            IsNextReady() const;
-        SimInstruction  GetNextReady() const;
-
-        int             GetInsnCount() const;
-        bool            IsEmpty() const;
-        void            Clear();
-
-        void            PushInsn(SimInstruction insn);
-        void            PopInsn();
-
-        void            ResetInput();
-
-        void            Eval();
+        
     };
 
     //
@@ -267,12 +271,15 @@ namespace VMC::RAT {
     std::cout << "                                    List all RAT entries and related PRF (with optional filter)" << std::endl; \
     std::cout << "- rat0.arf.ls.ref [-Z]              List all reference ARF register values (with optional filter)" << std::endl; \
     std::cout << "- rat0.arf.ls [-Z|-U]               List all values of ARF register mapped by RAT (with optional filter)" << std::endl; \
-    std::cout << "- rat0.arf.set <index> <value> [-F|-S|-NEQ] " << std::endl; \
+    std::cout << "- rat0.arf.set <index> <value> [-S|-NEQ] " << std::endl; \
     std::cout << "                                    Set specified ARF register value" << std::endl; \
-    std::cout << "- rat0.arf.set.randomval <index> [-F|-S|-NEQ]" << std::endl; \
+    std::cout << "- rat0.arf.set.randomval <index> [-S|-NEQ]" << std::endl; \
     std::cout << "                                    Set specified ARF register with random value" << std::endl; \
-    std::cout << "- rat0.arf.set.random [-F|-S|-NEQ]  Set random ARF register with random value" << std::endl; \
+    std::cout << "- rat0.arf.set.random [-S|-NEQ]     Set random ARF register with random value" << std::endl; \
+    std::cout << "- rat0.arf.setall.random [-S|-NEQ]  Set all ARF register with random value" << std::endl; \
     std::cout << "- rat0.arf.get <index> [-U|-S|-NEQ] Get specified ARF register value" << std::endl;  \
+    std::cout << "- rat0.diffsim.arf.set.random <count>" << std::endl; \
+    std::cout << "                                    Random difftest of immediate register writes" << std::endl;
 
     // rat0.infobystep [true|false]
     bool _RAT0_INFOBYSTEP(void* handle, const std::string& cmd,
@@ -533,12 +540,57 @@ namespace VMC::RAT {
     }
 
 
-    // 
+    //
     bool _common_RAT0_ARF_SET(VMCHandle vmc, int index, uint64_t value,
+                        bool flagS, bool flagNEQ)
+    {
+        //
+        SimHandle csim = GetCurrentHandle();
+
+        int prf = -1;
+
+        if (!SetMappedARFAndEval(csim, index, value, &prf))
+        {
+            if (vmc->bWarnOnFalse)
+                std::cout << "Failed to allocate entry in RAT for ARF #" << index << "." << std::endl;
+            
+            return false;
+        }
+
+
+        SetRefARF(csim, index, value);
+
+        //
+        uint64_t mARF = GetMappedARF(csim, index);
+        uint64_t Ref  = GetRefARF(csim, index);
+
+        if (!flagS)
+        {
+            if (mARF == Ref)
+                printf("\033[1;32m");
+            else
+                printf("\033[1;31m");
+
+            if (prf < 0) // Not mapped into PRF, converted by architecture
+            {
+                printf("ARF register #%d set but not mapped. mARF:0x%016lx. Ref: 0x%016lx.\033[0m\n",
+                    index, mARF, Ref);
+            }
+            else
+            {
+                printf("ARF register #%d set. PRF #%d: 0x%016lx. mARF:0x%016lx. Ref: 0x%016lx.\033[0m\n",
+                    index, prf, csim->PRF.Get(prf), mARF, Ref);
+            }
+        }
+
+        return flagNEQ ? mARF == Ref : true;
+    }
+
+    // 
+    bool _common_RAT0_ARF_SET_EX(VMCHandle vmc, int index, uint64_t value,
                         const std::vector<std::string>& params, int param_offset)
     {
         //
-        bool flagF   = false;
         bool flagS   = false;
         bool flagNEQ = false;
 
@@ -546,9 +598,7 @@ namespace VMC::RAT {
         {
             std::string param = params[i];
 
-            if (param.compare("-F") == 0)
-                flagF = true;
-            else if (param.compare("-S") == 0)
+            if (param.compare("-S") == 0)
                 flagS = true;
             else if (param.compare("-NEQ") == 0)
                 flagNEQ = true;
@@ -560,40 +610,11 @@ namespace VMC::RAT {
         }
 
         //
-        SimHandle csim = GetCurrentHandle();
-
-        int prf;
-
-        if (!SetMappedARFAndEval(csim, index, value, &prf))
-        {
-            if (vmc->bWarnOnFalse)
-                std::cout << "Failed to allocate entry in RAT for ARF ." << index << std::endl;
-            
-            return flagF ? false : true;
-        }
-
-        SetRefARF(csim, index, value);
-
-        //
-        uint64_t mARF = GetMappedARF(csim, index);
-        uint64_t Ref  = csim->RefARF[index];
-
-        if (!flagS)
-        {
-            if (mARF == Ref)
-                printf("\033[1;32m");
-            else
-                printf("\033[1;31m");
-
-            printf("ARF register #%d set. PRF #%d: 0x%016lx. mARF:0x%016lx. Ref: 0x%016lx.\033[0m\n",
-                index, prf, csim->PRF.Get(prf), mARF, Ref);
-        }
-
-        return flagNEQ ? mARF == Ref : true;
+        return _common_RAT0_ARF_SET(vmc, index, value, flagS, flagNEQ);
     }
 
 
-    // rat0.arf.set <index> <value> [-F|-S|-NEQ]
+    // rat0.arf.set <index> <value> [-S|-NEQ]
     bool _RAT0_ARF_SET(void* handle, const std::string& cmd,
                                      const std::string& paramline,
                                      const std::vector<std::string>& params)
@@ -612,11 +633,11 @@ namespace VMC::RAT {
         std::istringstream(params[1]) >> value;
 
         //
-        return _common_RAT0_ARF_SET((VMCHandle) handle, index, value, params, 2);
+        return _common_RAT0_ARF_SET_EX((VMCHandle) handle, index, value, params, 2);
     }
 
     
-    // rat0.arf.set.randomval <index> [-F|-S|-NEQ]
+    // rat0.arf.set.randomval <index> [-S|-NEQ]
     bool _RAT0_ARF_SET_RANDOMVAL(void* handle, const std::string& cmd,
                                                const std::string& paramline,
                                                const std::vector<std::string>& params)
@@ -635,11 +656,11 @@ namespace VMC::RAT {
         value = RandRegValue(GetCurrentHandle());
 
         //
-        return _common_RAT0_ARF_SET((VMCHandle) handle, index, value, params, 1);
+        return _common_RAT0_ARF_SET_EX((VMCHandle) handle, index, value, params, 1);
     }
 
 
-    // rat0.arf.set.random [-F|-S|-NEQ]
+    // rat0.arf.set.random [-S|-NEQ]
     bool _RAT0_ARF_SET_RANDOM(void* handle, const std::string& cmd,
                                             const std::string& paramline,
                                             const std::vector<std::string>& params)
@@ -652,10 +673,28 @@ namespace VMC::RAT {
         value = RandRegValue(GetCurrentHandle());
 
         //
-        return _common_RAT0_ARF_SET((VMCHandle) handle, index, value, params, 0);
+        return _common_RAT0_ARF_SET_EX((VMCHandle) handle, index, value, params, 0);
     }
 
-    
+
+    // rat0.arf.setall.random [-S|-NEQ]
+    bool _RAT0_ARF_SETALL_RANDOM(void* handle, const std::string& cmd,
+                                               const std::string& paramline,
+                                               const std::vector<std::string>& params)
+    {
+        for (int i = 0; i < EMULATED_ARF_SIZE; i++)
+        {
+            int      index = i;
+            uint64_t value = RandRegValue(GetCurrentHandle());
+
+            if (!_common_RAT0_ARF_SET_EX((VMCHandle) handle, index, value, params, 0))
+                return false;
+        }
+
+        return true;
+    }
+
+
     // rat0.arf.get <index> [-NEQ|-U|-S]
     bool _RAT0_ARF_GET(void* handle, const std::string& cmd,
                                      const std::string& paramline,
@@ -864,9 +903,83 @@ namespace VMC::RAT {
 
 
     // rat0.diffsim.arf.set.random <count>
+    bool _RAT0_DIFFSIM_ARF_SET_RANDOM(void* handle, const std::string& cmd,
+                                                    const std::string& paramline,
+                                                    const std::vector<std::string>& params)
+    {
+        if (params.size() != 1)
+        {
+            std::cout << "Too much or too less parameter(s) for \'rat0.diffsim.arf.set.random\'" << std::endl;
+            return false;
+        }
+
+        int count;
+        std::istringstream(params[0]) >> count;
+
+        //
+        SimHandle csim = GetCurrentHandle();
+
+        int i = 0;
+        for (; i < count; i++)
+        {
+            int      index = RandRegIndex(csim);
+            uint64_t value = RandRegValue(csim);
+
+            int prf = -1;
+
+            if (!SetMappedARFAndEval(csim, index, value, &prf))
+            {
+                printf("[%8d] \033[1;31mFailed to allocate RAT entry for ARF #%d.\033[0m\n",
+                    i, index);
+                break;
+            }
+
+            SetRefARF(csim, index, value);
+
+            uint64_t mARF = GetMappedARF(csim, index);
+            uint64_t Ref  = GetRefARF(csim, index);
+
+            bool eq = mARF == Ref;
+
+            if (csim->FlagStepInfo)
+            {
+                if (prf == -1)
+                    printf("[%8d] ARF Register set but unmapped. ", i);
+                else
+                    printf("[%8d] ARF Register set. PRF #%d: 0x%016lx. ", i, prf, csim->PRF.Get(prf));
+
+                if (!eq)
+                    printf("\033[1;31m");
+
+                printf("mARF: 0x%016lx. Ref: 0x%016lx.\033[0m\n", mARF, Ref);
+            }
+
+            if (!eq)
+                break;
+        }
+
+        if (i == count)
+        {
+            printf("\033[1;32mProcedure completed (%d/%d).\033[0m\n", i, count);
+            return true;
+        }
+        else
+        {
+            printf("\033[1;31mProcedure interrupted (%d/%d).\033[0m\n", i, count);
+            return false;
+        }
+    }
 
 
     // rat0.diffsim.insn <insncode> [delay] [dstARF] [srcARF1] [srcARF2]
+    bool _RAT0_DIFFSIM_INSN(void* handle, const std::string& cmd,
+                                          const std::string& paramline,
+                                          const std::vector<std::string>& params)
+    {
+        // TODO
+
+        return true;
+    }
 
 
     // rat0.diffsim.insn.random <count>
@@ -874,17 +987,19 @@ namespace VMC::RAT {
 
     void SetupCommands(VMCHandle handle)
     {
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.infobystep")       , &_RAT0_INFOBYSTEP });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf0conv")         , &_RAT0_ARF0CONV });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.rand.reg.value")   , &_RAT0_RAND_REG_VALUE });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.rand.reg.index")   , &_RAT0_RAND_REG_INDEX });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.prf.ls")           , &_RAT0_PRF_LS });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.ls.ref")       , &_RAT0_ARF_LS_REF });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.ls")           , &_RAT0_ARF_LS});
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.set")          , &_RAT0_ARF_SET});
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.set.randomval"), &_RAT0_ARF_SET_RANDOMVAL });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.set.random")   , &_RAT0_ARF_SET_RANDOM });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.get")          , &_RAT0_ARF_GET});
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.infobystep")              , &_RAT0_INFOBYSTEP });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf0conv")                , &_RAT0_ARF0CONV });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.rand.reg.value")          , &_RAT0_RAND_REG_VALUE });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.rand.reg.index")          , &_RAT0_RAND_REG_INDEX });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.prf.ls")                  , &_RAT0_PRF_LS });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.ls.ref")              , &_RAT0_ARF_LS_REF });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.ls")                  , &_RAT0_ARF_LS});
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.set")                 , &_RAT0_ARF_SET});
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.set.randomval")       , &_RAT0_ARF_SET_RANDOMVAL });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.set.random")          , &_RAT0_ARF_SET_RANDOM });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.setall.random")       , &_RAT0_ARF_SETALL_RANDOM });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.get")                 , &_RAT0_ARF_GET });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.arf.set.random")  , &_RAT0_DIFFSIM_ARF_SET_RANDOM });
     }
 }
 
@@ -892,76 +1007,76 @@ namespace VMC::RAT {
 // class VMC::RAT::SimInstruction
 namespace VMC::RAT {
     /*
-    int     dstARF;
+    int     FID;
     int     clkDelay;
+    int     dst;
+    int     src1;
+    int     src2;
+    int     insncode;
     */
 
-    SimInstruction::SimInstruction()
-        : clkDelay  (0)
-        , dstARF    (0)
-        , srcARF1   (0)
-        , srcARF2   (0)
+    SimInstruction::SimInstruction(int FID, int clkDelay, int dst)
+        : FID       (FID)
+        , clkDelay  (clkDelay)
+        , dst       (dst)
+        , src1      (0)
+        , src2      (0)
         , insncode  (INSN_CODE_NOP)
     { }
 
-    SimInstruction::SimInstruction(int clkDelay, int dstARF)
-        : clkDelay  (clkDelay)
-        , dstARF    (dstARF)
-        , srcARF1   (0)
-        , srcARF2   (0)
+    SimInstruction::SimInstruction(int FID, int clkDelay, int dst, int src1, int src2)
+        : FID       (FID)
+        , clkDelay  (clkDelay)
+        , dst       (dst)
+        , src1      (src1)
+        , src2      (src2)
         , insncode  (INSN_CODE_NOP)
     { }
 
-    SimInstruction::SimInstruction(int clkDelay, int dstARF, int srcARF1, int srcARF2)
-        : clkDelay  (clkDelay)
-        , dstARF    (dstARF)
-        , srcARF1   (srcARF1)
-        , srcARF2   (srcARF2)
-        , insncode  (INSN_CODE_NOP)
-    { }
-
-    SimInstruction::SimInstruction(int clkDelay, int dstARF, int srcARF1, int srcARF2, int insncode)
-        : clkDelay  (clkDelay)
-        , dstARF    (dstARF)
-        , srcARF1   (srcARF1)
-        , srcARF2   (srcARF2)
+    SimInstruction::SimInstruction(int FID, int clkDelay, int dst, int src1, int src2, int insncode)
+        : FID       (FID)
+        , clkDelay  (clkDelay)
+        , dst       (dst)
+        , src1      (src1)
+        , src2      (src2)
         , insncode  (INSN_CODE_NOP)
     { }
 
     SimInstruction::SimInstruction(const SimInstruction& obj)
-        : clkDelay  (obj.clkDelay)
-        , dstARF    (obj.dstARF)
-        , srcARF1   (obj.srcARF1)
-        , srcARF2   (obj.srcARF2)
+        : FID       (obj.FID)
+        , clkDelay  (obj.clkDelay)
+        , dst       (obj.dst)
+        , src1      (obj.src1)
+        , src2      (obj.src2)
         , insncode  (obj.insncode)
     { }
 
     SimInstruction::~SimInstruction()
     { }
 
-    inline int SimInstruction::GetRemainingClkDelay() const
+    inline int SimInstruction::GetFID() const
+    {
+        return FID;
+    }
+
+    inline int SimInstruction::GetClkDelay() const
     {
         return clkDelay;
     }
 
-    inline int SimInstruction::GetDstARF() const
+    inline int SimInstruction::GetDst() const
     {
-        return dstARF;
+        return dst;
     }
 
-    inline int SimInstruction::GetSrcARF1() const
+    inline int SimInstruction::GetSrc1() const
     {
-        return srcARF1;
+        return src1;
     }
 
-    inline int SimInstruction::GetSrcARF2() const
+    inline int SimInstruction::GetSrc2() const
     {
-        return srcARF2;
-    }
-
-    inline void SimInstruction::SetInsnCode(int insncode)
-    {
-        this->insncode = insncode;
+        return src2;
     }
 
     inline int SimInstruction::GetInsnCode() const
@@ -969,120 +1084,99 @@ namespace VMC::RAT {
         return insncode;
     }
 
-    inline bool SimInstruction::Immediate() const
+    inline void SimInstruction::SetDst(int dst)
     {
-        return clkDelay == 0;
+        this->dst = dst;
     }
 
-    void SimInstruction::Eval()
+    inline void SimInstruction::SetSrc1(int src1)
     {
-        if (clkDelay)
-            clkDelay--;
+        this->src1 = src1;
+    }
+
+    inline void SimInstruction::SetSrc2(int src2)
+    {
+        this->src2 = src2;
+    }
+
+    inline void SimInstruction::SetInsnCode(int insncode)
+    {
+        this->insncode = insncode;
+    }
+}
+
+
+// class VMC::RAT::SimScoreboard
+namespace VMC::RAT {
+    /*
+    const int   size;
+
+    bool* const busy;
+    int*  const FID;
+    */
+
+    SimScoreboard::SimScoreboard(int size)
+        : size  (size)
+        , busy  (new bool[size]())
+        , FID   (new int[size])
+    { }
+
+    SimScoreboard::SimScoreboard(const SimScoreboard& obj)
+        : size  (obj.size)
+        , busy  (new bool[obj.size]())
+        , FID   (new int[obj.size])
+    {
+        memcpy(busy, obj.busy, obj.size * sizeof(bool));
+        memcpy(FID,  obj.FID,  obj.size * sizeof(int));
+    }
+
+    SimScoreboard::~SimScoreboard()
+    {
+        delete busy;
+        delete FID;
+    }
+
+    void SimScoreboard::Clear()
+    {
+        memset(busy, 0, size * sizeof(bool));
+    }
+
+    inline bool SimScoreboard::IsBusy(int index) const
+    {
+        return busy[index];
+    }
+
+    inline int SimScoreboard::GetFID(int index) const
+    {
+        if (busy[index])
+            return FID[index];
+        
+        return -1;
+    }
+
+    inline void SimScoreboard::SetBusy(int index, int FID)
+    {
+        this->busy[index] = true;
+        this->FID[index]  = FID;
+    }
+
+    void SimScoreboard::Release(int FID)
+    {
+        for (int i = 0; i < size; i++)
+        {
+            if (this->FID[i] == FID && this->busy[i])
+            {
+                this->busy[i] = false;
+
+                // only one destination register for one instruction
+                break;
+            }
+        }
     }
 }
 
 
 // class VMC::RAT::SimReOrderBuffer
 namespace VMC::RAT {
-    /*
-    list<SimInstruction>    insnBuffer;
-    SimInstruction          insnReady;
-    bool                    insnReadyFlag;
-    SimInstruction          insnPush;
-    bool                    insnPushFlag;
-    bool                    insnPopFlag;
-    */
-
-    SimReOrderBuffer::SimReOrderBuffer()
-        : insnBuffer    (list<SimInstruction>())
-        , insnReady     (SimInstruction())
-        , insnReadyFlag (false)
-        , insnPush      (SimInstruction())
-        , insnPushFlag  (false)
-        , insnPopFlag   (false)
-    { }
-
-    SimReOrderBuffer::~SimReOrderBuffer()
-    { }
-
-    inline bool SimReOrderBuffer::IsNextReady() const
-    {
-        return insnReadyFlag;
-    }
-
-    inline SimInstruction SimReOrderBuffer::GetNextReady() const
-    {
-        return insnReady;
-    }
-
-    inline int SimReOrderBuffer::GetInsnCount() const
-    {
-        return insnBuffer.size();
-    }
-
-    inline bool SimReOrderBuffer::IsEmpty() const
-    {
-        return !GetInsnCount();
-    }
-
-    inline void SimReOrderBuffer::Clear()
-    {
-        insnBuffer.clear();
-    }
-
-    void SimReOrderBuffer::PushInsn(SimInstruction insn)
-    {
-        insnPush     = insn;
-        insnPushFlag = true;
-    }
-
-    void SimReOrderBuffer::PopInsn()
-    {
-        insnPopFlag = true;
-    }
-
-    void SimReOrderBuffer::ResetInput()
-    {
-        insnPushFlag = false;
-        insnPopFlag  = false;
-    }
-
-    void SimReOrderBuffer::Eval()
-    {
-        // eval all
-        list<SimInstruction>::iterator iter = insnBuffer.begin();
-        while (iter != insnBuffer.end())
-            (*iter++).Eval();
-
-        // push insn
-        if (insnPushFlag)
-        {
-            insnBuffer.push_back(insnPush);
-            insnPushFlag = false;
-        }
-
-        // pop insn
-        if (insnPopFlag && !insnBuffer.empty())
-        {
-            insnBuffer.pop_front();
-            insnPopFlag = false;
-        }
-
-        // check next ready insn
-        insnReadyFlag = false;
-
-        iter = insnBuffer.begin();
-        while (iter != insnBuffer.end())
-        {
-            if ((*iter).Immediate())
-            {
-                insnReady     = *iter;
-                insnReadyFlag = true;
-
-                break;
-            }
-            else
-                iter++;
-        }
-    }
+    
 }
