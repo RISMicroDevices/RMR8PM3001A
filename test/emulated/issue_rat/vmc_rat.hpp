@@ -62,7 +62,7 @@ namespace VMC::RAT {
         void    SetInsnCode(int insncode);
     };
 
-    class SimScoreboard
+    class SimScoreboard // Only support ARF0-conv mode
     {
     private:
         const int   size;
@@ -85,9 +85,47 @@ namespace VMC::RAT {
         void    operator=(const SimScoreboard& obj) = delete;
     };
 
-    class SimReservation
+    class SimReservation // Only support ARF0-conv mode
     {
+    public:
+        class Entry {
+        private:
+            const SimInstruction    insn;
+            bool                    src1rdy;
+            bool                    src2rdy;
 
+        public:
+            Entry(const SimInstruction& insn);
+            Entry(const SimInstruction& insn, bool src1rdy, bool src2rdy);
+            ~Entry();
+
+            const SimInstruction&   GetInsn() const;
+            bool                    IsSrc1Ready() const;
+            bool                    IsSrc2Ready() const;
+            bool                    IsReady() const;
+            int                     GetSrc1() const;
+            int                     GetSrc2() const;
+
+            void                    SetSrc1Ready(bool rdy = true);
+            void                    SetSrc2Ready(bool rdy = true);
+        };
+
+    private:
+        const SimScoreboard*    scoreboard;
+        list<Entry>             entries;
+
+    public:
+        SimReservation(const SimScoreboard* scoreboard);
+        ~SimReservation();
+        
+
+
+        // TODO
+    };
+
+    class SimExecution
+    {
+        
     };
 
     class SimReOrderBuffer
@@ -1143,11 +1181,17 @@ namespace VMC::RAT {
 
     inline bool SimScoreboard::IsBusy(int index) const
     {
+        if (!index)
+            return false;
+
         return busy[index];
     }
 
     inline int SimScoreboard::GetFID(int index) const
     {
+        if (!index)
+            return -1;
+
         if (busy[index])
             return FID[index];
         
@@ -1156,13 +1200,18 @@ namespace VMC::RAT {
 
     inline void SimScoreboard::SetBusy(int index, int FID)
     {
+        /*
+        if (!index)
+            return;
+        */
+
         this->busy[index] = true;
         this->FID[index]  = FID;
     }
 
     void SimScoreboard::Release(int FID)
     {
-        for (int i = 0; i < size; i++)
+        for (int i = 1; i < size; i++)
         {
             if (this->FID[i] == FID && this->busy[i])
             {
@@ -1173,6 +1222,77 @@ namespace VMC::RAT {
             }
         }
     }
+}
+
+
+// class VMC::RAT::SimReservation::Entry
+namespace VMC::RAT {
+    /*
+    const SimInstruction    insn;
+    bool                    src1rdy;
+    bool                    src2rdy;
+    */
+
+    SimReservation::Entry::Entry(const SimInstruction& insn)
+        : insn      (insn)
+        , src1rdy   (false)
+        , src2rdy   (false)
+    { }
+
+    SimReservation::Entry::Entry(const SimInstruction& insn, bool src1rdy, bool src2rdy)
+        : insn      (insn)
+        , src1rdy   (src1rdy)
+        , src2rdy   (src2rdy)
+    { }
+
+    SimReservation::Entry::~Entry()
+    { }
+
+    inline const SimInstruction& SimReservation::Entry::GetInsn() const
+    {
+        return insn;
+    }
+
+    inline bool SimReservation::Entry::IsSrc1Ready() const
+    {
+        return src1rdy;
+    }
+
+    inline bool SimReservation::Entry::IsSrc2Ready() const
+    {
+        return src2rdy;
+    }
+
+    inline bool SimReservation::Entry::IsReady() const
+    {
+        return src1rdy && src2rdy;
+    }
+
+    inline int SimReservation::Entry::GetSrc1() const
+    {
+        return insn.GetSrc1();
+    }
+
+    inline int SimReservation::Entry::GetSrc2() const
+    {
+        return insn.GetSrc2();
+    }
+
+    inline void SimReservation::Entry::SetSrc1Ready(bool rdy)
+    {
+        src1rdy = rdy;
+    }
+
+    inline void SimReservation::Entry::SetSrc2Ready(bool rdy)
+    {
+        src2rdy = rdy;
+    }
+}
+
+
+// class VMC::RAT::SimReservation
+namespace VMC::RAT {
+
 }
 
 
