@@ -43,6 +43,7 @@ namespace VMC::RAT {
         int     insncode;
 
     public:
+        SimInstruction();
         SimInstruction(int FID, int clkDelay, int dst);
         SimInstruction(int FID, int clkDelay, int dst, int src1, int src2);
         SimInstruction(int FID, int clkDelay, int dst, int src1, int src2, int insncode);
@@ -97,6 +98,7 @@ namespace VMC::RAT {
         public:
             Entry(const SimInstruction& insn);
             Entry(const SimInstruction& insn, bool src1rdy, bool src2rdy);
+            Entry(const Entry& obj);
             ~Entry();
 
             const SimInstruction&   GetInsn() const;
@@ -116,16 +118,58 @@ namespace VMC::RAT {
 
     public:
         SimReservation(const SimScoreboard* scoreboard);
+        SimReservation(const SimReservation& obj);
         ~SimReservation();
-        
 
+        void                    PushInsn(const SimInstruction& insn);
 
-        // TODO
+        const SimScoreboard*    GetScoreboardRef() const;
+        void                    SetScoreboardRef(const SimScoreboard* scoreboard);
+
+        bool                    NextInsn(SimInstruction* insn = nullptr) const;
+        bool                    PopInsn();
+
+        void                    Clear();
+
+        void                    Eval();
+
+        void                    operator=(const SimReservation& obj);
     };
 
     class SimExecution
     {
-        
+    public:
+        class Entry {
+        private:
+            const SimInstruction    insn;
+            uint64_t                src1val;
+            uint64_t                src2val;
+            bool                    rdy;
+            uint64_t                dstval;
+
+        public:
+            Entry(const SimInstruction& insn);
+            Entry(const SimInstruction& insn, uint64_t src1val, uint64_t src2val);
+            Entry(const Entry& entry);
+            ~Entry();
+
+            const SimInstruction&   GetInsn() const;
+            uint64_t                GetSrc1Value() const;
+            uint64_t                GetSrc2Value() const;
+            bool                    IsReady() const;
+            uint64_t                GetDstValue() const;
+
+            void                    SetSrc1Value(uint64_t value);
+            void                    SetSrc2Value(uint64_t value);
+            void                    SetReady(bool ready = true);
+            void                    SetDstValue(uint64_t value);
+        };
+
+    private:
+        // TODO
+
+    public:
+        // TODO
     };
 
     class SimReOrderBuffer
@@ -317,7 +361,7 @@ namespace VMC::RAT {
     std::cout << "- rat0.arf.setall.random [-S|-NEQ]  Set all ARF register with random value" << std::endl; \
     std::cout << "- rat0.arf.get <index> [-U|-S|-NEQ] Get specified ARF register value" << std::endl;  \
     std::cout << "- rat0.diffsim.arf.set.random <count>" << std::endl; \
-    std::cout << "                                    Random difftest of immediate register writes" << std::endl;
+    std::cout << "                                    Random difftest of immediate register writes" << std::endl; \
 
     // rat0.infobystep [true|false]
     bool _RAT0_INFOBYSTEP(void* handle, const std::string& cmd,
@@ -1021,6 +1065,14 @@ namespace VMC::RAT {
 
 
     // rat0.diffsim.insn.random <count>
+    bool _RAT0_DIFFSIM_INSN_RANDOM(void* handle, const std::string& cmd,
+                                                 const std::string& paramline,
+                                                 const std::vector<std::string>& params)
+    {
+        // TODO
+
+        return true;
+    }
 
 
     void SetupCommands(VMCHandle handle)
@@ -1038,6 +1090,8 @@ namespace VMC::RAT {
         RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.setall.random")       , &_RAT0_ARF_SETALL_RANDOM });
         RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.get")                 , &_RAT0_ARF_GET });
         RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.arf.set.random")  , &_RAT0_DIFFSIM_ARF_SET_RANDOM });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn")            , &_RAT0_DIFFSIM_INSN });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.random")     , &_RAT0_DIFFSIM_INSN_RANDOM });
     }
 }
 
@@ -1052,6 +1106,15 @@ namespace VMC::RAT {
     int     src2;
     int     insncode;
     */
+
+    SimInstruction::SimInstruction()
+        : FID       (-1)
+        , clkDelay  (clkDelay)
+        , dst       (dst)
+        , src1      (0)
+        , src2      (0)
+        , insncode  (INSN_CODE_NOP)
+    { }
 
     SimInstruction::SimInstruction(int FID, int clkDelay, int dst)
         : FID       (FID)
@@ -1245,6 +1308,12 @@ namespace VMC::RAT {
         , src2rdy   (src2rdy)
     { }
 
+    SimReservation::Entry::Entry(const Entry& obj)
+        : insn      (obj.insn)
+        , src1rdy   (obj.src1rdy)
+        , src2rdy   (obj.src2rdy)
+    { }
+
     SimReservation::Entry::~Entry()
     { }
 
@@ -1291,6 +1360,195 @@ namespace VMC::RAT {
 
 
 // class VMC::RAT::SimReservation
+namespace VMC::RAT {
+    /*
+    const SimScoreboard*    scoreboard;
+    list<Entry>             entries;
+    */
+
+    SimReservation::SimReservation(const SimScoreboard* scoreboard)
+        : scoreboard(scoreboard)
+        , entries   (list<Entry>())
+    { }
+
+    SimReservation::SimReservation(const SimReservation& obj)
+        : scoreboard(obj.scoreboard)
+        , entries   (obj.entries)
+    { }
+
+    SimReservation::~SimReservation()
+    { }
+
+    void SimReservation::PushInsn(const SimInstruction& insn)
+    {
+        Entry entry = Entry(insn);
+        entry.SetSrc1Ready(insn.GetSrc1() ? !scoreboard->IsBusy(insn.GetSrc1()) : true);
+        entry.SetSrc2Ready(insn.GetSrc2() ? !scoreboard->IsBusy(insn.GetSrc2()) : true);
+
+        entries.push_back(entry);
+    }
+
+    inline const SimScoreboard* SimReservation::GetScoreboardRef() const
+    {
+        return scoreboard;
+    }
+
+    inline void SimReservation::SetScoreboardRef(const SimScoreboard* scoreboard)
+    {
+        this->scoreboard = scoreboard;
+    }
+
+    bool SimReservation::NextInsn(SimInstruction* insn) const
+    {
+        list<Entry>::const_iterator iter = entries.begin();
+        while (iter != entries.end())
+        {
+            if (iter->IsReady())
+            {
+                if (insn)
+                    *insn = iter->GetInsn();
+
+                return true;
+            }
+            
+            iter++;
+        }
+
+        return false;
+    }
+
+    bool SimReservation::PopInsn()
+    {
+        list<Entry>::iterator iter = entries.begin();
+        while (iter != entries.end())
+        {
+            if (iter->IsReady())
+            {
+                entries.erase(iter);
+
+                return true;
+            }
+            
+            iter++;
+        }
+
+        return false;
+    }
+    
+    inline void SimReservation::Clear()
+    {
+        entries.clear();
+    }
+
+    void SimReservation::Eval()
+    {
+        list<Entry>::iterator iter = entries.begin();
+        while (iter != entries.end())
+        {
+            if (iter->IsReady())
+                continue;
+
+            if (!iter->IsSrc1Ready() && !scoreboard->IsBusy(iter->GetSrc1()))
+                iter->SetSrc1Ready();
+
+            if (!iter->IsSrc2Ready() && !scoreboard->IsBusy(iter->GetSrc2()))
+                iter->SetSrc2Ready();
+        }
+    }
+
+    void SimReservation::operator=(const SimReservation& obj)
+    {
+        scoreboard = obj.scoreboard;
+        entries    = obj.entries;
+    }
+}
+
+
+// class VMC::RAT::SimExecution::Entry
+namespace VMC::RAT {
+    /*
+    const SimInstruction    insn;
+    uint64_t                src1val;
+    uint64_t                src2val;
+    bool                    rdy;
+    uint64_t                dstval;
+    */
+
+    SimExecution::Entry::Entry(const SimInstruction& insn)
+        : insn      (insn)
+        , src1val   (0)
+        , src2val   (0)
+        , rdy       (false)
+        , dstval    (0)
+    { }
+
+    SimExecution::Entry::Entry(const SimInstruction& insn, uint64_t src1val, uint64_t src2val)
+        : insn      (insn)
+        , src1val   (src1val)
+        , src2val   (src2val)
+        , rdy       (false)
+        , dstval    (0)
+    { }
+
+    SimExecution::Entry::Entry(const Entry& obj)
+        : insn      (obj.insn)
+        , src1val   (obj.src1val)
+        , src2val   (obj.src2val)
+        , rdy       (obj.rdy)
+        , dstval    (obj.dstval)
+    { }
+
+    SimExecution::Entry::~Entry()
+    { }
+
+    inline const SimInstruction& SimExecution::Entry::GetInsn() const
+    {
+        return insn;
+    }
+
+    inline uint64_t SimExecution::Entry::GetSrc1Value() const
+    {
+        return src1val;
+    }
+
+    inline uint64_t SimExecution::Entry::GetSrc2Value() const
+    {
+        return src2val;
+    }
+
+    inline bool SimExecution::Entry::IsReady() const
+    {
+        return rdy;
+    }
+
+    inline uint64_t SimExecution::Entry::GetDstValue() const
+    {
+        return dstval;
+    }
+
+    inline void SimExecution::Entry::SetSrc1Value(uint64_t value)
+    {
+        src1val = value;
+    }
+
+    inline void SimExecution::Entry::SetSrc2Value(uint64_t value)
+    {
+        src1val = value;
+    }
+
+    inline void SimExecution::Entry::SetReady(bool ready)
+    {
+        rdy = ready;
+    }
+
+    inline void SimExecution::Entry::SetDstValue(uint64_t value)
+    {
+        dstval = value;
+    }
+}
+
+
+// class VMC::RAT::SimExecution
 namespace VMC::RAT {
 
 }
