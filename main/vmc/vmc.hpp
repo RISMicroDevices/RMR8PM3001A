@@ -52,7 +52,6 @@ namespace VMC {
         bool                                bWarnOnFalse    = true;
     } VMCEntity, *VMCHandle;
 
-    
     inline void RegisterCommand(VMCHandle handle, const CommandHandler&& command)
     {
         handle->handlers.push_back(command);
@@ -89,7 +88,7 @@ namespace VMC {
     {
         handle->mapIntVars[VMC_VARNAME_LAST_RETURN] = IntVariable(val);
     }
-    
+
     // 
     void Setup(VMCHandle handle)
     {
@@ -176,6 +175,21 @@ namespace VMC {
             handle->last_mute = false;
 
         return true;
+    }
+
+    //
+    inline void ShouldNotReachHere(const char* msg = nullptr)
+    {
+        printf("VMC failure ::ShouldNotReachHere");
+
+        if (msg)
+            printf("(\"%s\")", msg);
+
+        printf("\n");
+
+        printf("VMC exit.\n");
+
+        exit(0xDEADBEEF);
     }
 
 }
