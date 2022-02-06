@@ -35,8 +35,8 @@ namespace MEMU::Core {
         
         int             GetNext() const;
         int             ValidateNext();
-
         void            Invalidate(int index);
+        void            ResetInput();
 
         virtual void    Eval() override;
     };
@@ -66,8 +66,8 @@ namespace MEMU::Core {
     GlobalCheckpointTable::GlobalCheckpointTable(const GlobalCheckpointTable& obj)
         : gc_valid      (obj.gc_valid)
         , gc_next       (obj.gc_next)
-        , gc_eval_state (__MEMU_CORE_GCT_EVAL_STATE_NOP)
-        , gc_eval_index (-1)
+        , gc_eval_state (obj.gc_eval_state)
+        , gc_eval_index (obj.gc_eval_index)
     { }
 
     GlobalCheckpointTable::~GlobalCheckpointTable()
@@ -100,6 +100,12 @@ namespace MEMU::Core {
     {
         gc_eval_state = __MEMU_CORE_GCT_EVAL_STATE_INVALIDATE;
         gc_eval_index = index;
+    }
+
+    inline void GlobalCheckpointTable::ResetInput()
+    {
+        gc_eval_state = __MEMU_CORE_GCT_EVAL_STATE_NOP;
+        gc_eval_index = -1;
     }
 
     void GlobalCheckpointTable::Eval()

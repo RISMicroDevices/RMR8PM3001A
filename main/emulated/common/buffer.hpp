@@ -24,6 +24,7 @@ namespace MEMU::Common {
         virtual bool    GetOutput(__PayloadType* dst) const = 0;
 
         virtual bool    ReadOutput(__PayloadType* dst) = 0;
+        virtual void    ResetOutput() = 0;
 
         virtual void    Eval() override = 0;
     };
@@ -55,6 +56,7 @@ namespace MEMU::Common {
         virtual bool    GetOutput(__PayloadType* dst) const override;
 
         virtual bool    ReadOutput(__PayloadType* dst) override;
+        virtual void    ResetOutput() override;
 
         virtual void    Eval() override;
     };
@@ -88,8 +90,10 @@ namespace MEMU::Common {
         virtual bool    GetOutput(__PayloadType* dst) const override;
 
         virtual bool    ReadOutput(__PayloadType* dst) override;
+        virtual void    ResetOutput() override;
 
         void            Flush();
+        void            ResetFlush();
 
         virtual void    Eval() override;
     };
@@ -114,10 +118,11 @@ namespace MEMU::Common {
 
     template<typename __PayloadType>
     NormalBypassBuffer<__PayloadType>::NormalBypassBuffer(const NormalBypassBuffer<__PayloadType>& obj)
-        : buffer_input_valid    (false)
-        , buffer_bypass_valid   (obj.buffer_bypass_valid)
+        : buffer_input          (obj.buffer_input)
+        , buffer_input_valid    (obj.buffer_input_valid)
         , buffer_bypass         (obj.buffer_bypass)
-        , buffer_readed         (false)
+        , buffer_bypass_valid   (obj.buffer_bypass_valid)
+        , buffer_readed         (obj.buffer_readed)
     { }
 
     template<typename __PayloadType>
@@ -191,11 +196,17 @@ namespace MEMU::Common {
     }
 
     template<typename __PayloadType>
-    bool NormalBypassBuffer<__PayloadType>::ReadOutput(__PayloadType* dst)
+    inline bool NormalBypassBuffer<__PayloadType>::ReadOutput(__PayloadType* dst)
     {
         buffer_readed = true;
 
         return GetOutput(dst);
+    }
+
+    template<typename __PayloadType>
+    inline void NormalBypassBuffer<__PayloadType>::ResetOutput()
+    {
+        buffer_readed = false;
     }
 
     template<typename __PayloadType>
@@ -239,12 +250,13 @@ namespace MEMU::Common {
 
     template<typename __PayloadType>
     FlushableBypassBuffer<__PayloadType>::FlushableBypassBuffer(const FlushableBypassBuffer& obj)
-        : buffer_input_valid    (false)
-        , buffer_bypass_valid   (obj.buffer_bypass_valid)
+        : buffer_input          (obj.buffer_input)
+        , buffer_input_valid    (obj.buffer_input_valid)
         , buffer_bypass         (obj.buffer_bypass)
-        , buffer_flush          (false)
-        , buffer_flushed        (false)
-        , buffer_readed         (false)
+        , buffer_bypass_valid   (obj.buffer_bypass_valid)
+        , buffer_flush          (obj.buffer_flush)
+        , buffer_flushed        (obj.buffer_flushed)
+        , buffer_readed         (obj.buffer_readed)
     { }
 
     template<typename __PayloadType>
@@ -322,7 +334,7 @@ namespace MEMU::Common {
     }
 
     template<typename __PayloadType>
-    bool FlushableBypassBuffer<__PayloadType>::ReadOutput(__PayloadType* dst)
+    inline bool FlushableBypassBuffer<__PayloadType>::ReadOutput(__PayloadType* dst)
     {
         buffer_readed = true;
 
@@ -330,9 +342,21 @@ namespace MEMU::Common {
     }
 
     template<typename __PayloadType>
-    void FlushableBypassBuffer<__PayloadType>::Flush()
+    inline void FlushableBypassBuffer<__PayloadType>::ResetOutput()
+    {
+        buffer_readed = false;
+    }
+
+    template<typename __PayloadType>
+    inline void FlushableBypassBuffer<__PayloadType>::Flush()
     {
         buffer_flushed = true;
+    }
+
+    template<typename __PayloadType>
+    inline void FlushableBypassBuffer<__PayloadType>::ResetFlush()
+    {
+        buffer_flushed = false;
     }
 
     template<typename __PayloadType>

@@ -917,7 +917,7 @@ namespace MEMU::Common {
         , history                   (obj.history)
         , payload                   (obj.payload)
         , payload_mask              ()
-        , payload_mask_overrided    (obj.payload_mask)
+        , payload_mask_overrided    (obj.payload_mask_overrided)
         , payload_masked            (obj.payload_masked)
         , maskoptr                  (obj.maskoptr)
     { 
@@ -1314,7 +1314,8 @@ namespace MEMU::Common {
         , rmode             (obj.rmode)
         , memory            (new __PayloadType[obj.size]())
         , memory_inalloc    (true)
-        , write_p0_address  (-1)
+        , write_p0_address  (obj.write_p0_address)
+        , write_p0_payload  (obj.write_p0_payload)
     { 
         TEMPLATE_SPECIALIZATION_ASSERTIONS
 
@@ -1327,13 +1328,15 @@ namespace MEMU::Common {
         const W1RTRandomAccessMemory<__PayloadType, __PayloadMaskType>& obj,
         typename std::enable_if<_t_is_maskable_optr>::type*
     )
-        : size              (obj.size)
-        , rmode             (obj.rmode)
-        , memory            (new __PayloadType[obj.size]())
-        , memory_inalloc    (true)
-        , write_p0_address  (-1)
-        , write_p0_masked   (false)
-        , maskoptr          (obj.maskoptr)
+        : size                      (obj.size)
+        , rmode                     (obj.rmode)
+        , memory                    (new __PayloadType[obj.size]())
+        , memory_inalloc            (true)
+        , write_p0_address          (obj.write_p0_address)
+        , write_p0_payload          (obj.write_p0_payload)
+        , write_p0_masked           (obj.write_p0_masked)
+        , write_p0_mask_overrided   (obj.write_p0_mask_overrided)
+        , maskoptr                  (obj.maskoptr)
     { 
         TEMPLATE_SPECIALIZATION_ASSERTIONS
 
@@ -1349,8 +1352,10 @@ namespace MEMU::Common {
         , rmode             (obj.rmode)
         , memory            (new __PayloadType[obj.size]())
         , memory_inalloc    (true)
-        , write_p0_address  (-1)
-        , write_p0_masked   (false)
+        , write_p0_address  (obj.write_p0_address)
+        , write_p0_payload  (obj.write_p0_payload)
+        , write_p0_masked   (obj.write_p0_masked)
+        , write_p0_mask     (obj.write_p0_mask)
     { 
         TEMPLATE_SPECIALIZATION_ASSERTIONS
 
@@ -1358,7 +1363,6 @@ namespace MEMU::Common {
     }
 
     template<typename __PayloadType, typename __PayloadMaskType>
-    
     W1RTRandomAccessMemory<__PayloadType, __PayloadMaskType>::~W1RTRandomAccessMemory()
     {
         if (memory_inalloc)
@@ -1721,7 +1725,8 @@ namespace MEMU::Common {
         , rmode             (obj.rmode)
         , memory            (new __PayloadType[obj.size]())
         , memory_inalloc    (true)
-        , write_p0_address  (-1)
+        , write_p0_address  (obj.write_p0_address)
+        , write_p0_payload  (obj.write_p0_payload)
         , rop_head          (new DelayedMemoryRead<__PayloadType>)
         , rop_tail          (nullptr)
     {
@@ -1736,15 +1741,17 @@ namespace MEMU::Common {
         const W1RDRandomAccessMemory<__PayloadType, __PayloadMaskType>& obj,
         typename std::enable_if<_t_is_maskable_optr>::type*
     )
-        : size              (obj.size)
-        , rmode             (obj.rmode)
-        , memory            (new __PayloadType[obj.size]())
-        , memory_inalloc    (true)
-        , write_p0_address  (-1)
-        , write_p0_masked   (false)
-        , rop_head          (new DelayedMemoryRead<__PayloadType>)
-        , rop_tail          (nullptr)
-        , maskoptr          (obj.maskoptr)
+        : size                      (obj.size)
+        , rmode                     (obj.rmode)
+        , memory                    (new __PayloadType[obj.size]())
+        , memory_inalloc            (true)
+        , write_p0_address          (obj.write_p0_address)
+        , write_p0_payload          (obj.write_p0_payload)
+        , write_p0_masked           (obj.write_p0_masked)
+        , write_p0_mask_overrided   (obj.write_p0_mask_overrided)
+        , rop_head                  (new DelayedMemoryRead<__PayloadType>)
+        , rop_tail                  (nullptr)
+        , maskoptr                  (obj.maskoptr)
     {
         TEMPLATE_SPECIALIZATION_ASSERTIONS
 
@@ -1761,8 +1768,10 @@ namespace MEMU::Common {
         , rmode             (obj.rmode)
         , memory            (new __PayloadType[obj.size]())
         , memory_inalloc    (true)
-        , write_p0_address  (-1)
-        , write_p0_masked   (false)
+        , write_p0_address  (obj.write_p0_address)
+        , write_p0_payload  (obj.write_p0_payload)
+        , write_p0_masked   (obj.write_p0_masked)
+        , write_p0_mask     (obj.write_p0_mask)
         , rop_head          (new DelayedMemoryRead<__PayloadType>)
         , rop_tail          (nullptr)
     {

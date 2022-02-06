@@ -34,6 +34,7 @@ namespace MEMU::Common {
         bool            IsPicked(int index) const;
 
         void            Update(int index);
+        void            ResetUpdate();
 
         virtual void    Eval() override;
     };
@@ -62,6 +63,7 @@ namespace MEMU::Common {
         bool            IsPicked(int index) const;
 
         void            Update(int index);
+        void            ResetUpdate();
 
         void            SetValid(int index);
         void            ResetValid();
@@ -91,11 +93,9 @@ namespace MEMU::Common {
     template<int __size_log2>
     PseudoLRUSwap<__size_log2>::PseudoLRUSwap(const PseudoLRUSwap<__size_log2>& obj)
         : lru_bits          (obj.lru_bits)
-        , lru_picked_index  (-1)
-        , lru_update_index  (-1)
-    { 
-        Eval();
-    }
+        , lru_picked_index  (obj.lru_picked_index)
+        , lru_update_index  (obj.lru_update_index)
+    { }
 
     template<int __size_log2>
     PseudoLRUSwap<__size_log2>::~PseudoLRUSwap()
@@ -123,6 +123,12 @@ namespace MEMU::Common {
     inline void PseudoLRUSwap<__size_log2>::Update(int index)
     {
         lru_update_index = index;
+    }
+
+    template<int __size_log2>
+    inline void PseudoLRUSwap<__size_log2>::ResetUpdate()
+    {
+        lru_update_index = -1;
     }
     
     template<int __size_log2>
@@ -189,11 +195,10 @@ namespace MEMU::Common {
     template<int __size_log2>
     PseudoLRUPick<__size_log2>::PseudoLRUPick(const PseudoLRUPick<__size_log2>& obj)
         : lru_bits              (obj.lru_bits)
-        , lru_update_index      (-1)
-        , lru_sub_picked_index  (-1)
-    {  
-        Eval();
-    }
+        , lru_update_index      (obj.lru_update_index)
+        , lru_sub               (obj.lru_sub)
+        , lru_sub_picked_index  (obj.lru_sub_picked_index)
+    {  }
 
     template<int __size_log2>
     PseudoLRUPick<__size_log2>::~PseudoLRUPick()
@@ -227,6 +232,12 @@ namespace MEMU::Common {
     inline void PseudoLRUPick<__size_log2>::Update(int index)
     {
         lru_update_index = index;
+    }
+
+    template<int __size_log2>
+    inline void PseudoLRUPick<__size_log2>::ResetUpdate()
+    {
+        lru_update_index = -1;
     }
 
     template<int __size_log2>

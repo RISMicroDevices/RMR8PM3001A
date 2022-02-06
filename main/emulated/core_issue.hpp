@@ -481,9 +481,9 @@ namespace MEMU::Core::Issue {
     RegisterAliasTable::RegisterAliasTable(const RegisterAliasTable& obj)
         : entries       (new Entry[rat_size])
         , checkpoints   (new GlobalCheckpoint[rat_gc_count])
-        , modified      (list<EntryModification>())
-        , rollback      (-1)
-        , snapshot      (-1)
+        , modified      (obj.modified)
+        , rollback      (obj.rollback)
+        , snapshot      (obj.snapshot)
     {
         memcpy(entries, obj.entries, rat_size * sizeof(Entry));
         memcpy(checkpoints, obj.checkpoints, rat_gc_count * sizeof(GlobalCheckpoint));
