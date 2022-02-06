@@ -32,11 +32,36 @@ namespace VMC::RAT {
 
     static constexpr int INSN_COUNT         = 6;
 
+    class SimRefARF
+    {
+    private:
+        uint64_t* const refARF;
+
+    public:
+        SimRefARF(uint64_t* refARF);
+        SimRefARF(const SimRefARF& obj);
+
+        uint64_t    operator[](const int index) const;
+    };
+
+    class SimMappedARF
+    {
+    private:
+        RegisterAliasTable*     const RAT;
+        PhysicalRegisterFile*   const PRF;
+
+    public:
+        SimMappedARF(RegisterAliasTable* RAT, PhysicalRegisterFile* PRF);
+        SimMappedARF(const SimMappedARF& obj);
+
+        uint64_t    operator[](const int index) const;
+    };
+
     class SimInstruction
     {
     private:
         int     FID;
-        int     clkDelay;
+        int     delay;
         int     dst;
         int     src1;
         int     src2;
@@ -51,7 +76,7 @@ namespace VMC::RAT {
         ~SimInstruction();
 
         int     GetFID() const;
-        int     GetClkDelay() const;
+        int     GetDelay() const;
         int     GetDst() const;
         int     GetSrc1() const;
         int     GetSrc2() const;
@@ -82,8 +107,6 @@ namespace VMC::RAT {
         bool    IsBusy(int index) const;
         void    SetBusy(int index, int FID);
         void    Release(int FID);
-
-        void    operator=(const SimScoreboard& obj) = delete;
     };
 
     class SimReservation // Only support ARF0-conv mode
@@ -91,9 +114,9 @@ namespace VMC::RAT {
     public:
         class Entry {
         private:
-            const SimInstruction    insn;
-            bool                    src1rdy;
-            bool                    src2rdy;
+            SimInstruction  insn;
+            bool            src1rdy;
+            bool            src2rdy;
 
         public:
             Entry(const SimInstruction& insn);
@@ -113,18 +136,17 @@ namespace VMC::RAT {
         };
 
     private:
-        const SimScoreboard*    scoreboard;
-        list<Entry>             entries;
+        const SimScoreboard*    const scoreboard;
+        std::list<Entry>              entries;
 
     public:
         SimReservation(const SimScoreboard* scoreboard);
         SimReservation(const SimReservation& obj);
         ~SimReservation();
 
-        void                    PushInsn(const SimInstruction& insn);
-
         const SimScoreboard*    GetScoreboardRef() const;
-        void                    SetScoreboardRef(const SimScoreboard* scoreboard);
+
+        void                    PushInsn(const SimInstruction& insn);
 
         bool                    NextInsn(SimInstruction* insn = nullptr) const;
         bool                    PopInsn();
@@ -132,8 +154,6 @@ namespace VMC::RAT {
         void                    Clear();
 
         void                    Eval();
-
-        void                    operator=(const SimReservation& obj);
     };
 
     class SimExecution
@@ -141,11 +161,12 @@ namespace VMC::RAT {
     public:
         class Entry {
         private:
-            const SimInstruction    insn;
-            uint64_t                src1val;
-            uint64_t                src2val;
-            bool                    rdy;
-            uint64_t                dstval;
+            SimInstruction  insn;
+            uint64_t        src1val;
+            uint64_t        src2val;
+            int             delay;
+            bool            dstrdy;
+            uint64_t        dstval;
 
         public:
             Entry(const SimInstruction& insn);
@@ -157,24 +178,74 @@ namespace VMC::RAT {
             uint64_t                GetSrc1Value() const;
             uint64_t                GetSrc2Value() const;
             bool                    IsReady() const;
+            bool                    IsDstReady() const;
             uint64_t                GetDstValue() const;
 
             void                    SetSrc1Value(uint64_t value);
             void                    SetSrc2Value(uint64_t value);
-            void                    SetReady(bool ready = true);
+            void                    SetDstReady(bool ready = true);
             void                    SetDstValue(uint64_t value);
+
+            void                    Eval();
         };
 
     private:
-        // TODO
+        bool                  const ref;
+        SimRefARF*            const refARF;
+        SimMappedARF*         const mappedARF;
+        std::list<Entry>            entries;
+        std::list<Entry>::iterator  next;
 
     public:
-        // TODO
+        SimExecution(uint64_t* ARF);
+        SimExecution(RegisterAliasTable* RAT, PhysicalRegisterFile* PRF);
+        SimExecution(const SimExecution& obj);
+        ~SimExecution();
+
+        void    PushInsn(const SimInstruction& insn, Entry* entry = nullptr);
+
+        bool    NextInsn(Entry* entry = nullptr);
+        bool    PopInsn();
+
+        void    Eval();
     };
 
     class SimReOrderBuffer
     {
-        
+    public:
+        class Entry {
+        private:
+            SimInstruction  insn;
+            bool            rdy;
+            uint64_t        dstval;
+
+        public:
+            Entry(const SimInstruction& insn);
+            Entry(const Entry& obj);
+            ~Entry();
+
+            const SimInstruction&   GetInsn() const;
+            int                     GetFID() const;
+            bool                    IsReady() const;
+            uint64_t                GetDstValue() const;
+
+            void                    SetReady(bool ready = true);
+            void                    SetDstValue(uint64_t value);
+        };
+    
+    private:
+        std::list<Entry>    entries;
+
+    public:
+        SimReOrderBuffer();
+        SimReOrderBuffer(const SimReOrderBuffer& obj);
+        ~SimReOrderBuffer();
+
+        void    TouchInsn(const SimInstruction& insn);
+        void    WritebackInsn(const SimInstruction& insn, uint64_t value);
+
+        bool    NextInsn(Entry* entry = nullptr);
+        bool    PopInsn();
     };
 
     //
@@ -1096,6 +1167,57 @@ namespace VMC::RAT {
 }
 
 
+// class VMC::RAT::SimRefARF
+namespace VMC::RAT {
+    /*
+    uint64_t*   refARF;
+    */
+
+    SimRefARF::SimRefARF(uint64_t* refARF)
+        : refARF(refARF)
+    { }
+
+    SimRefARF::SimRefARF(const SimRefARF& obj)
+        : refARF(obj.refARF)
+    { }
+
+    uint64_t SimRefARF::operator[](const int index) const
+    {
+        return refARF[index];
+    }
+}
+
+
+// class VMC::RAT::SimMappedARF
+namespace VMC::RAT {
+    /*
+    RegisterAliasTable*     RAT;
+    PhysicalRegisterFile*   PRF;
+    */
+
+    SimMappedARF::SimMappedARF(RegisterAliasTable* RAT, PhysicalRegisterFile* PRF)
+        : RAT   (RAT)
+        , PRF   (PRF)
+    { }
+
+    SimMappedARF::SimMappedARF(const SimMappedARF& obj)
+        : RAT   (obj.RAT)
+        , PRF   (obj.PRF)
+    { }
+
+    uint64_t SimMappedARF::operator[](const int index) const
+    {
+        if (!index)
+            return 0;
+
+        int  mappedPRF = RAT->GetAliasPRF(index);
+        bool mapped    = mappedPRF >= 0;
+
+        return mapped ? PRF->Get(mappedPRF) : 0;
+    }
+}
+
+
 // class VMC::RAT::SimInstruction
 namespace VMC::RAT {
     /*
@@ -1109,8 +1231,8 @@ namespace VMC::RAT {
 
     SimInstruction::SimInstruction()
         : FID       (-1)
-        , clkDelay  (clkDelay)
-        , dst       (dst)
+        , delay     (0)
+        , dst       (0)
         , src1      (0)
         , src2      (0)
         , insncode  (INSN_CODE_NOP)
@@ -1118,7 +1240,7 @@ namespace VMC::RAT {
 
     SimInstruction::SimInstruction(int FID, int clkDelay, int dst)
         : FID       (FID)
-        , clkDelay  (clkDelay)
+        , delay     (delay)
         , dst       (dst)
         , src1      (0)
         , src2      (0)
@@ -1127,7 +1249,7 @@ namespace VMC::RAT {
 
     SimInstruction::SimInstruction(int FID, int clkDelay, int dst, int src1, int src2)
         : FID       (FID)
-        , clkDelay  (clkDelay)
+        , delay     (delay)
         , dst       (dst)
         , src1      (src1)
         , src2      (src2)
@@ -1136,7 +1258,7 @@ namespace VMC::RAT {
 
     SimInstruction::SimInstruction(int FID, int clkDelay, int dst, int src1, int src2, int insncode)
         : FID       (FID)
-        , clkDelay  (clkDelay)
+        , delay     (delay)
         , dst       (dst)
         , src1      (src1)
         , src2      (src2)
@@ -1145,7 +1267,7 @@ namespace VMC::RAT {
 
     SimInstruction::SimInstruction(const SimInstruction& obj)
         : FID       (obj.FID)
-        , clkDelay  (obj.clkDelay)
+        , delay     (delay)
         , dst       (obj.dst)
         , src1      (obj.src1)
         , src2      (obj.src2)
@@ -1160,9 +1282,9 @@ namespace VMC::RAT {
         return FID;
     }
 
-    inline int SimInstruction::GetClkDelay() const
+    inline int SimInstruction::GetDelay() const
     {
-        return clkDelay;
+        return delay;
     }
 
     inline int SimInstruction::GetDst() const
@@ -1393,14 +1515,9 @@ namespace VMC::RAT {
         return scoreboard;
     }
 
-    inline void SimReservation::SetScoreboardRef(const SimScoreboard* scoreboard)
-    {
-        this->scoreboard = scoreboard;
-    }
-
     bool SimReservation::NextInsn(SimInstruction* insn) const
     {
-        list<Entry>::const_iterator iter = entries.begin();
+        std::list<Entry>::const_iterator iter = entries.begin();
         while (iter != entries.end())
         {
             if (iter->IsReady())
@@ -1419,7 +1536,7 @@ namespace VMC::RAT {
 
     bool SimReservation::PopInsn()
     {
-        list<Entry>::iterator iter = entries.begin();
+        std::list<Entry>::iterator iter = entries.begin();
         while (iter != entries.end())
         {
             if (iter->IsReady())
@@ -1442,7 +1559,7 @@ namespace VMC::RAT {
 
     void SimReservation::Eval()
     {
-        list<Entry>::iterator iter = entries.begin();
+        std::list<Entry>::iterator iter = entries.begin();
         while (iter != entries.end())
         {
             if (iter->IsReady())
@@ -1455,12 +1572,6 @@ namespace VMC::RAT {
                 iter->SetSrc2Ready();
         }
     }
-
-    void SimReservation::operator=(const SimReservation& obj)
-    {
-        scoreboard = obj.scoreboard;
-        entries    = obj.entries;
-    }
 }
 
 
@@ -1470,7 +1581,7 @@ namespace VMC::RAT {
     const SimInstruction    insn;
     uint64_t                src1val;
     uint64_t                src2val;
-    bool                    rdy;
+    int                     delay;
     uint64_t                dstval;
     */
 
@@ -1478,7 +1589,8 @@ namespace VMC::RAT {
         : insn      (insn)
         , src1val   (0)
         , src2val   (0)
-        , rdy       (false)
+        , delay     (insn.GetDelay())
+        , dstrdy    (false)
         , dstval    (0)
     { }
 
@@ -1486,7 +1598,8 @@ namespace VMC::RAT {
         : insn      (insn)
         , src1val   (src1val)
         , src2val   (src2val)
-        , rdy       (false)
+        , delay     (insn.GetDelay())
+        , dstrdy    (false)
         , dstval    (0)
     { }
 
@@ -1494,7 +1607,8 @@ namespace VMC::RAT {
         : insn      (obj.insn)
         , src1val   (obj.src1val)
         , src2val   (obj.src2val)
-        , rdy       (obj.rdy)
+        , delay     (obj.delay)
+        , dstrdy    (obj.dstrdy)
         , dstval    (obj.dstval)
     { }
 
@@ -1518,7 +1632,12 @@ namespace VMC::RAT {
 
     inline bool SimExecution::Entry::IsReady() const
     {
-        return rdy;
+        return dstrdy && !delay;
+    }
+
+    inline bool SimExecution::Entry::IsDstReady() const
+    {
+        return dstrdy;
     }
 
     inline uint64_t SimExecution::Entry::GetDstValue() const
@@ -1536,21 +1655,204 @@ namespace VMC::RAT {
         src1val = value;
     }
 
-    inline void SimExecution::Entry::SetReady(bool ready)
+    inline void SimExecution::Entry::SetDstReady(bool ready)
     {
-        rdy = ready;
+        dstrdy = ready;
     }
 
     inline void SimExecution::Entry::SetDstValue(uint64_t value)
     {
         dstval = value;
     }
+
+    void SimExecution::Entry::Eval()
+    {
+        if (delay)
+            delay--;
+        else if (!dstrdy)
+        {
+            switch (insn.GetInsnCode())
+            {
+                case INSN_CODE_NOP:
+                    dstval = src1val;
+                    break;
+
+                case INSN_CODE_AND:
+                    dstval = src1val & src2val;
+                    break;
+
+                case INSN_CODE_OR:
+                    dstval = src1val | src2val;
+                    break;
+
+                case INSN_CODE_XOR:
+                    dstval = src1val ^ src2val;
+                    break;
+
+                case INSN_CODE_ADD:
+                    dstval = src1val + src2val;
+                    break;
+
+                case INSN_CODE_SUB:
+                    dstval = src1val - src2val;
+                    break;
+
+                default:
+                    ShouldNotReachHere("SimExecution::INVALID_INSN_CODE");
+                    break;
+            }
+
+            dstrdy = true;
+        }
+    }
 }
 
 
 // class VMC::RAT::SimExecution
 namespace VMC::RAT {
+    /*
+    bool                    const ref;
+    SimRefARF*              const refARF;
+    SimMappedARF*           const mappedARF;
+    list<Entry>             entries;
+    list<Entry>::iterator   next;
+    */
 
+    SimExecution::SimExecution(uint64_t* ARF)
+        : ref       (true)
+        , refARF    (new SimRefARF(ARF))
+        , mappedARF (nullptr)
+        , entries   (list<Entry>())
+        , next      (entries.end())
+    { }
+
+    SimExecution::SimExecution(RegisterAliasTable* RAT, PhysicalRegisterFile* PRF)
+        : ref       (false)
+        , refARF    (nullptr)
+        , mappedARF (new SimMappedARF(RAT, PRF))
+        , entries   (list<Entry>())
+        , next      (entries.end())
+    { }
+
+    SimExecution::SimExecution(const SimExecution& obj)
+        : ref       (obj.ref)
+        , refARF    ( ref ? new SimRefARF(*refARF) : nullptr)
+        , mappedARF (!ref ? new SimMappedARF(*mappedARF) : nullptr)
+        , entries   (obj.entries)
+        , next      (entries.end())
+    { }
+
+    SimExecution::~SimExecution()
+    {
+        if (ref)
+            delete refARF;
+        else
+            delete mappedARF;
+    }
+
+    void SimExecution::PushInsn(const SimInstruction& insn, Entry* entry = nullptr)
+    {
+        uint64_t src1val = ref ? (*refARF)[insn.GetSrc1()] : (*mappedARF)[insn.GetSrc1()];
+        uint64_t src2val = ref ? (*refARF)[insn.GetSrc2()] : (*mappedARF)[insn.GetSrc2()];
+
+        Entry newEntry(insn, src1val, src2val);
+
+        if (entry)
+            *entry = newEntry;
+
+        entries.push_back(newEntry);
+    }
+
+    bool SimExecution::NextInsn(Entry* entry)
+    {
+        if (next == entries.end())
+            return false;
+
+        if (entry)
+            *entry = *next;
+
+        return true;
+    }
+
+    bool SimExecution::PopInsn()
+    {
+        if (next == entries.end())
+            return false;
+
+        entries.erase(next);
+        next = entries.end();
+
+        return true;
+    }
+
+    void SimExecution::Eval()
+    {
+        std::list<Entry>::iterator iter = entries.begin();
+        while (iter != entries.end())
+        {
+            iter->Eval();
+            
+            if (next == entries.end() && iter->IsReady())
+                next = iter;
+
+            iter++;
+        }
+    }
+}
+
+
+// class VMC::RAT::SimReOrderBuffer::Entry
+namespace VMC::RAT {
+    /*
+    SimInstruction  insn;
+    bool            rdy;
+    uint64_t        dstval;
+    */
+
+    SimReOrderBuffer::Entry::Entry(const SimInstruction& insn)
+        : insn      (insn)
+        , rdy       (false)
+        , dstval    (0)
+    { }
+
+    SimReOrderBuffer::Entry::Entry(const Entry& obj)
+        : insn      (obj.insn)
+        , rdy       (obj.rdy)
+        , dstval    (obj.dstval)
+    { }
+
+    SimReOrderBuffer::Entry::~Entry()
+    { }
+
+    inline const SimInstruction& SimReOrderBuffer::Entry::GetInsn() const
+    {
+        return insn;
+    }
+
+    inline int SimReOrderBuffer::Entry::GetFID() const
+    {
+        return insn.GetFID();
+    }
+
+    inline bool SimReOrderBuffer::Entry::IsReady() const
+    {
+        return rdy;
+    }
+
+    inline uint64_t SimReOrderBuffer::Entry::GetDstValue() const
+    {
+        return dstval;
+    }
+
+    inline void SimReOrderBuffer::Entry::SetReady(bool ready)
+    {
+        rdy = ready;
+    }
+
+    inline void SimReOrderBuffer::Entry::SetDstValue(uint64_t value)
+    {
+        dstval = value;
+    }
 }
 
 
