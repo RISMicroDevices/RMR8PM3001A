@@ -49,7 +49,7 @@ namespace MEMU::Core::Issue {
         class Entry {
         private:
             int     FID;   // Instruction Fetch ID
-            bool    FV;    // Instruction On-flight Valid
+            bool    FV;    // Instruction On-flight Valid !!Removal Consideration!!
             bool    NRA;   // Not reallocate-able Flag
 
             int     PRF;   // PRF (Physical Register File) address
@@ -64,14 +64,14 @@ namespace MEMU::Core::Issue {
             void        Clear();
 
             int         GetFID() const;
-            bool        GetFV() const;
+            bool        GetFV() const; // !!Removal Consideration!!
             bool        GetNRA() const;
             int         GetPRF() const;
             int         GetARF() const;
             bool        GetValid() const;
 
             void        SetFID(int val);
-            void        SetFV(bool val);
+            void        SetFV(bool val); // !!Removal Consideration!!
             void        SetNRA(bool val);
             void        SetPRF(int val);
             void        SetARF(int val);
