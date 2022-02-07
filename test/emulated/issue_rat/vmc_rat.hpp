@@ -138,6 +138,7 @@ namespace VMC::RAT {
     private:
         const SimScoreboard*    const scoreboard;
         std::list<Entry>              entries;
+        std::list<Entry>::iterator    next;
 
     public:
         SimReservation(const SimScoreboard* scoreboard);
@@ -148,7 +149,7 @@ namespace VMC::RAT {
 
         void                    PushInsn(const SimInstruction& insn);
 
-        bool                    NextInsn(SimInstruction* insn = nullptr) const;
+        bool                    NextInsn(SimInstruction* insn = nullptr);
         bool                    PopInsn();
 
         void                    Clear();
@@ -234,7 +235,8 @@ namespace VMC::RAT {
         };
     
     private:
-        std::list<Entry>    entries;
+        std::list<Entry>            entries;
+        std::list<Entry>::iterator  next;
 
     public:
         SimReOrderBuffer();
@@ -242,7 +244,7 @@ namespace VMC::RAT {
         ~SimReOrderBuffer();
 
         void    TouchInsn(const SimInstruction& insn);
-        void    WritebackInsn(const SimInstruction& insn, uint64_t value);
+        bool    WritebackInsn(const SimInstruction& insn, uint64_t value);
 
         bool    NextInsn(Entry* entry = nullptr);
         bool    PopInsn();
@@ -1486,6 +1488,7 @@ namespace VMC::RAT {
     /*
     const SimScoreboard*    scoreboard;
     list<Entry>             entries;
+    list<Entry>::iterator   next;
     */
 
     SimReservation::SimReservation(const SimScoreboard* scoreboard)
@@ -1515,13 +1518,23 @@ namespace VMC::RAT {
         return scoreboard;
     }
 
-    bool SimReservation::NextInsn(SimInstruction* insn) const
+    bool SimReservation::NextInsn(SimInstruction* insn)
     {
-        std::list<Entry>::const_iterator iter = entries.begin();
+        if (next != entries.end())
+        {
+            if (insn)
+                *insn = next->GetInsn();
+
+            return true;
+        }
+
+        std::list<Entry>::iterator iter = entries.begin();
         while (iter != entries.end())
         {
             if (iter->IsReady())
             {
+                next = iter;
+
                 if (insn)
                     *insn = iter->GetInsn();
 
@@ -1536,20 +1549,13 @@ namespace VMC::RAT {
 
     bool SimReservation::PopInsn()
     {
-        std::list<Entry>::iterator iter = entries.begin();
-        while (iter != entries.end())
-        {
-            if (iter->IsReady())
-            {
-                entries.erase(iter);
+        if (next == entries.end() && !NextInsn())
+            return false;
 
-                return true;
-            }
-            
-            iter++;
-        }
+        entries.erase(next);
+        next = entries.end();
 
-        return false;
+        return true;
     }
     
     inline void SimReservation::Clear()
@@ -1571,6 +1577,9 @@ namespace VMC::RAT {
             if (!iter->IsSrc2Ready() && !scoreboard->IsBusy(iter->GetSrc2()))
                 iter->SetSrc2Ready();
         }
+
+        // always keep the next instruction oldest
+        next = entries.end();
     }
 }
 
@@ -1765,18 +1774,36 @@ namespace VMC::RAT {
 
     bool SimExecution::NextInsn(Entry* entry)
     {
-        if (next == entries.end())
-            return false;
+        if (next != entries.end())
+        {
+            if (entry)
+                *entry = *next;
 
-        if (entry)
-            *entry = *next;
+            return true;
+        }
 
-        return true;
+        std::list<Entry>::iterator iter = entries.begin();
+        while (iter != entries.end())
+        {
+            if (iter->IsReady())
+            {
+                next = iter;
+
+                if (entry)
+                    *entry = *iter;
+
+                return true;
+            }
+
+            iter++;
+        }
+
+        return false;
     }
 
     bool SimExecution::PopInsn()
     {
-        if (next == entries.end())
+        if (next == entries.end() && !NextInsn())
             return false;
 
         entries.erase(next);
@@ -1789,14 +1816,7 @@ namespace VMC::RAT {
     {
         std::list<Entry>::iterator iter = entries.begin();
         while (iter != entries.end())
-        {
-            iter->Eval();
-            
-            if (next == entries.end() && iter->IsReady())
-                next = iter;
-
-            iter++;
-        }
+            (iter++)->Eval();
     }
 }
 
@@ -1858,5 +1878,93 @@ namespace VMC::RAT {
 
 // class VMC::RAT::SimReOrderBuffer
 namespace VMC::RAT {
-    
+    /*
+    std::list<Entry>            entries;
+    std::list<Entry>::iterator  next;
+    */
+
+    SimReOrderBuffer::SimReOrderBuffer()
+        : entries   (std::list<Entry>())
+        , next      (entries.end())
+    { }
+
+    SimReOrderBuffer::SimReOrderBuffer(const SimReOrderBuffer& obj)
+        : entries   (obj.entries)
+        , next      (entries.end())
+    { }
+
+    SimReOrderBuffer::~SimReOrderBuffer()
+    { }
+
+    void SimReOrderBuffer::TouchInsn(const SimInstruction& insn)
+    {
+        entries.push_back(Entry(insn));
+    }
+
+    bool SimReOrderBuffer::WritebackInsn(const SimInstruction& insn, uint64_t value)
+    {
+        std::list<Entry>::iterator iter = entries.begin();
+        while (iter != entries.end())
+        {
+            if (iter->GetFID() != insn.GetFID())
+            {
+                iter++;
+                continue;
+            }
+
+            if (iter->IsReady())
+            {
+                // writeback overlap, not permitted
+                return false;
+            }
+
+            iter->SetDstValue(value);
+            iter->SetReady();
+
+            return true;
+        }
+
+        // FID not found in ROB
+        return false;
+    }
+
+    bool SimReOrderBuffer::NextInsn(Entry* entry)
+    {
+        if (next != entries.end())
+        {
+            if (entry)
+                *entry = *next;
+
+            return true;
+        }
+
+        std::list<Entry>::iterator iter = entries.begin();
+        while (iter != entries.end())
+        {
+            if (iter->IsReady())
+            {
+                next = iter;
+
+                if (entry)
+                    *entry = *iter;
+
+                return true;
+            }
+
+            iter++;
+        }
+
+        return false;
+    }
+
+    bool SimReOrderBuffer::PopInsn()
+    {
+        if (next == entries.end() && !NextInsn())
+            return false;
+
+        entries.erase(next);
+        next = entries.end();
+        
+        return true;
+    }
 }
