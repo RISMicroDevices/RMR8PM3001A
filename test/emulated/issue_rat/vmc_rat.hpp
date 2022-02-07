@@ -44,15 +44,15 @@ namespace VMC::RAT {
         uint64_t    operator[](const int index) const;
     };
 
-    class SimMappedARF
+    class SimO3ARF
     {
     private:
         RegisterAliasTable*     const RAT;
         PhysicalRegisterFile*   const PRF;
 
     public:
-        SimMappedARF(RegisterAliasTable* RAT, PhysicalRegisterFile* PRF);
-        SimMappedARF(const SimMappedARF& obj);
+        SimO3ARF(RegisterAliasTable* RAT, PhysicalRegisterFile* PRF);
+        SimO3ARF(const SimO3ARF& obj);
 
         uint64_t    operator[](const int index) const;
     };
@@ -153,6 +153,8 @@ namespace VMC::RAT {
         bool                    PopInsn();
 
         void                    Clear();
+        int                     GetCount() const;
+        bool                    IsEmpty() const;
 
         void                    Eval();
     };
@@ -193,7 +195,7 @@ namespace VMC::RAT {
     private:
         bool                  const ref;
         SimRefARF*            const refARF;
-        SimMappedARF*         const mappedARF;
+        SimO3ARF*             const o3ARF;
         std::list<Entry>            entries;
         std::list<Entry>::iterator  next;
 
@@ -202,6 +204,9 @@ namespace VMC::RAT {
         SimExecution(RegisterAliasTable* RAT, PhysicalRegisterFile* PRF);
         SimExecution(const SimExecution& obj);
         ~SimExecution();
+
+        int     GetCount() const;
+        bool    IsEmpty() const;
 
         void    PushInsn(const SimInstruction& insn, Entry* entry = nullptr);
 
@@ -243,6 +248,9 @@ namespace VMC::RAT {
         SimReOrderBuffer(const SimReOrderBuffer& obj);
         ~SimReOrderBuffer();
 
+        int     GetCount() const;
+        bool    IsEmpty() const;
+
         void    TouchInsn(const SimInstruction& insn);
         bool    WritebackInsn(const SimInstruction& insn, uint64_t value);
 
@@ -266,13 +274,25 @@ namespace VMC::RAT {
 
     typedef struct {
 
-        RegisterAliasTable      RAT                         = RegisterAliasTable();
+        RegisterAliasTable      O3RAT                       = RegisterAliasTable();
 
-        PhysicalRegisterFile    PRF                         = PhysicalRegisterFile();
+        PhysicalRegisterFile    O3PRF                       = PhysicalRegisterFile();
 
-        SimReOrderBuffer        ROB                         = SimReOrderBuffer();
+        SimScoreboard           O3Scoreboard                = SimScoreboard(EMULATED_PRF_SIZE);
+
+        SimReservation          O3Reservation               = SimReservation(&O3Scoreboard);
+
+        SimExecution            O3Execution                 = SimExecution(&O3RAT, &O3PRF);
+
+        SimReOrderBuffer        O3ROB                       = SimReOrderBuffer();
 
         uint64_t                RefARF[EMULATED_ARF_SIZE]   = { 0 };
+
+        SimScoreboard           RefScoreboard               = SimScoreboard(EMULATED_ARF_SIZE);
+
+        SimReservation          RefReservation              = SimReservation(&RefScoreboard);
+
+        SimExecution            RefExecution                = SimExecution(RefARF);
 
         int                     GlobalFID                   = 0;
 
@@ -362,12 +382,12 @@ namespace VMC::RAT {
         handle->RefARF[arf] = val;
     }
 
-    inline uint64_t GetMappedARF(SimHandle handle, int arf, bool* out_mapped = 0, int* out_mappedPRF = 0)
+    inline uint64_t GetO3ARF(SimHandle handle, int arf, bool* out_mapped = 0, int* out_mappedPRF = 0)
     {
         if (handle->FlagARF0Conv && !arf)
             return 0;
 
-        int  mappedPRF = handle->RAT.GetAliasPRF(arf);
+        int  mappedPRF = handle->O3RAT.GetAliasPRF(arf);
         bool mapped    = mappedPRF >= 0;
 
         if (out_mapped)
@@ -376,19 +396,19 @@ namespace VMC::RAT {
         if (out_mappedPRF)
             *out_mappedPRF = mappedPRF;
 
-        return mapped ? handle->PRF.Get(mappedPRF) : 0;
+        return mapped ? handle->O3PRF.Get(mappedPRF) : 0;
     }
 
-    inline bool SetMappedARF(SimHandle handle, int arf, uint64_t val, int* out_prf = 0)
+    inline bool SetO3ARF(SimHandle handle, int arf, uint64_t val, int* out_prf = 0)
     {
         if (handle->FlagARF0Conv && !arf)
             return true;
 
         int prf;
-        if (!handle->RAT.TouchAndCommit(handle->GlobalFID++, arf, &prf))
+        if (!handle->O3RAT.TouchAndCommit(handle->GlobalFID++, arf, &prf))
             return false;
 
-        handle->PRF.Set(prf, val);
+        handle->O3PRF.Set(prf, val);
 
         if (out_prf)
             *out_prf = prf;
@@ -396,13 +416,13 @@ namespace VMC::RAT {
         return true;
     }
 
-    inline bool SetMappedARFAndEval(SimHandle handle, int arf, uint64_t val, int* out_prf = 0)
+    inline bool SetO3ARFAndEval(SimHandle handle, int arf, uint64_t val, int* out_prf = 0)
     {
-        if (!SetMappedARF(handle, arf, val, out_prf))
+        if (!SetO3ARF(handle, arf, val, out_prf))
             return false;
 
-        handle->RAT.Eval();
-        handle->PRF.Eval();
+        handle->O3RAT.Eval();
+        handle->O3PRF.Eval();
 
         return true;
     }
@@ -660,7 +680,7 @@ namespace VMC::RAT {
             bool mapped;
             int  mappedPRF;
 
-            uint64_t val = GetMappedARF(csim, i, &mapped, &mappedPRF);
+            uint64_t val = GetO3ARF(csim, i, &mapped, &mappedPRF);
             uint64_t ref = GetRefARF(csim, i);
 
             if (filterU && !mapped)
@@ -704,7 +724,7 @@ namespace VMC::RAT {
 
         int prf = -1;
 
-        if (!SetMappedARFAndEval(csim, index, value, &prf))
+        if (!SetO3ARFAndEval(csim, index, value, &prf))
         {
             if (vmc->bWarnOnFalse)
                 std::cout << "Failed to allocate entry in RAT for ARF #" << index << "." << std::endl;
@@ -716,7 +736,7 @@ namespace VMC::RAT {
         SetRefARF(csim, index, value);
 
         //
-        uint64_t mARF = GetMappedARF(csim, index);
+        uint64_t mARF = GetO3ARF(csim, index);
         uint64_t Ref  = GetRefARF(csim, index);
 
         if (!flagS)
@@ -734,7 +754,7 @@ namespace VMC::RAT {
             else
             {
                 printf("ARF register #%d set. PRF #%d: 0x%016lx. mARF:0x%016lx. Ref: 0x%016lx.\033[0m\n",
-                    index, prf, csim->PRF.Get(prf), mARF, Ref);
+                    index, prf, csim->O3PRF.Get(prf), mARF, Ref);
             }
         }
 
@@ -897,7 +917,7 @@ namespace VMC::RAT {
         int  mappedPRF;
 
         ref = GetRefARF(csim, index);
-        val = GetMappedARF(csim, index, &mapped, &mappedPRF);
+        val = GetO3ARF(csim, index, &mapped, &mappedPRF);
 
         //
         if (!flagS)
@@ -1028,9 +1048,9 @@ namespace VMC::RAT {
         std::cout << "-----      -----      ---      -----      -----      ----      ------------------" << std::endl;
 
         SimHandle csim = GetCurrentHandle();
-        for (int i = 0; i < csim->RAT.GetSize(); i++)
+        for (int i = 0; i < csim->O3RAT.GetSize(); i++)
         {
-            const RegisterAliasTable::Entry& entry = csim->RAT.GetEntry(i);
+            const RegisterAliasTable::Entry& entry = csim->O3RAT.GetEntry(i);
             
             if (enFilterV && filterV != entry.GetValid())
                 continue;
@@ -1041,7 +1061,7 @@ namespace VMC::RAT {
             if (enFilterFV && filterFV != entry.GetFV())
                 continue;
 
-            if (enFilterZ && filterZ == (bool)entry.GetValue(csim->PRF))
+            if (enFilterZ && filterZ == (bool)entry.GetValue(csim->O3PRF))
                 continue;
 
             printf("%-5d      ", entry.GetPRF());
@@ -1050,7 +1070,7 @@ namespace VMC::RAT {
             printf("%-5d      ", entry.GetNRA());
             printf("%-5d      ", entry.GetFID());
             printf("%-4d      ", entry.GetFV());
-            printf("0x%016lx\n"  , entry.GetValue(csim->PRF));
+            printf("0x%016lx\n"  , entry.GetValue(csim->O3PRF));
         }
 
         return true;
@@ -1082,7 +1102,7 @@ namespace VMC::RAT {
 
             int prf = -1;
 
-            if (!SetMappedARFAndEval(csim, index, value, &prf))
+            if (!SetO3ARFAndEval(csim, index, value, &prf))
             {
                 printf("[%8d] \033[1;31mFailed to allocate RAT entry for ARF #%d.\033[0m\n",
                     i, index);
@@ -1091,7 +1111,7 @@ namespace VMC::RAT {
 
             SetRefARF(csim, index, value);
 
-            uint64_t mARF = GetMappedARF(csim, index);
+            uint64_t mARF = GetO3ARF(csim, index);
             uint64_t Ref  = GetRefARF(csim, index);
 
             bool eq = mARF == Ref;
@@ -1101,7 +1121,7 @@ namespace VMC::RAT {
                 if (prf == -1)
                     printf("[%8d] ARF Register set but unmapped. ", i);
                 else
-                    printf("[%8d] ARF Register set. PRF #%d: 0x%016lx. ", i, prf, csim->PRF.Get(prf));
+                    printf("[%8d] ARF Register set. PRF #%d: 0x%016lx. ", i, prf, csim->O3PRF.Get(prf));
 
                 if (!eq)
                     printf("\033[1;31m");
@@ -1135,6 +1155,12 @@ namespace VMC::RAT {
 
         return true;
     }
+
+    // rat0.diffsim.insn.step
+
+
+    // rat0.diffsim.insn.stepout
+
 
 
     // rat0.diffsim.insn.random <count>
@@ -1190,24 +1216,24 @@ namespace VMC::RAT {
 }
 
 
-// class VMC::RAT::SimMappedARF
+// class VMC::RAT::SimO3ARF
 namespace VMC::RAT {
     /*
     RegisterAliasTable*     RAT;
     PhysicalRegisterFile*   PRF;
     */
 
-    SimMappedARF::SimMappedARF(RegisterAliasTable* RAT, PhysicalRegisterFile* PRF)
+    SimO3ARF::SimO3ARF(RegisterAliasTable* RAT, PhysicalRegisterFile* PRF)
         : RAT   (RAT)
         , PRF   (PRF)
     { }
 
-    SimMappedARF::SimMappedARF(const SimMappedARF& obj)
+    SimO3ARF::SimO3ARF(const SimO3ARF& obj)
         : RAT   (obj.RAT)
         , PRF   (obj.PRF)
     { }
 
-    uint64_t SimMappedARF::operator[](const int index) const
+    uint64_t SimO3ARF::operator[](const int index) const
     {
         if (!index)
             return 0;
@@ -1518,6 +1544,16 @@ namespace VMC::RAT {
         return scoreboard;
     }
 
+    inline int SimReservation::GetCount() const
+    {
+        return entries.size();
+    }
+
+    inline bool SimReservation::IsEmpty() const
+    {
+        return entries.empty();
+    }
+
     bool SimReservation::NextInsn(SimInstruction* insn)
     {
         if (next != entries.end())
@@ -1722,7 +1758,7 @@ namespace VMC::RAT {
     /*
     bool                    const ref;
     SimRefARF*              const refARF;
-    SimMappedARF*           const mappedARF;
+    SimO3ARF*               const o3ARF;
     list<Entry>             entries;
     list<Entry>::iterator   next;
     */
@@ -1730,7 +1766,7 @@ namespace VMC::RAT {
     SimExecution::SimExecution(uint64_t* ARF)
         : ref       (true)
         , refARF    (new SimRefARF(ARF))
-        , mappedARF (nullptr)
+        , o3ARF     (nullptr)
         , entries   (list<Entry>())
         , next      (entries.end())
     { }
@@ -1738,7 +1774,7 @@ namespace VMC::RAT {
     SimExecution::SimExecution(RegisterAliasTable* RAT, PhysicalRegisterFile* PRF)
         : ref       (false)
         , refARF    (nullptr)
-        , mappedARF (new SimMappedARF(RAT, PRF))
+        , o3ARF     (new SimO3ARF(RAT, PRF))
         , entries   (list<Entry>())
         , next      (entries.end())
     { }
@@ -1746,7 +1782,7 @@ namespace VMC::RAT {
     SimExecution::SimExecution(const SimExecution& obj)
         : ref       (obj.ref)
         , refARF    ( ref ? new SimRefARF(*refARF) : nullptr)
-        , mappedARF (!ref ? new SimMappedARF(*mappedARF) : nullptr)
+        , o3ARF     (!ref ? new SimO3ARF(*o3ARF) : nullptr)
         , entries   (obj.entries)
         , next      (entries.end())
     { }
@@ -1756,13 +1792,23 @@ namespace VMC::RAT {
         if (ref)
             delete refARF;
         else
-            delete mappedARF;
+            delete o3ARF;
     }
 
-    void SimExecution::PushInsn(const SimInstruction& insn, Entry* entry = nullptr)
+    inline int SimExecution::GetCount() const
     {
-        uint64_t src1val = ref ? (*refARF)[insn.GetSrc1()] : (*mappedARF)[insn.GetSrc1()];
-        uint64_t src2val = ref ? (*refARF)[insn.GetSrc2()] : (*mappedARF)[insn.GetSrc2()];
+        return entries.size();
+    }
+
+    inline bool SimExecution::IsEmpty() const
+    {
+        return entries.empty();
+    }
+
+    void SimExecution::PushInsn(const SimInstruction& insn, Entry* entry)
+    {
+        uint64_t src1val = ref ? (*refARF)[insn.GetSrc1()] : (*o3ARF)[insn.GetSrc1()];
+        uint64_t src2val = ref ? (*refARF)[insn.GetSrc2()] : (*o3ARF)[insn.GetSrc2()];
 
         Entry newEntry(insn, src1val, src2val);
 
@@ -1895,6 +1941,16 @@ namespace VMC::RAT {
 
     SimReOrderBuffer::~SimReOrderBuffer()
     { }
+
+    inline int SimReOrderBuffer::GetCount() const
+    {
+        return entries.size();
+    }
+
+    inline bool SimReOrderBuffer::IsEmpty() const
+    {
+        return entries.empty();
+    }
 
     void SimReOrderBuffer::TouchInsn(const SimInstruction& insn)
     {
