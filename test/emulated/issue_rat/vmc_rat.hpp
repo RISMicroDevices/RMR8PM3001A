@@ -30,7 +30,17 @@ namespace VMC::RAT {
 
     static constexpr int INSN_CODE_SUB      = 5;
 
-    static constexpr int INSN_COUNT         = 6;
+    static constexpr int INSN_CODE_ANDI     = 6;
+
+    static constexpr int INSN_CODE_ORI      = 7;
+    
+    static constexpr int INSN_CODE_XORI     = 8;
+
+    static constexpr int INSN_CODE_ADDI     = 9;
+
+    static constexpr int INSN_CODE_SUBI     = 10;
+
+    static constexpr int INSN_COUNT         = 11;
 
     class SimRefARF
     {
@@ -60,32 +70,56 @@ namespace VMC::RAT {
     class SimInstruction
     {
     private:
-        int     FID;
-        int     delay;
-        int     dst;
-        int     src1;
-        int     src2;
-        int     insncode;
+        int         FID;
+        int         delay;
+        int         dst;
+        int         src1;
+        int         src2;
+        int         insncode;
+        uint64_t    imm;
 
     public:
         SimInstruction();
-        SimInstruction(int FID, int clkDelay, int dst);
-        SimInstruction(int FID, int clkDelay, int dst, int src1, int src2);
-        SimInstruction(int FID, int clkDelay, int dst, int src1, int src2, int insncode);
+        SimInstruction(int FID, int delay, int insncode, int dst);
+        SimInstruction(int FID, int delay, int insncode, int dst, int imm);
+        SimInstruction(int FID, int delay, int insncode, int dst, int src1, int src2);
+        SimInstruction(int FID, int delay, int insncode, int dst, int src1, int src2, int imm);
         SimInstruction(const SimInstruction& obj);
         ~SimInstruction();
 
-        int     GetFID() const;
-        int     GetDelay() const;
-        int     GetDst() const;
-        int     GetSrc1() const;
-        int     GetSrc2() const;
-        int     GetInsnCode() const;
+        int         GetFID() const;
+        int         GetDelay() const;
+        int         GetDst() const;
+        int         GetSrc1() const;
+        int         GetSrc2() const;
+        int         GetInsnCode() const;
+        uint64_t    GetImmediate() const;
 
-        void    SetDst(int dst);
-        void    SetSrc1(int src1);
-        void    SetSrc2(int src2);
-        void    SetInsnCode(int insncode);
+        void        SetDst(int dst);
+        void        SetSrc1(int src1);
+        void        SetSrc2(int src2);
+        void        SetInsnCode(int insncode);
+        void        SetImmediate(uint64_t imm);
+    };
+
+    class SimFetch
+    {
+    private:
+        std::list<SimInstruction>   fetched;
+
+    public:
+        SimFetch();
+        ~SimFetch();
+
+        int     GetCount() const;
+        bool    IsEmpty() const;
+
+        void    Clear();
+
+        void    PushInsn(const SimInstruction& insn);
+
+        bool    NextInsn(SimInstruction* insn = nullptr);
+        bool    PopInsn();
     };
 
     class SimScoreboard // Only support ARF0-conv mode
@@ -272,11 +306,15 @@ namespace VMC::RAT {
 
     static constexpr int            SIM_DEFAULT_RAND_MAX_REG_INDEX  = RAND_MAX_REG_INDEX_MAX;
 
+    static constexpr int            SIM_DEFAULT_RAND_MAX_INSN_DELAY = 32;
+
     typedef struct {
 
         RegisterAliasTable      O3RAT                       = RegisterAliasTable();
 
         PhysicalRegisterFile    O3PRF                       = PhysicalRegisterFile();
+
+        SimFetch                O3Fetch                     = SimFetch();
 
         SimScoreboard           O3Scoreboard                = SimScoreboard(EMULATED_PRF_SIZE);
 
@@ -287,6 +325,8 @@ namespace VMC::RAT {
         SimReOrderBuffer        O3ROB                       = SimReOrderBuffer();
 
         uint64_t                RefARF[EMULATED_ARF_SIZE]   = { 0 };
+
+        SimFetch                RefFetch                    = SimFetch();
 
         SimScoreboard           RefScoreboard               = SimScoreboard(EMULATED_ARF_SIZE);
 
@@ -303,6 +343,8 @@ namespace VMC::RAT {
         uint64_t                RandMaxRegValue             = SIM_DEFAULT_RAND_MAX_REG_VALUE;
 
         unsigned int            RandMaxRegIndex             = SIM_DEFAULT_RAND_MAX_REG_INDEX;
+
+        unsigned int            RandMaxInsnDelay            = SIM_DEFAULT_RAND_MAX_INSN_DELAY;
 
     } SimContext, *SimHandle;
 }
@@ -361,9 +403,24 @@ namespace VMC::RAT {
             return val ^ orc;
     }
 
-    int RandRegIndex(SimHandle handle)
+    inline int RandRegIndex(SimHandle handle)
     {
         return rand() % handle->RandMaxRegIndex;
+    }
+
+    inline int RandInsnDelay(SimHandle handle)
+    {
+        return rand() % handle->RandMaxInsnDelay;
+    }
+
+    inline int RandInsn(SimHandle handle)
+    {
+        return rand() % INSN_COUNT;
+    }
+
+    inline int NextFID(SimHandle handle)
+    {
+        return handle->GlobalFID++;
     }
 
     inline uint64_t GetRefARF(SimHandle handle, int arf)
@@ -1146,32 +1203,196 @@ namespace VMC::RAT {
     }
 
 
-    // rat0.diffsim.insn <insncode> [delay] [dstARF] [srcARF1] [srcARF2]
-    bool _RAT0_DIFFSIM_INSN(void* handle, const std::string& cmd,
-                                          const std::string& paramline,
-                                          const std::vector<std::string>& params)
+    // rat0.diffsim.insn.push <insncode> [delay] [dstARF] [srcARF1] [srcARF2] [imm]
+    bool _RAT0_DIFFSIM_INSN_PUSH(void* handle, const std::string& cmd,
+                                               const std::string& paramline,
+                                               const std::vector<std::string>& params)
     {
-        // TODO
+        //
+        int      insncode = INSN_CODE_NOP;
+        int      delay    = 0;
+        int      dstARF   = 0;
+        int      srcARF1  = 0;
+        int      srcARF2  = 0;
+        uint64_t imm      = 0;
+
+        std::string param;
+        std::vector<std::string>::const_iterator argiter = params.begin();
+
+        if (argiter == params.end())
+        {
+            std::cout << "Too much or too less parameter(s) for \'rat0.diffsim.insn.push\'" << std::endl;
+            return false;
+        }
+
+        // insncode
+        param = *argiter;
+        if (param.compare("NOP") == 0)
+            insncode = INSN_CODE_NOP;
+        else if (param.compare("AND") == 0)
+            insncode = INSN_CODE_AND;
+        else if (param.compare("OR") == 0)
+            insncode = INSN_CODE_OR;
+        else if (param.compare("XOR") == 0)
+            insncode = INSN_CODE_XOR;
+        else if (param.compare("ADD") == 0)
+            insncode = INSN_CODE_ADD;
+        else if (param.compare("SUB") == 0)
+            insncode = INSN_CODE_SUB;
+        else if (param.compare("ANDI") == 0)
+            insncode = INSN_CODE_ANDI;
+        else if (param.compare("ORI") == 0)
+            insncode = INSN_CODE_ORI;
+        else if (param.compare("XORI") == 0)
+            insncode = INSN_CODE_XORI;
+        else if (param.compare("ADDI") == 0)
+            insncode = INSN_CODE_ADDI;
+        else if (param.compare("SUBI") == 0)
+            insncode = INSN_CODE_SUBI;
+        else
+        {
+            std::cout << "Unknown instruction: " << param << std::endl;
+            std::cout << "Param 0 \'" << param << "\' is invalid." << std::endl;
+            return false;
+        }
+
+        argiter++;
+
+        // delay
+        if (argiter == params.end())
+            goto END_OF_INSN_PARSE;
+
+        std::istringstream(*argiter) >> delay;
+
+        argiter++;
+
+        // dstARF
+        if (argiter == params.end())
+            goto END_OF_INSN_PARSE;
+
+        std::istringstream(*argiter) >> dstARF;
+
+        argiter++;
+
+        // srcARF1
+        if (argiter == params.end())
+            goto END_OF_INSN_PARSE;
+
+        std::istringstream(*argiter) >> srcARF1;
+        
+        argiter++;
+
+        // srcARF2
+        if (argiter == params.end())
+            goto END_OF_INSN_PARSE;
+
+        std::istringstream(*argiter) >> srcARF2;
+
+        argiter++;
+
+        // imm
+        if (argiter == params.end())
+            goto END_OF_INSN_PARSE;
+
+        std::istringstream(*argiter) >> imm;
+
+        argiter++;
+
+        //
+        if (argiter != params.end())
+        {
+            std::cout << "Too much or too less parameter(s) for \'rat0.diffsim.insn.push\'" << std::endl;
+            return false;
+        }
+
+        //
+        END_OF_INSN_PARSE:
+            ;
+
+        //
+        SimHandle csim = GetCurrentHandle();
+        int FID = NextFID(csim);
+
+        SimInstruction insn(FID, delay, insncode, dstARF, srcARF1, srcARF2, imm);
+
+        csim->O3Fetch.PushInsn(insn);
+        csim->RefFetch.PushInsn(insn);
 
         return true;
     }
 
-    // rat0.diffsim.insn.step
-
-
-    // rat0.diffsim.insn.stepout
-
-
-
-    // rat0.diffsim.insn.random <count>
-    bool _RAT0_DIFFSIM_INSN_RANDOM(void* handle, const std::string& cmd,
-                                                 const std::string& paramline,
-                                                 const std::vector<std::string>& params)
+    // rat0.diffsim.insn.push.random <count>
+    bool _RAT0_DIFFSIM_INSN_PUSH_RANDOM(void* handle, const std::string& cmd,
+                                                      const std::string& paramline,
+                                                      const std::vector<std::string>& params)
     {
-        // TODO
+        if (params.size() != 1)
+        {
+            std::cout << "Too much or too less parameter(s) for \'rat0.diffsim.insn.push.random\'" << std::endl;
+            return false;
+        }
+
+        SimHandle csim = GetCurrentHandle();
+
+        int count;
+        std::istringstream(params[0]) >> count;
+
+        for (int i = 0; i < count; i++)
+        {
+            int FID = NextFID(csim);
+
+            int      insncode = INSN_CODE_NOP;
+            int      delay    = 0;
+            int      dstARF   = 0;
+            int      srcARF1  = 0;
+            int      srcARF2  = 0;
+            uint64_t imm      = 0;
+
+            //
+            insncode = RandInsn(csim);
+            
+            //
+            delay = RandInsnDelay(csim);
+
+            //
+            dstARF = RandRegIndex(csim);
+
+            // 
+            srcARF1 = RandRegIndex(csim);
+            srcARF2 = RandRegIndex(csim);
+
+            //
+            imm = RandRegValue(csim); // stub
+
+            //
+            SimInstruction insn(FID, delay, insncode, dstARF, srcARF1, srcARF2, imm);
+
+            csim->O3Fetch.PushInsn(insn);
+            csim->RefFetch.PushInsn(insn);
+        }
 
         return true;
     }
+
+
+    bool __common_RAT0_DIFFSIM_INSN_EVAL(bool info)
+    {
+        SimHandle csim = GetCurrentHandle();
+
+        // O3 (out-of-order) datapath
+        
+
+        // Ref (in-order) datapath
+    }
+
+    // rat0.diffsim.insn.eval.step
+
+
+    // rat0.diffsim.insn.eval.stepout
+
+
+
+    
 
 
     void SetupCommands(VMCHandle handle)
@@ -1189,8 +1410,8 @@ namespace VMC::RAT {
         RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.setall.random")       , &_RAT0_ARF_SETALL_RANDOM });
         RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.get")                 , &_RAT0_ARF_GET });
         RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.arf.set.random")  , &_RAT0_DIFFSIM_ARF_SET_RANDOM });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn")            , &_RAT0_DIFFSIM_INSN });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.random")     , &_RAT0_DIFFSIM_INSN_RANDOM });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.push")       , &_RAT0_DIFFSIM_INSN_PUSH });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.push.random"), &_RAT0_DIFFSIM_INSN_PUSH_RANDOM });
     }
 }
 
@@ -1249,12 +1470,13 @@ namespace VMC::RAT {
 // class VMC::RAT::SimInstruction
 namespace VMC::RAT {
     /*
-    int     FID;
-    int     clkDelay;
-    int     dst;
-    int     src1;
-    int     src2;
-    int     insncode;
+    int         FID;
+    int         clkDelay;
+    int         dst;
+    int         src1;
+    int         src2;
+    int         insncode;
+    uint64_t    imm;
     */
 
     SimInstruction::SimInstruction()
@@ -1264,42 +1486,57 @@ namespace VMC::RAT {
         , src1      (0)
         , src2      (0)
         , insncode  (INSN_CODE_NOP)
+        , imm       (0)
     { }
 
-    SimInstruction::SimInstruction(int FID, int clkDelay, int dst)
+    SimInstruction::SimInstruction(int FID, int delay, int insncode, int dst)
         : FID       (FID)
         , delay     (delay)
         , dst       (dst)
         , src1      (0)
         , src2      (0)
-        , insncode  (INSN_CODE_NOP)
+        , insncode  (insncode)
+        , imm       (0)
     { }
 
-    SimInstruction::SimInstruction(int FID, int clkDelay, int dst, int src1, int src2)
+    SimInstruction::SimInstruction(int FID, int delay, int insncode, int dst, int imm)
+        : FID       (FID)
+        , delay     (delay)
+        , dst       (dst)
+        , src1      (0)
+        , src2      (0)
+        , insncode  (insncode)
+        , imm       (imm)
+    { }
+
+    SimInstruction::SimInstruction(int FID, int delay, int insncode, int dst, int src1, int src2)
         : FID       (FID)
         , delay     (delay)
         , dst       (dst)
         , src1      (src1)
         , src2      (src2)
-        , insncode  (INSN_CODE_NOP)
+        , insncode  (insncode)
+        , imm       (0)
     { }
 
-    SimInstruction::SimInstruction(int FID, int clkDelay, int dst, int src1, int src2, int insncode)
+    SimInstruction::SimInstruction(int FID, int delay, int insncode, int dst, int src1, int src2, int imm)
         : FID       (FID)
         , delay     (delay)
         , dst       (dst)
         , src1      (src1)
         , src2      (src2)
-        , insncode  (INSN_CODE_NOP)
+        , insncode  (insncode)
+        , imm       (imm)
     { }
 
     SimInstruction::SimInstruction(const SimInstruction& obj)
         : FID       (obj.FID)
-        , delay     (delay)
+        , delay     (obj.delay)
         , dst       (obj.dst)
         , src1      (obj.src1)
         , src2      (obj.src2)
         , insncode  (obj.insncode)
+        , imm       (obj.imm)
     { }
 
     SimInstruction::~SimInstruction()
@@ -1330,6 +1567,11 @@ namespace VMC::RAT {
         return src2;
     }
 
+    inline uint64_t SimInstruction::GetImmediate() const
+    {
+        return imm;
+    }
+
     inline int SimInstruction::GetInsnCode() const
     {
         return insncode;
@@ -1353,6 +1595,67 @@ namespace VMC::RAT {
     inline void SimInstruction::SetInsnCode(int insncode)
     {
         this->insncode = insncode;
+    }
+
+    inline void SimInstruction::SetImmediate(uint64_t imm)
+    {
+        this->imm = imm;
+    }
+}
+
+
+// class VMC::RAT::SimFetch
+namespace VMC::RAT {
+    /*
+    std::list<SimInstruction>   fetched;
+    */
+
+    SimFetch::SimFetch()
+        : fetched(std::list<SimInstruction>())
+    { }
+
+    SimFetch::~SimFetch()
+    { }
+
+    inline int SimFetch::GetCount() const
+    {
+        return fetched.size();
+    }
+
+    inline bool SimFetch::IsEmpty() const
+    {
+        return fetched.empty();
+    }
+
+    inline void SimFetch::Clear()
+    {
+        fetched.clear();
+    }
+
+    inline void SimFetch::PushInsn(const SimInstruction& insn)
+    {
+        fetched.push_back(insn);
+    }
+
+    inline bool SimFetch::NextInsn(SimInstruction* insn)
+    {
+        if (fetched.empty())
+            return false;
+
+        if (insn)
+            *insn = fetched.front();
+
+        return true;
+    }
+
+    inline bool SimFetch::PopInsn()
+    {
+        if (fetched.empty())
+            return false;
+
+        fetched.pop_front();
+
+        return true;
     }
 }
 
@@ -1742,7 +2045,28 @@ namespace VMC::RAT {
                     dstval = src1val - src2val;
                     break;
 
+                case INSN_CODE_ANDI:
+                    dstval = src1val & insn.GetImmediate();
+                    break;
+
+                case INSN_CODE_ORI:
+                    dstval = src1val | insn.GetImmediate();
+                    break;
+
+                case INSN_CODE_XORI:
+                    dstval = src1val ^ insn.GetImmediate();
+                    break;
+
+                case INSN_CODE_ADDI:
+                    dstval = src1val + insn.GetImmediate();
+                    break;
+
+                case INSN_CODE_SUBI:
+                    dstval = src1val - insn.GetImmediate();
+                    break;
+
                 default:
+                    printf("Invalid insncode: %d (0x%08x)\n", insn.GetInsnCode(), insn.GetInsnCode());
                     ShouldNotReachHere("SimExecution::INVALID_INSN_CODE");
                     break;
             }
