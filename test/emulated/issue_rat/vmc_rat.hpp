@@ -42,6 +42,65 @@ namespace VMC::RAT {
 
     static constexpr int INSN_COUNT         = 11;
 
+    //
+    class SimStageStatus {
+    private:
+        const std::string str;
+
+    public:
+        SimStageStatus(const char* str);
+        SimStageStatus(const std::string str);
+        ~SimStageStatus();
+
+        const std::string&  GetString() const;
+    };
+
+    static const SimStageStatus     STAGE_STATUS_IDLE   = SimStageStatus("IDLE");
+
+    static const SimStageStatus     STAGE_STATUS_WAIT   = SimStageStatus("WAIT");
+
+    static const SimStageStatus     STAGE_STATUS_BUSY   = SimStageStatus("BUSY");
+
+    //
+    class SimRefPipeStatus {
+    private:
+        const SimStageStatus*   fetchStatus;
+        const SimStageStatus*   reservationStatus;
+        const SimStageStatus*   executionStatus;
+
+    public:
+        SimRefPipeStatus();
+        ~SimRefPipeStatus();
+
+        const SimStageStatus*   GetFetchStatus() const;
+        const SimStageStatus*   GetReservationStatus() const;
+        const SimStageStatus*   GetExecutionStatus() const;
+
+        void                    SetFetchStatus(const SimStageStatus* status);
+        void                    SetReservationStatus(const SimStageStatus* status);
+        void                    SetExecutionStatus(const SimStageStatus* status);
+    };
+
+    class SimO3PipeStatus {
+    private:
+        const SimStageStatus*   fetchStatus;
+        const SimStageStatus*   reservationStatus;
+        const SimStageStatus*   executionStatus;
+
+    public:
+        SimO3PipeStatus();
+        ~SimO3PipeStatus();
+
+        const SimStageStatus*   GetFetchStatus() const;
+        const SimStageStatus*   GetReservationStatus() const;
+        const SimStageStatus*   GetExecutionStatus() const;
+
+        void                    SetFetchStatus(const SimStageStatus* status);
+        void                    SetReservationStatus(const SimStageStatus* status);
+        void                    SetExecutionStatus(const SimStageStatus* status);
+    };
+
+    //
     class SimRefARF
     {
     private:
@@ -151,22 +210,26 @@ namespace VMC::RAT {
             SimInstruction  insn;
             bool            src1rdy;
             bool            src2rdy;
+            bool            dstrdy;
 
         public:
             Entry(const SimInstruction& insn);
-            Entry(const SimInstruction& insn, bool src1rdy, bool src2rdy);
+            Entry(const SimInstruction& insn, bool src1rdy, bool src2rdy, bool dstrdy);
             Entry(const Entry& obj);
             ~Entry();
 
             const SimInstruction&   GetInsn() const;
             bool                    IsSrc1Ready() const;
             bool                    IsSrc2Ready() const;
+            bool                    IsDstReady() const;
             bool                    IsReady() const;
             int                     GetSrc1() const;
             int                     GetSrc2() const;
+            int                     GetDst() const;
 
             void                    SetSrc1Ready(bool rdy = true);
             void                    SetSrc2Ready(bool rdy = true);
+            void                    SetDstReady(bool rdy = true);
         };
 
     private:
@@ -324,6 +387,8 @@ namespace VMC::RAT {
 
         SimReOrderBuffer        O3ROB                       = SimReOrderBuffer();
 
+        SimO3PipeStatus         O3Status                    = SimO3PipeStatus();
+
         uint64_t                RefARF[EMULATED_ARF_SIZE]   = { 0 };
 
         SimFetch                RefFetch                    = SimFetch();
@@ -333,6 +398,8 @@ namespace VMC::RAT {
         SimReservation          RefReservation              = SimReservation(&RefScoreboard);
 
         SimExecution            RefExecution                = SimExecution(RefARF);
+
+        SimRefPipeStatus        RefStatus                   = SimRefPipeStatus();
 
         int                     GlobalFID                   = 0;
 
@@ -1375,6 +1442,102 @@ namespace VMC::RAT {
     }
 
 
+    bool EvalRefFetch(SimHandle csim, bool info, int step = 0)
+    {
+        if (csim->RefFetch.IsEmpty())
+        {
+            csim->RefStatus.SetFetchStatus(&STAGE_STATUS_IDLE);
+
+            if (info)
+                printf("[ %8d ] RefFetch: Fetch queue empty.\n", step);
+
+            return true;
+        }
+
+        if (!csim->RefReservation.IsEmpty())
+        {
+            csim->RefStatus.SetFetchStatus(&STAGE_STATUS_WAIT);
+
+            if (info)
+                printf("[ %8d ] RefFetch: Fetch queue wait for reserved issue.\n", step);
+
+            return true;
+        }
+
+        //
+        SimInstruction insn;
+
+        if (!csim->RefFetch.NextInsn(&insn))
+        {
+            ShouldNotReachHere(" RAT::EvalRefFetch ILLEGAL_FETCH_STATE #0");
+            return false;
+        }
+
+        //
+        csim->RefScoreboard.SetBusy(insn.GetDst(), insn.GetFID());
+        csim->RefReservation.PushInsn(insn);
+        
+        csim->RefFetch.PopInsn();
+
+        csim->RefStatus.SetFetchStatus(&STAGE_STATUS_BUSY);
+
+        if (info)
+            printf("[ %8d ] RefFetch: Instruction fetched, passed to issue. FID: %d.\n", step, insn.GetFID());
+
+        return true;
+    }
+
+    bool EvalRefIssue(SimHandle csim, bool info, int step = 0)
+    {
+        csim->RefReservation.Eval();
+
+        if (csim->RefReservation.IsEmpty())
+        {
+            csim->RefStatus.SetReservationStatus(&STAGE_STATUS_IDLE);
+
+            if (info)
+                printf("[ %8d ] RefIssue: Issue queue empty.\n", step);
+
+            return true;
+        }
+
+        //
+        SimInstruction insn;
+
+        if (!csim->RefReservation.NextInsn(&insn))
+        {
+            csim->RefStatus.SetReservationStatus(&STAGE_STATUS_WAIT);
+
+            if (info)
+                printf("[ %8d ] RefIssue: Issue pause on scoreboard. ARF #%d not ready.\n", step, insn.GetFID());
+
+            return true;
+        }
+
+        //
+        csim->RefExecution.PushInsn(insn);
+
+        if (!csim->RefReservation.PopInsn())
+        {
+            ShouldNotReachHere(" RAT::EvalRefIssue ILLEGAL_ISSUE_STATE #ReservationPopFail");
+            return false;
+        }
+
+        csim->RefStatus.SetReservationStatus(&STAGE_STATUS_BUSY);
+
+        if (info)
+            printf("[ %8d ] RefIssue: Instruction issued. FID: %d.\n", step, insn.GetFID());
+
+        return true;
+    }
+
+    bool EvalRefWriteback(SimHandle csim, bool info, int step = 0)
+    {
+        // TODO
+
+        return true;
+    }
+
     bool __common_RAT0_DIFFSIM_INSN_EVAL(bool info)
     {
         SimHandle csim = GetCurrentHandle();
@@ -1383,6 +1546,7 @@ namespace VMC::RAT {
         
 
         // Ref (in-order) datapath
+        
     }
 
     // rat0.diffsim.insn.eval.step
@@ -1414,6 +1578,128 @@ namespace VMC::RAT {
         RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.push.random"), &_RAT0_DIFFSIM_INSN_PUSH_RANDOM });
     }
 }
+
+
+// class VMC::RAT::SimStageStatus
+namespace VMC::RAT {
+    /*
+    const std::string str;
+    */
+
+    SimStageStatus::SimStageStatus(const char* str)
+        : str(std::string(str))
+    { }
+
+    SimStageStatus::SimStageStatus(const std::string str)
+        : str(str)
+    { }
+
+    SimStageStatus::~SimStageStatus()
+    { }
+
+    const std::string& SimStageStatus::GetString() const
+    {
+        return str;
+    }
+};
+
+
+// class VMC::RAT::SimRefPipeStatus
+namespace VMC::RAT {
+    /*
+    const SimStageStatus*   fetchStatus;
+    const SimStageStatus*   reservationStatus;
+    const SimStageStatus*   executionStatus;
+    */
+
+    SimRefPipeStatus::SimRefPipeStatus()
+        : fetchStatus       (&STAGE_STATUS_IDLE)
+        , reservationStatus (&STAGE_STATUS_IDLE)
+        , executionStatus   (&STAGE_STATUS_IDLE)
+    { }
+
+    SimRefPipeStatus::~SimRefPipeStatus()
+    { }
+
+    inline const SimStageStatus* SimRefPipeStatus::GetFetchStatus() const
+    {
+        return fetchStatus;
+    }
+
+    inline const SimStageStatus* SimRefPipeStatus::GetReservationStatus() const
+    {
+        return reservationStatus;
+    }
+
+    inline const SimStageStatus* SimRefPipeStatus::GetExecutionStatus() const
+    {
+        return executionStatus;
+    }
+
+    inline void SimRefPipeStatus::SetFetchStatus(const SimStageStatus* status)
+    {
+        this->fetchStatus = status;
+    }
+
+    inline void SimRefPipeStatus::SetReservationStatus(const SimStageStatus* status)
+    {
+        this->reservationStatus = status;
+    }
+
+    inline void SimRefPipeStatus::SetExecutionStatus(const SimStageStatus* status)
+    {
+        this->executionStatus = status;
+    }
+};
+
+
+// class VMC::RAT::SimO3PipeStatus
+namespace VMC::RAT {
+    /*
+    const SimStageStatus*   fetchStatus;
+    const SimStageStatus*   reservationStatus;
+    const SimStageStatus*   executionStatus;
+    */
+
+    SimO3PipeStatus::SimO3PipeStatus()
+        : fetchStatus       (&STAGE_STATUS_IDLE)
+        , reservationStatus (&STAGE_STATUS_IDLE)
+        , executionStatus   (&STAGE_STATUS_IDLE)
+    { }
+
+    SimO3PipeStatus::~SimO3PipeStatus()
+    { }
+
+    inline const SimStageStatus* SimO3PipeStatus::GetFetchStatus() const
+    {
+        return fetchStatus;
+    }
+
+    inline const SimStageStatus* SimO3PipeStatus::GetReservationStatus() const
+    {
+        return reservationStatus;
+    }
+
+    inline const SimStageStatus* SimO3PipeStatus::GetExecutionStatus() const
+    {
+        return executionStatus;
+    }
+
+    inline void SimO3PipeStatus::SetFetchStatus(const SimStageStatus* status)
+    {
+        this->fetchStatus = status;
+    }
+
+    inline void SimO3PipeStatus::SetReservationStatus(const SimStageStatus* status)
+    {
+        this->reservationStatus = status;
+    }
+
+    inline void SimO3PipeStatus::SetExecutionStatus(const SimStageStatus* status)
+    {
+        this->executionStatus = status;
+    }
+};
 
 
 // class VMC::RAT::SimRefARF
@@ -1753,18 +2039,21 @@ namespace VMC::RAT {
         : insn      (insn)
         , src1rdy   (false)
         , src2rdy   (false)
+        , dstrdy    (false)
     { }
 
-    SimReservation::Entry::Entry(const SimInstruction& insn, bool src1rdy, bool src2rdy)
+    SimReservation::Entry::Entry(const SimInstruction& insn, bool src1rdy, bool src2rdy, bool dstrdy)
         : insn      (insn)
         , src1rdy   (src1rdy)
         , src2rdy   (src2rdy)
+        , dstrdy    (dstrdy)
     { }
 
     SimReservation::Entry::Entry(const Entry& obj)
         : insn      (obj.insn)
         , src1rdy   (obj.src1rdy)
         , src2rdy   (obj.src2rdy)
+        , dstrdy    (obj.dstrdy)
     { }
 
     SimReservation::Entry::~Entry()
@@ -1785,9 +2074,14 @@ namespace VMC::RAT {
         return src2rdy;
     }
 
+    inline bool SimReservation::Entry::IsDstReady() const
+    {
+        return dstrdy;
+    }
+
     inline bool SimReservation::Entry::IsReady() const
     {
-        return src1rdy && src2rdy;
+        return src1rdy && src2rdy && dstrdy;
     }
 
     inline int SimReservation::Entry::GetSrc1() const
@@ -1800,6 +2094,11 @@ namespace VMC::RAT {
         return insn.GetSrc2();
     }
 
+    inline int SimReservation::Entry::GetDst() const
+    {
+        return insn.GetDst();
+    }
+
     inline void SimReservation::Entry::SetSrc1Ready(bool rdy)
     {
         src1rdy = rdy;
@@ -1808,6 +2107,11 @@ namespace VMC::RAT {
     inline void SimReservation::Entry::SetSrc2Ready(bool rdy)
     {
         src2rdy = rdy;
+    }
+
+    inline void SimReservation::Entry::SetDstReady(bool rdy)
+    {
+        dstrdy = rdy;
     }
 }
 
@@ -1838,6 +2142,7 @@ namespace VMC::RAT {
         Entry entry = Entry(insn);
         entry.SetSrc1Ready(insn.GetSrc1() ? !scoreboard->IsBusy(insn.GetSrc1()) : true);
         entry.SetSrc2Ready(insn.GetSrc2() ? !scoreboard->IsBusy(insn.GetSrc2()) : true);
+        entry.SetDstReady( insn.GetDst()  ? !scoreboard->IsBusy(insn.GetDst())  : true);
 
         entries.push_back(entry);
     }
@@ -1915,6 +2220,9 @@ namespace VMC::RAT {
 
             if (!iter->IsSrc2Ready() && !scoreboard->IsBusy(iter->GetSrc2()))
                 iter->SetSrc2Ready();
+
+            if (!iter->IsDstReady() && !scoreboard->IsBusy(iter->GetDst()))
+                iter->SetDstReady();
         }
 
         // always keep the next instruction oldest
