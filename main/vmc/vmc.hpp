@@ -101,6 +101,13 @@ namespace VMC {
         handle->mapBoolVars["vmc.WarnOnFalse"] = BoolVariable(&(handle->bWarnOnFalse));
     }
 
+
+    inline void EraseLineSplitters(std::string& str)
+    {
+        int pos;
+        while ((pos = str.find('\r')) != std::string::npos || (pos = str.find('\n')) != std::string::npos)
+            str.erase(pos, 1);
+    }
     
     //
     bool Next(VMCHandle handle, std::istream& is, bool continuous = false)
@@ -120,8 +127,15 @@ namespace VMC {
         std::string cmd;
         std::getline(iss, cmd, ' ');
 
-        if (cmd.empty())
+        bool rawEmpty = cmd.empty();
+
+        if (!rawEmpty)
+            EraseLineSplitters(cmd);
+        else
             return false;
+
+        if (cmd.empty())
+            return true;
 
         std::transform(cmd.begin(), cmd.end(), cmd.begin(), ::tolower);
 
@@ -154,9 +168,7 @@ namespace VMC {
             std::getline(iss, param, ' ');
 
             // erase line-splits
-            int pos;
-            while ((pos = param.find('\r')) != std::string::npos || (pos = param.find('\n')) != std::string::npos)
-                param.erase(pos, 1);
+            EraseLineSplitters(param);
 
             if (!param.empty())
                 params.push_back(param);
