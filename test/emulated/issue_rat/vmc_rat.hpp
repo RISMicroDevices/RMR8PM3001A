@@ -55,11 +55,11 @@ namespace VMC::RAT {
         const std::string&  GetString() const;
     };
 
-    static const SimStageStatus     STAGE_STATUS_IDLE   = SimStageStatus("IDLE");
+    static const SimStageStatus     STAGE_STATUS_IDLE   = SimStageStatus("\033[1;32mIDLE\033[0m");
 
-    static const SimStageStatus     STAGE_STATUS_WAIT   = SimStageStatus("WAIT");
+    static const SimStageStatus     STAGE_STATUS_WAIT   = SimStageStatus("\033[1;33mWAIT\033[0m");
 
-    static const SimStageStatus     STAGE_STATUS_BUSY   = SimStageStatus("BUSY");
+    static const SimStageStatus     STAGE_STATUS_BUSY   = SimStageStatus("\033[1;31mBUSY\033[0m");
 
     //
     class SimRefPipeStatus {
@@ -86,6 +86,7 @@ namespace VMC::RAT {
         const SimStageStatus*   fetchStatus;
         const SimStageStatus*   reservationStatus;
         const SimStageStatus*   executionStatus;
+        const SimStageStatus*   robStatus;
 
     public:
         SimO3PipeStatus();
@@ -94,10 +95,12 @@ namespace VMC::RAT {
         const SimStageStatus*   GetFetchStatus() const;
         const SimStageStatus*   GetReservationStatus() const;
         const SimStageStatus*   GetExecutionStatus() const;
+        const SimStageStatus*   GetROBStatus() const;
 
         void                    SetFetchStatus(const SimStageStatus* status);
         void                    SetReservationStatus(const SimStageStatus* status);
         void                    SetExecutionStatus(const SimStageStatus* status);
+        void                    SetROBStatus(const SimStageStatus* status);
     };
 
     //
@@ -269,6 +272,7 @@ namespace VMC::RAT {
             uint64_t        dstval;
 
         public:
+            Entry();
             Entry(const SimInstruction& insn);
             Entry(const SimInstruction& insn, uint64_t src1val, uint64_t src2val);
             Entry(const Entry& entry);
@@ -369,7 +373,7 @@ namespace VMC::RAT {
 
     static constexpr int            SIM_DEFAULT_RAND_MAX_REG_INDEX  = RAND_MAX_REG_INDEX_MAX;
 
-    static constexpr int            SIM_DEFAULT_RAND_MAX_INSN_DELAY = 32;
+    static constexpr int            SIM_DEFAULT_RAND_MAX_INSN_DELAY = 8;
 
     typedef struct {
 
@@ -1434,6 +1438,10 @@ namespace VMC::RAT {
             //
             SimInstruction insn(FID, delay, insncode, dstARF, srcARF1, srcARF2, imm);
 
+            if (csim->FlagStepInfo)
+                printf("[ %8d ] FID: %d, Delay: %d, Insncode: 0x%08x, DstARF: %d, SrcARF1: %d, SrcARF2: %d, Imm: %lu (0x%016lx)\n",
+                    i, FID, delay, insncode, dstARF, srcARF1, srcARF2, imm, imm);
+
             csim->O3Fetch.PushInsn(insn);
             csim->RefFetch.PushInsn(insn);
         }
@@ -1441,8 +1449,7 @@ namespace VMC::RAT {
         return true;
     }
 
-
-    bool EvalRefFetch(SimHandle csim, bool info, int step = 0)
+    bool EvalRefFetchInternal(SimHandle csim, bool info, int step)
     {
         if (csim->RefFetch.IsEmpty())
         {
@@ -1469,12 +1476,11 @@ namespace VMC::RAT {
 
         if (!csim->RefFetch.NextInsn(&insn))
         {
-            ShouldNotReachHere(" RAT::EvalRefFetch ILLEGAL_FETCH_STATE #0");
+            ShouldNotReachHere(" RAT::EvalRefFetch ILLEGAL_STATE #FetchFail");
             return false;
         }
 
         //
-        csim->RefScoreboard.SetBusy(insn.GetDst(), insn.GetFID());
         csim->RefReservation.PushInsn(insn);
         
         csim->RefFetch.PopInsn();
@@ -1487,10 +1493,13 @@ namespace VMC::RAT {
         return true;
     }
 
-    bool EvalRefIssue(SimHandle csim, bool info, int step = 0)
+    inline bool EvalRefFetch(SimHandle csim, bool info, int step = 0)
     {
-        csim->RefReservation.Eval();
+        return EvalRefFetchInternal(csim, info, step);
+    }
 
+    bool EvalRefIssueInternal(SimHandle csim, bool info, int step)
+    {
         if (csim->RefReservation.IsEmpty())
         {
             csim->RefStatus.SetReservationStatus(&STAGE_STATUS_IDLE);
@@ -1509,17 +1518,18 @@ namespace VMC::RAT {
             csim->RefStatus.SetReservationStatus(&STAGE_STATUS_WAIT);
 
             if (info)
-                printf("[ %8d ] RefIssue: Issue pause on scoreboard. ARF #%d not ready.\n", step, insn.GetFID());
+                printf("[ %8d ] RefIssue: Issue pause on scoreboard. ARF not ready.\n", step);
 
             return true;
         }
 
         //
         csim->RefExecution.PushInsn(insn);
+        csim->RefScoreboard.SetBusy(insn.GetDst(), insn.GetFID());
 
         if (!csim->RefReservation.PopInsn())
         {
-            ShouldNotReachHere(" RAT::EvalRefIssue ILLEGAL_ISSUE_STATE #ReservationPopFail");
+            ShouldNotReachHere(" RAT::EvalRefIssue ILLEGAL_STATE #ReservationPopFail");
             return false;
         }
 
@@ -1531,14 +1541,136 @@ namespace VMC::RAT {
         return true;
     }
 
-    bool EvalRefWriteback(SimHandle csim, bool info, int step = 0)
+    inline bool EvalRefIssue(SimHandle csim, bool info, int step = 0)
+    {
+        // Eval ahead, bypass exists
+        csim->RefReservation.Eval();
+
+        return EvalRefIssueInternal(csim, info, step);
+    }
+
+    bool EvalRefWritebackInternal(SimHandle csim, bool info, int step)
+    {
+        if (csim->RefExecution.IsEmpty())
+        {
+            csim->RefStatus.SetExecutionStatus(&STAGE_STATUS_IDLE);
+
+            if (info)
+                printf("[ %8d ] RefWriteback: Execution unit empty.\n", step);
+
+            return true;
+        }
+
+
+        //
+        SimExecution::Entry entry;
+
+        if (!csim->RefExecution.NextInsn(&entry))
+        {
+            csim->RefStatus.SetExecutionStatus(&STAGE_STATUS_BUSY);
+
+            if (info)
+                printf("[ %8d ] RefWriteback: Instruction writeback not ready.\n", step);
+
+            return true;
+        }
+
+        const SimInstruction& insn = entry.GetInsn();
+
+        //
+        SetRefARF(csim, insn.GetDst(), entry.GetDstValue());
+
+        if (!csim->RefExecution.PopInsn())
+        {
+            ShouldNotReachHere(" RAT::EvalRefWriteback ILLEGAL_STATE #ExecutionPopFail");
+            return false;
+        }
+
+        csim->RefScoreboard.Release(insn.GetFID());
+
+        csim->RefStatus.SetExecutionStatus(&STAGE_STATUS_BUSY);
+
+        if (info)
+            printf("[ %8d ] RefWriteback: FID #%d written-back. DstARF #%d.\n", step, insn.GetFID(), insn.GetDst());
+
+        return true;
+    }
+
+    inline bool EvalRefWriteback(SimHandle csim, bool info, int step = 0)
+    {
+        bool result = EvalRefWritebackInternal(csim, info, step);
+
+        // Eval later, always delayed
+        csim->RefExecution.Eval();
+
+        return result;
+    }
+
+
+    inline bool EvalO3Fetch(SimHandle csim, bool info, int step)
     {
         // TODO
 
         return true;
     }
 
-    bool __common_RAT0_DIFFSIM_INSN_EVAL(bool info)
+
+    inline bool EvalO3Issue(SimHandle csim, bool info, int step)
+    {
+        // TODO
+
+        return true;
+    }
+
+    inline bool EvalO3Writeback(SimHandle csim, bool info, int step)
+    {
+        // TODO
+
+        return true;
+    }
+
+    inline bool EvalO3Commit(SimHandle csim, bool info, int step)
+    {
+        // TODO
+
+        return true;
+    }
+
+
+    inline void DispRefStatus(SimHandle csim)
+    {
+        std::cout << "Ref:";
+        std::cout << " Fetch[" << csim->RefStatus.GetFetchStatus()->GetString()       << "]";
+        std::cout << " Issue[" << csim->RefStatus.GetReservationStatus()->GetString() << "]";
+        std::cout << " EX/WB[" << csim->RefStatus.GetExecutionStatus()->GetString()   << "]" << std::endl;
+    }
+
+    inline bool IsRefAllIdle(SimHandle csim)
+    {
+        return (&STAGE_STATUS_IDLE == csim->RefStatus.GetFetchStatus())
+            && (&STAGE_STATUS_IDLE == csim->RefStatus.GetReservationStatus())
+            && (&STAGE_STATUS_IDLE == csim->RefStatus.GetExecutionStatus());
+    }
+
+    inline void DispO3Status(SimHandle csim)
+    {
+        std::cout << "O3: ";
+        std::cout << " Fetch[" << csim->O3Status.GetFetchStatus()->GetString()       << "]";
+        std::cout << " Issue[" << csim->O3Status.GetReservationStatus()->GetString() << "]";
+        std::cout << " EX/WB[" << csim->O3Status.GetExecutionStatus()->GetString()   << "]";
+        std::cout << " ROB["   << csim->O3Status.GetROBStatus()->GetString()         << "]" << std::endl;
+    }
+
+    inline bool IsO3AllIdle(SimHandle csim)
+    {
+        return (&STAGE_STATUS_IDLE == csim->O3Status.GetFetchStatus())
+            && (&STAGE_STATUS_IDLE == csim->O3Status.GetReservationStatus())
+            && (&STAGE_STATUS_IDLE == csim->O3Status.GetExecutionStatus())
+            && (&STAGE_STATUS_IDLE == csim->O3Status.GetROBStatus());
+    }
+
+    //
+    bool __common_RAT0_DIFFSIM_INSN_EVAL(bool info, int step = 0)
     {
         SimHandle csim = GetCurrentHandle();
 
@@ -1546,36 +1678,119 @@ namespace VMC::RAT {
         
 
         // Ref (in-order) datapath
-        
+        if (!EvalRefFetch(csim, info, step))
+            return false;
+
+        if (!EvalRefIssue(csim, info, step))
+            return false;
+
+        if (!EvalRefWriteback(csim, info, step))
+            return false;
+
+        return true;
     }
 
+
     // rat0.diffsim.insn.eval.step
+    bool _RAT0_DIFFSIM_INSN_EVAL_STEP(void* handle, const std::string& cmd,
+                                                    const std::string& paramline,
+                                                    const std::vector<std::string>& params)
+    {
+        SimHandle csim = GetCurrentHandle();
+
+        if (!csim->FlagARF0Conv)
+        {
+            std::cout << "Only support ARF0-conv mode." << std::endl;
+            return false;
+        }
+
+        if (!params.empty())
+        {
+            std::cout << "Too much or too less parameter(s) for \'rat0.diffsim.insn.eval.step\'" << std::endl;
+            return false;
+        }
+
+        if (!__common_RAT0_DIFFSIM_INSN_EVAL(csim->FlagStepInfo))
+        {
+            std::cout << "Eval failure." << std::endl;
+            return false;
+        }
+
+        DispRefStatus(csim);
+        DispO3Status(csim);
+
+        return true;
+    }
 
 
-    // rat0.diffsim.insn.eval.stepout
+    // rat0.diffsim.insn.eval.stepout [-NEQ|-T <count>]
+    bool _RAT0_DIFFSIM_INSN_EVAL_STEPOUT(void* handle, const std::string& cmd,
+                                                       const std::string& paramline,
+                                                       const std::vector<std::string>& params)
+    {
+        // TODO: implement flag -NEQ, -T
 
+        SimHandle csim = GetCurrentHandle();
 
+        if (!csim->FlagARF0Conv)
+        {
+            std::cout << "Only support ARF0-conv mode." << std::endl;
+            return false;
+        }
 
-    
+        int step = 0;
+
+        if (csim->FlagStepInfo)
+            printf("[ -------- ] --------------------------------\n");
+
+        do 
+        {
+            step++;
+
+            if (!__common_RAT0_DIFFSIM_INSN_EVAL(csim->FlagStepInfo, step))
+            {
+                std::cout << "Eval failure at step " << step << "." << std::endl;
+                return false;
+            }
+
+            if (csim->FlagStepInfo)
+            {
+                printf("[ %8d ] ", step);
+                DispRefStatus(csim);
+
+                printf("[ %8d ] ", step);
+                DispO3Status(csim);
+
+                printf("[ -------- ] --------------------------------\n");
+            }
+        }
+        while (!IsRefAllIdle(csim) || !IsO3AllIdle(csim));
+
+        std::cout << "Finished stepout. " << step << " step(s) walked in total." << std::endl;
+
+        return true;
+    }
 
 
     void SetupCommands(VMCHandle handle)
     {
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.infobystep")              , &_RAT0_INFOBYSTEP });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf0conv")                , &_RAT0_ARF0CONV });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.rand.reg.value")          , &_RAT0_RAND_REG_VALUE });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.rand.reg.index")          , &_RAT0_RAND_REG_INDEX });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.prf.ls")                  , &_RAT0_PRF_LS });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.ls.ref")              , &_RAT0_ARF_LS_REF });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.ls")                  , &_RAT0_ARF_LS});
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.set")                 , &_RAT0_ARF_SET});
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.set.randomval")       , &_RAT0_ARF_SET_RANDOMVAL });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.set.random")          , &_RAT0_ARF_SET_RANDOM });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.setall.random")       , &_RAT0_ARF_SETALL_RANDOM });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.get")                 , &_RAT0_ARF_GET });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.arf.set.random")  , &_RAT0_DIFFSIM_ARF_SET_RANDOM });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.push")       , &_RAT0_DIFFSIM_INSN_PUSH });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.push.random"), &_RAT0_DIFFSIM_INSN_PUSH_RANDOM });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.infobystep")                  , &_RAT0_INFOBYSTEP });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf0conv")                    , &_RAT0_ARF0CONV });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.rand.reg.value")              , &_RAT0_RAND_REG_VALUE });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.rand.reg.index")              , &_RAT0_RAND_REG_INDEX });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.prf.ls")                      , &_RAT0_PRF_LS });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.ls.ref")                  , &_RAT0_ARF_LS_REF });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.ls")                      , &_RAT0_ARF_LS});
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.set")                     , &_RAT0_ARF_SET});
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.set.randomval")           , &_RAT0_ARF_SET_RANDOMVAL });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.set.random")              , &_RAT0_ARF_SET_RANDOM });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.setall.random")           , &_RAT0_ARF_SETALL_RANDOM });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.arf.get")                     , &_RAT0_ARF_GET });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.arf.set.random")      , &_RAT0_DIFFSIM_ARF_SET_RANDOM });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.push")           , &_RAT0_DIFFSIM_INSN_PUSH });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.push.random")    , &_RAT0_DIFFSIM_INSN_PUSH_RANDOM });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.eval.step")      , &_RAT0_DIFFSIM_INSN_EVAL_STEP });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.eval.stepout")   , &_RAT0_DIFFSIM_INSN_EVAL_STEPOUT });
     }
 }
 
@@ -1659,12 +1874,14 @@ namespace VMC::RAT {
     const SimStageStatus*   fetchStatus;
     const SimStageStatus*   reservationStatus;
     const SimStageStatus*   executionStatus;
+    const SimStageStatus*   robStatus;
     */
 
     SimO3PipeStatus::SimO3PipeStatus()
         : fetchStatus       (&STAGE_STATUS_IDLE)
         , reservationStatus (&STAGE_STATUS_IDLE)
         , executionStatus   (&STAGE_STATUS_IDLE)
+        , robStatus         (&STAGE_STATUS_IDLE)
     { }
 
     SimO3PipeStatus::~SimO3PipeStatus()
@@ -1685,6 +1902,11 @@ namespace VMC::RAT {
         return executionStatus;
     }
 
+    inline const SimStageStatus* SimO3PipeStatus::GetROBStatus() const
+    {
+        return robStatus;
+    }
+
     inline void SimO3PipeStatus::SetFetchStatus(const SimStageStatus* status)
     {
         this->fetchStatus = status;
@@ -1698,6 +1920,11 @@ namespace VMC::RAT {
     inline void SimO3PipeStatus::SetExecutionStatus(const SimStageStatus* status)
     {
         this->executionStatus = status;
+    }
+
+    inline void SimO3PipeStatus::SetROBStatus(const SimStageStatus* status)
+    {
+        this->robStatus = status;
     }
 };
 
@@ -2127,11 +2354,13 @@ namespace VMC::RAT {
     SimReservation::SimReservation(const SimScoreboard* scoreboard)
         : scoreboard(scoreboard)
         , entries   (list<Entry>())
+        , next      (entries.end())
     { }
 
     SimReservation::SimReservation(const SimReservation& obj)
         : scoreboard(obj.scoreboard)
         , entries   (obj.entries)
+        , next      (entries.end())
     { }
 
     SimReservation::~SimReservation()
@@ -2213,7 +2442,10 @@ namespace VMC::RAT {
         while (iter != entries.end())
         {
             if (iter->IsReady())
+            {
+                iter++;
                 continue;
+            }
 
             if (!iter->IsSrc1Ready() && !scoreboard->IsBusy(iter->GetSrc1()))
                 iter->SetSrc1Ready();
@@ -2223,6 +2455,8 @@ namespace VMC::RAT {
 
             if (!iter->IsDstReady() && !scoreboard->IsBusy(iter->GetDst()))
                 iter->SetDstReady();
+
+            iter++;
         }
 
         // always keep the next instruction oldest
@@ -2240,6 +2474,15 @@ namespace VMC::RAT {
     int                     delay;
     uint64_t                dstval;
     */
+
+    SimExecution::Entry::Entry()
+        : insn      ()
+        , src1val   (0)
+        , src2val   (0)
+        , delay     (0)
+        , dstrdy    (false)
+        , dstval    (0)
+    { }
 
     SimExecution::Entry::Entry(const SimInstruction& insn)
         : insn      (insn)
