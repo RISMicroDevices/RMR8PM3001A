@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <fstream>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -102,11 +103,12 @@ namespace VMC {
 
     
     //
-    bool Next(VMCHandle handle, std::istream& is)
+    bool Next(VMCHandle handle, std::istream& is, bool continuous = false)
     {
         std::string cmdline;
 
-        std::cout << "#" << handle->name << "> ";
+        if (!continuous)
+            std::cout << "#" << handle->name << "> ";
         std::getline(is, cmdline);
 
         //
@@ -150,6 +152,11 @@ namespace VMC {
         while (iss.good())
         {
             std::getline(iss, param, ' ');
+
+            // erase line-splits
+            int pos;
+            while ((pos = param.find('\r')) != std::string::npos || (pos = param.find('\n')) != std::string::npos)
+                param.erase(pos, 1);
 
             if (!param.empty())
                 params.push_back(param);
@@ -200,6 +207,7 @@ namespace VMC::Basic {
     std::cout << "Basic command usages:" << std::endl; \
     std::cout << "- version                           Display version of VMC console " << std::endl; \
     std::cout << "- exit                              Exit VMC console               " << std::endl; \
+    std::cout << "- exec <filename>                   Execute VMC script file        " << std::endl; \
     std::cout << "- echo <content...>                 Display information on console " << std::endl; \
     std::cout << "- setbool [name] [value] [-N]       Set or list boolean variables  " << std::endl; \
     std::cout << "- movbool <dst> <src> [-N]          Get boolean variable           " << std::endl; \
@@ -236,6 +244,25 @@ namespace VMC::Basic {
                             const std::vector<std::string>& params)
     {
         exit(EXIT_SUCCESS);
+        return true;
+    }
+
+    bool Exec(void* handle, const std::string& cmd, 
+                            const std::string& paramline, 
+                            const std::vector<std::string>& params)
+    {
+        std::ifstream ifs(paramline);
+
+        if (!ifs)
+        {
+            std::cout << "exec: failed to open file" << std::endl;
+            return false;
+        }
+
+        while (Next((VMCHandle) handle, ifs, true));
+
+        ifs.close();
+
         return true;
     }
 
@@ -598,6 +625,7 @@ namespace VMC::Basic {
         RegisterCommand(handle, VMC::CommandHandler { std::string("rem")    , &Nop     });
         RegisterCommand(handle, VMC::CommandHandler { std::string("version"), &Version });
         RegisterCommand(handle, VMC::CommandHandler { std::string("exit")   , &Exit });
+        RegisterCommand(handle, VMC::CommandHandler { std::string("exec")   , &Exec });
         RegisterCommand(handle, VMC::CommandHandler { std::string("echo")   , &Echo }); 
         RegisterCommand(handle, VMC::CommandHandler { std::string("setbool"), &SetBool });
         RegisterCommand(handle, VMC::CommandHandler { std::string("movbool"), &MovBool });
