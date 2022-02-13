@@ -563,6 +563,9 @@ namespace MEMU::Core::Issue {
 
     void RegisterAliasTable::Invalidate(int ARF)
     {
+        if (!ARF)
+            return;
+
         for (int i = 0; i < rat_size; i++)
             if (entries[i].GetARF() == ARF)
             {
@@ -578,6 +581,9 @@ namespace MEMU::Core::Issue {
 
     void RegisterAliasTable::Release(int ARF)
     {
+        if (!ARF)
+            return;
+
         for (int i = 0; i < rat_size; i++)
             if (entries[i].GetARF() == ARF)
             {
@@ -593,6 +599,9 @@ namespace MEMU::Core::Issue {
 
     void RegisterAliasTable::InvalidateAndRelease(int ARF)
     {
+        if (!ARF)
+            return;
+
         bool invalidated;
 
         for (int i = 0; i < rat_size; i++)
@@ -630,6 +639,9 @@ namespace MEMU::Core::Issue {
 
     bool RegisterAliasTable::Touch(bool FV, int FID, int ARF, int* PRF)
     {
+        if (!ARF)
+            return true;
+
         int index = GetNextEntry();
 
         if (index < 0)
