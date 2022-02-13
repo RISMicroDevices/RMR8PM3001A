@@ -527,6 +527,9 @@ namespace MEMU::Core::Issue {
 
     int RegisterAliasTable::GetAliasPRF(int arf)
     {
+        if (!arf)
+            return -1;
+
         for (int i = 0; i < rat_size; i++)
             if (entries[i].GetValid() && (entries[i].GetARF() == arf))
                 return entries[i].GetPRF();
