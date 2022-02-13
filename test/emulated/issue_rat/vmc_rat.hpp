@@ -556,6 +556,274 @@ namespace VMC::RAT {
     }
 
     //
+    bool EvalRefFetchInternal(SimHandle csim, bool info, int step)
+    {
+        if (csim->RefFetch.IsEmpty())
+        {
+            csim->RefStatus.SetFetchStatus(&STAGE_STATUS_IDLE);
+
+            if (info)
+                printf("[ %8d ] RefFetch: Fetch queue empty.\n", step);
+
+            return true;
+        }
+
+        if (!csim->RefReservation.IsEmpty())
+        {
+            csim->RefStatus.SetFetchStatus(&STAGE_STATUS_WAIT);
+
+            if (info)
+                printf("[ %8d ] RefFetch: Fetch queue wait for reserved issue.\n", step);
+
+            return true;
+        }
+
+        //
+        SimInstruction insn;
+
+        if (!csim->RefFetch.NextInsn(&insn))
+        {
+            ShouldNotReachHere(" RAT::EvalRefFetch ILLEGAL_STATE #FetchFail");
+            return false;
+        }
+
+        //
+        csim->RefReservation.PushInsn(insn);
+        
+        csim->RefFetch.PopInsn();
+
+        csim->RefStatus.SetFetchStatus(&STAGE_STATUS_BUSY);
+
+        if (info)
+            printf("[ %8d ] RefFetch: Instruction fetched, passed to issue. FID: %d.\n", step, insn.GetFID());
+
+        return true;
+    }
+
+    inline bool EvalRefFetch(SimHandle csim, bool info, int step = 0)
+    {
+        return EvalRefFetchInternal(csim, info, step);
+    }
+
+    bool EvalRefIssueInternal(SimHandle csim, bool info, int step)
+    {
+        if (csim->RefReservation.IsEmpty())
+        {
+            csim->RefStatus.SetReservationStatus(&STAGE_STATUS_IDLE);
+
+            if (info)
+                printf("[ %8d ] RefIssue: Issue queue empty.\n", step);
+
+            return true;
+        }
+
+        //
+        SimInstruction insn;
+
+        if (!csim->RefReservation.NextInsn(&insn))
+        {
+            csim->RefStatus.SetReservationStatus(&STAGE_STATUS_WAIT);
+
+            if (info)
+                printf("[ %8d ] RefIssue: Issue pause on scoreboard. ARF not ready.\n", step);
+
+            return true;
+        }
+
+        //
+        csim->RefExecution.PushInsn(insn);
+        csim->RefScoreboard.SetBusy(insn.GetDst(), insn.GetFID());
+
+        if (!csim->RefReservation.PopInsn())
+        {
+            ShouldNotReachHere(" RAT::EvalRefIssue ILLEGAL_STATE #ReservationPopFail");
+            return false;
+        }
+
+        csim->RefStatus.SetReservationStatus(&STAGE_STATUS_BUSY);
+
+        if (info)
+            printf("[ %8d ] RefIssue: Instruction issued. FID: %d.\n", step, insn.GetFID());
+
+        return true;
+    }
+
+    inline bool EvalRefIssue(SimHandle csim, bool info, int step = 0)
+    {
+        // Eval ahead, bypass exists
+        csim->RefReservation.Eval();
+
+        return EvalRefIssueInternal(csim, info, step);
+    }
+
+    bool EvalRefWritebackInternal(SimHandle csim, bool info, int step)
+    {
+        if (csim->RefExecution.IsEmpty())
+        {
+            csim->RefStatus.SetExecutionStatus(&STAGE_STATUS_IDLE);
+
+            if (info)
+                printf("[ %8d ] RefWriteback: Execution unit empty.\n", step);
+
+            return true;
+        }
+
+
+        //
+        SimExecution::Entry entry;
+
+        if (!csim->RefExecution.NextInsn(&entry))
+        {
+            csim->RefStatus.SetExecutionStatus(&STAGE_STATUS_BUSY);
+
+            if (info)
+                printf("[ %8d ] RefWriteback: Instruction writeback not ready.\n", step);
+
+            return true;
+        }
+
+        const SimInstruction& insn = entry.GetInsn();
+
+        //
+        SetRefARF(csim, insn.GetDst(), entry.GetDstValue());
+
+        if (!csim->RefExecution.PopInsn())
+        {
+            ShouldNotReachHere(" RAT::EvalRefWriteback ILLEGAL_STATE #ExecutionPopFail");
+            return false;
+        }
+
+        csim->RefScoreboard.Release(insn.GetFID());
+
+        csim->RefStatus.SetExecutionStatus(&STAGE_STATUS_BUSY);
+
+        if (info)
+            printf("[ %8d ] RefWriteback: FID #%d written-back. DstARF #%d.\n", step, insn.GetFID(), insn.GetDst());
+
+        return true;
+    }
+
+    inline bool EvalRefWriteback(SimHandle csim, bool info, int step = 0)
+    {
+        bool result = EvalRefWritebackInternal(csim, info, step);
+
+        // Eval later, always delayed
+        csim->RefExecution.Eval();
+
+        return result;
+    }
+
+
+    inline bool EvalO3FetchInternal(SimHandle csim, bool info, int step)
+    {
+        if (csim->O3Fetch.IsEmpty())
+        {
+            csim->O3Status.SetFetchStatus(&STAGE_STATUS_IDLE);
+
+            if (info)
+                printf("[ %8d ] O3Fetch: Fetch queue empty.\n", step);
+
+            return true;
+        }
+
+        //
+        SimInstruction insn;
+
+        if (!csim->O3Fetch.NextInsn(&insn))
+        {
+            ShouldNotReachHere(" RAT::EvalO3Fetch ILLEGAL_STATE #FetchFail");
+            return false;
+        }
+
+        // Get src PRFs
+        int src1prf = csim->O3RAT.GetAliasPRF(insn.GetSrc1());
+        int src2prf = csim->O3RAT.GetAliasPRF(insn.GetSrc2());
+
+        // Try to allocate RAT entry
+        int dstprf = -1;
+        
+        if (!csim->O3RAT.Touch(insn.GetFID(), insn.GetDst(), &dstprf))
+        {
+            csim->O3Status.SetFetchStatus(&STAGE_STATUS_WAIT);
+
+            if (info)
+                printf("[ %8d ] O3Fetch: Wait on FID #%d. RAT not available.\n", info, insn.GetFID());
+
+            return true;
+        }
+
+        // Re-write/modify instruction after RAT
+        insn.SetSrc1(src1prf);
+        insn.SetSrc2(src2prf);
+        insn.SetDst(dstprf);
+
+        // 
+        csim->O3Reservation.PushInsn(insn);
+
+        csim->O3Fetch.PopInsn();
+
+        csim->O3Status.SetFetchStatus(&STAGE_STATUS_BUSY);
+
+        if (info)
+            printf("[ %8d ] O3Fetch: Instruction fetched and renamed, passed to reseravtion. FID #%d.\n", step, insn.GetFID());
+
+        return true;
+    }
+
+
+    inline bool EvalO3Issue(SimHandle csim, bool info, int step)
+    {
+        // TODO
+
+        return true;
+    }
+
+    inline bool EvalO3Writeback(SimHandle csim, bool info, int step)
+    {
+        // TODO
+
+        return true;
+    }
+
+    inline bool EvalO3Commit(SimHandle csim, bool info, int step)
+    {
+        // TODO
+
+        return true;
+    }
+
+
+    inline void DispRefStatus(SimHandle csim)
+    {
+        std::cout << "Ref:";
+        std::cout << " Fetch[" << csim->RefStatus.GetFetchStatus()->GetString()       << "]";
+        std::cout << " Issue[" << csim->RefStatus.GetReservationStatus()->GetString() << "]";
+        std::cout << " EX/WB[" << csim->RefStatus.GetExecutionStatus()->GetString()   << "]" << std::endl;
+    }
+
+    inline bool IsRefAllIdle(SimHandle csim)
+    {
+        return (&STAGE_STATUS_IDLE == csim->RefStatus.GetFetchStatus())
+            && (&STAGE_STATUS_IDLE == csim->RefStatus.GetReservationStatus())
+            && (&STAGE_STATUS_IDLE == csim->RefStatus.GetExecutionStatus());
+    }
+
+    inline void DispO3Status(SimHandle csim)
+    {
+        std::cout << "O3: ";
+        std::cout << " Fetch[" << csim->O3Status.GetFetchStatus()->GetString()       << "]";
+        std::cout << " Issue[" << csim->O3Status.GetReservationStatus()->GetString() << "]";
+        std::cout << " EX/WB[" << csim->O3Status.GetExecutionStatus()->GetString()   << "]";
+        std::cout << " ROB["   << csim->O3Status.GetROBStatus()->GetString()         << "]" << std::endl;
+    }
+
+    inline bool IsO3AllIdle(SimHandle csim)
+    {
+        return (&STAGE_STATUS_IDLE == csim->O3Status.GetFetchStatus())
+            && (&STAGE_STATUS_IDLE == csim->O3Status.GetReservationStatus())
+            && (&STAGE_STATUS_IDLE == csim->O3Status.GetExecutionStatus())
+            && (&STAGE_STATUS_IDLE == csim->O3Status.GetROBStatus());
+    }
 }
 
 
@@ -1449,225 +1717,6 @@ namespace VMC::RAT {
         return true;
     }
 
-    bool EvalRefFetchInternal(SimHandle csim, bool info, int step)
-    {
-        if (csim->RefFetch.IsEmpty())
-        {
-            csim->RefStatus.SetFetchStatus(&STAGE_STATUS_IDLE);
-
-            if (info)
-                printf("[ %8d ] RefFetch: Fetch queue empty.\n", step);
-
-            return true;
-        }
-
-        if (!csim->RefReservation.IsEmpty())
-        {
-            csim->RefStatus.SetFetchStatus(&STAGE_STATUS_WAIT);
-
-            if (info)
-                printf("[ %8d ] RefFetch: Fetch queue wait for reserved issue.\n", step);
-
-            return true;
-        }
-
-        //
-        SimInstruction insn;
-
-        if (!csim->RefFetch.NextInsn(&insn))
-        {
-            ShouldNotReachHere(" RAT::EvalRefFetch ILLEGAL_STATE #FetchFail");
-            return false;
-        }
-
-        //
-        csim->RefReservation.PushInsn(insn);
-        
-        csim->RefFetch.PopInsn();
-
-        csim->RefStatus.SetFetchStatus(&STAGE_STATUS_BUSY);
-
-        if (info)
-            printf("[ %8d ] RefFetch: Instruction fetched, passed to issue. FID: %d.\n", step, insn.GetFID());
-
-        return true;
-    }
-
-    inline bool EvalRefFetch(SimHandle csim, bool info, int step = 0)
-    {
-        return EvalRefFetchInternal(csim, info, step);
-    }
-
-    bool EvalRefIssueInternal(SimHandle csim, bool info, int step)
-    {
-        if (csim->RefReservation.IsEmpty())
-        {
-            csim->RefStatus.SetReservationStatus(&STAGE_STATUS_IDLE);
-
-            if (info)
-                printf("[ %8d ] RefIssue: Issue queue empty.\n", step);
-
-            return true;
-        }
-
-        //
-        SimInstruction insn;
-
-        if (!csim->RefReservation.NextInsn(&insn))
-        {
-            csim->RefStatus.SetReservationStatus(&STAGE_STATUS_WAIT);
-
-            if (info)
-                printf("[ %8d ] RefIssue: Issue pause on scoreboard. ARF not ready.\n", step);
-
-            return true;
-        }
-
-        //
-        csim->RefExecution.PushInsn(insn);
-        csim->RefScoreboard.SetBusy(insn.GetDst(), insn.GetFID());
-
-        if (!csim->RefReservation.PopInsn())
-        {
-            ShouldNotReachHere(" RAT::EvalRefIssue ILLEGAL_STATE #ReservationPopFail");
-            return false;
-        }
-
-        csim->RefStatus.SetReservationStatus(&STAGE_STATUS_BUSY);
-
-        if (info)
-            printf("[ %8d ] RefIssue: Instruction issued. FID: %d.\n", step, insn.GetFID());
-
-        return true;
-    }
-
-    inline bool EvalRefIssue(SimHandle csim, bool info, int step = 0)
-    {
-        // Eval ahead, bypass exists
-        csim->RefReservation.Eval();
-
-        return EvalRefIssueInternal(csim, info, step);
-    }
-
-    bool EvalRefWritebackInternal(SimHandle csim, bool info, int step)
-    {
-        if (csim->RefExecution.IsEmpty())
-        {
-            csim->RefStatus.SetExecutionStatus(&STAGE_STATUS_IDLE);
-
-            if (info)
-                printf("[ %8d ] RefWriteback: Execution unit empty.\n", step);
-
-            return true;
-        }
-
-
-        //
-        SimExecution::Entry entry;
-
-        if (!csim->RefExecution.NextInsn(&entry))
-        {
-            csim->RefStatus.SetExecutionStatus(&STAGE_STATUS_BUSY);
-
-            if (info)
-                printf("[ %8d ] RefWriteback: Instruction writeback not ready.\n", step);
-
-            return true;
-        }
-
-        const SimInstruction& insn = entry.GetInsn();
-
-        //
-        SetRefARF(csim, insn.GetDst(), entry.GetDstValue());
-
-        if (!csim->RefExecution.PopInsn())
-        {
-            ShouldNotReachHere(" RAT::EvalRefWriteback ILLEGAL_STATE #ExecutionPopFail");
-            return false;
-        }
-
-        csim->RefScoreboard.Release(insn.GetFID());
-
-        csim->RefStatus.SetExecutionStatus(&STAGE_STATUS_BUSY);
-
-        if (info)
-            printf("[ %8d ] RefWriteback: FID #%d written-back. DstARF #%d.\n", step, insn.GetFID(), insn.GetDst());
-
-        return true;
-    }
-
-    inline bool EvalRefWriteback(SimHandle csim, bool info, int step = 0)
-    {
-        bool result = EvalRefWritebackInternal(csim, info, step);
-
-        // Eval later, always delayed
-        csim->RefExecution.Eval();
-
-        return result;
-    }
-
-
-    inline bool EvalO3Fetch(SimHandle csim, bool info, int step)
-    {
-        // TODO
-
-        return true;
-    }
-
-
-    inline bool EvalO3Issue(SimHandle csim, bool info, int step)
-    {
-        // TODO
-
-        return true;
-    }
-
-    inline bool EvalO3Writeback(SimHandle csim, bool info, int step)
-    {
-        // TODO
-
-        return true;
-    }
-
-    inline bool EvalO3Commit(SimHandle csim, bool info, int step)
-    {
-        // TODO
-
-        return true;
-    }
-
-
-    inline void DispRefStatus(SimHandle csim)
-    {
-        std::cout << "Ref:";
-        std::cout << " Fetch[" << csim->RefStatus.GetFetchStatus()->GetString()       << "]";
-        std::cout << " Issue[" << csim->RefStatus.GetReservationStatus()->GetString() << "]";
-        std::cout << " EX/WB[" << csim->RefStatus.GetExecutionStatus()->GetString()   << "]" << std::endl;
-    }
-
-    inline bool IsRefAllIdle(SimHandle csim)
-    {
-        return (&STAGE_STATUS_IDLE == csim->RefStatus.GetFetchStatus())
-            && (&STAGE_STATUS_IDLE == csim->RefStatus.GetReservationStatus())
-            && (&STAGE_STATUS_IDLE == csim->RefStatus.GetExecutionStatus());
-    }
-
-    inline void DispO3Status(SimHandle csim)
-    {
-        std::cout << "O3: ";
-        std::cout << " Fetch[" << csim->O3Status.GetFetchStatus()->GetString()       << "]";
-        std::cout << " Issue[" << csim->O3Status.GetReservationStatus()->GetString() << "]";
-        std::cout << " EX/WB[" << csim->O3Status.GetExecutionStatus()->GetString()   << "]";
-        std::cout << " ROB["   << csim->O3Status.GetROBStatus()->GetString()         << "]" << std::endl;
-    }
-
-    inline bool IsO3AllIdle(SimHandle csim)
-    {
-        return (&STAGE_STATUS_IDLE == csim->O3Status.GetFetchStatus())
-            && (&STAGE_STATUS_IDLE == csim->O3Status.GetReservationStatus())
-            && (&STAGE_STATUS_IDLE == csim->O3Status.GetExecutionStatus())
-            && (&STAGE_STATUS_IDLE == csim->O3Status.GetROBStatus());
-    }
 
     //
     bool __common_RAT0_DIFFSIM_INSN_EVAL(bool info, int step = 0)
@@ -1723,12 +1772,12 @@ namespace VMC::RAT {
     }
 
 
-    // rat0.diffsim.insn.eval.stepout [-NEQ|-T <count>]
+    // rat0.diffsim.insn.eval.stepout [-SF|-T <count>]
     bool _RAT0_DIFFSIM_INSN_EVAL_STEPOUT(void* handle, const std::string& cmd,
                                                        const std::string& paramline,
                                                        const std::vector<std::string>& params)
     {
-        // TODO: implement flag -NEQ, -T
+        // TODO: implement flag -SF if further debug required
 
         SimHandle csim = GetCurrentHandle();
 
@@ -1736,6 +1785,34 @@ namespace VMC::RAT {
         {
             std::cout << "Only support ARF0-conv mode." << std::endl;
             return false;
+        }
+
+        bool flagT = false;
+
+        int varT = 0;
+
+        for (int i = 0; i < params.size(); i++)
+        {
+            std::string param = params[i];
+
+            if (param.compare("-T") == 0)
+            {
+                if (i + 1 < params.size())
+                {
+                    flagT = true;
+                    std::istringstream(params[++i]) >> varT;
+                }
+                else
+                {
+                    std::cout << "Param " << i << " \'" << param << "\' needs more parameter(s)." << std::endl;
+                    return false;
+                }
+            }
+            else
+            {
+                std::cout << "Param " << i << " \'" << param << "\' is invalid." << std::endl;
+                return false;
+            }
         }
 
         int step = 0;
@@ -1762,6 +1839,14 @@ namespace VMC::RAT {
                 DispO3Status(csim);
 
                 printf("[ -------- ] --------------------------------\n");
+            }
+
+            if (flagT)
+            {
+                if (step < varT)
+                    continue;
+
+                break;
             }
         }
         while (!IsRefAllIdle(csim) || !IsO3AllIdle(csim));
@@ -1945,6 +2030,9 @@ namespace VMC::RAT {
 
     uint64_t SimRefARF::operator[](const int index) const
     {
+        if (index == -1)
+            return 0;
+
         return refARF[index];
     }
 }
@@ -1969,6 +2057,9 @@ namespace VMC::RAT {
 
     uint64_t SimO3ARF::operator[](const int index) const
     {
+        if (index == -1)
+            return 0;
+
         if (!index)
             return 0;
 
@@ -2210,6 +2301,9 @@ namespace VMC::RAT {
 
     inline bool SimScoreboard::IsBusy(int index) const
     {
+        if (index == -1)
+            return false;
+
         if (!index)
             return false;
 
@@ -2218,6 +2312,9 @@ namespace VMC::RAT {
 
     inline int SimScoreboard::GetFID(int index) const
     {
+        if (index == -1)
+            return -1;
+
         if (!index)
             return -1;
 
@@ -2229,10 +2326,11 @@ namespace VMC::RAT {
 
     inline void SimScoreboard::SetBusy(int index, int FID)
     {
-        /*
+        if (index == -1)
+            return;
+
         if (!index)
             return;
-        */
 
         this->busy[index] = true;
         this->FID[index]  = FID;
