@@ -327,6 +327,7 @@ namespace VMC::RAT {
             uint64_t        dstval;
 
         public:
+            Entry();
             Entry(const SimInstruction& insn);
             Entry(const Entry& obj);
             ~Entry();
@@ -668,7 +669,6 @@ namespace VMC::RAT {
             return true;
         }
 
-
         //
         SimExecution::Entry entry;
 
@@ -714,7 +714,7 @@ namespace VMC::RAT {
     }
 
 
-    inline bool EvalO3FetchInternal(SimHandle csim, bool info, int step)
+    bool EvalO3FetchInternal(SimHandle csim, bool info, int step)
     {
         if (csim->O3Fetch.IsEmpty())
         {
@@ -738,7 +738,7 @@ namespace VMC::RAT {
         // Get src PRFs
         int src1prf = csim->O3RAT.GetAliasPRF(insn.GetSrc1());
         int src2prf = csim->O3RAT.GetAliasPRF(insn.GetSrc2());
-
+        
         // Try to allocate RAT entry
         int dstprf = -1;
         
@@ -757,8 +757,9 @@ namespace VMC::RAT {
         insn.SetSrc2(src2prf);
         insn.SetDst(dstprf);
 
-        // 
+        // Push to issue queue and broadcast to ROB
         csim->O3Reservation.PushInsn(insn);
+        csim->O3ROB.TouchInsn(insn);
 
         csim->O3Fetch.PopInsn();
 
@@ -770,26 +771,184 @@ namespace VMC::RAT {
         return true;
     }
 
-
-    inline bool EvalO3Issue(SimHandle csim, bool info, int step)
+    inline bool EvalO3Fetch(SimHandle csim, bool info, int step = 0)
     {
-        // TODO
+        bool result = EvalO3FetchInternal(csim, info, step);
+
+        //csim->O3RAT.Eval();   moved to commit stage
+
+        return result;
+    }
+
+    bool EvalO3IssueInternal(SimHandle csim, bool info, int step)
+    {
+        if (csim->O3Reservation.IsEmpty())
+        {
+            csim->O3Status.SetReservationStatus(&STAGE_STATUS_IDLE);
+
+            if (info)
+                printf("[ %8d ] O3Issue: Issue queue empty.\n", step);
+
+            return true;
+        }
+
+        //
+        SimInstruction insn;
+
+        if (!csim->O3Reservation.NextInsn(&insn))
+        {
+            csim->O3Status.SetReservationStatus(&STAGE_STATUS_WAIT);
+
+            if (info)
+                printf("[ %8d ] O3Issue: Issue pause on scoreboard. PRF not ready.\n", step);
+
+            return true;
+        }
+
+        //
+        csim->O3Execution.PushInsn(insn);
+        csim->O3Scoreboard.SetBusy(insn.GetDst(), insn.GetFID());
+
+        if (!csim->O3Reservation.PopInsn())
+        {
+            ShouldNotReachHere(" RAT::EvalO3Issue ILLEGAL_STATE #ReservationPopFail");
+            return false;
+        }
+
+        csim->O3Status.SetReservationStatus(&STAGE_STATUS_BUSY);
+
+        if (info)
+            printf("[ %8d ] O3Issue: Instruction issued. FID: %d.\n", step, insn.GetFID());
 
         return true;
     }
 
-    inline bool EvalO3Writeback(SimHandle csim, bool info, int step)
+    inline bool EvalO3Issue(SimHandle csim, bool info, int step = 0)
     {
-        // TODO
+        // Eval ahead, bypass exists
+        csim->O3Reservation.Eval();
+
+        return EvalO3IssueInternal(csim, info, step);
+    }
+
+    bool EvalO3WritebackInternal(SimHandle csim, bool info, int step)
+    {
+        if (csim->O3Execution.IsEmpty())
+        {
+            csim->O3Status.SetExecutionStatus(&STAGE_STATUS_IDLE);
+            
+            if (info)
+                printf("[ %8d ] O3Writeback: Execution unit empty.\n", step);
+
+            return true;
+        }
+
+        //
+        SimExecution::Entry entry;
+
+        if (!csim->O3Execution.NextInsn(&entry))
+        {
+            csim->O3Status.SetExecutionStatus(&STAGE_STATUS_BUSY);
+
+            if (info)
+                printf("[ %8d ] O3Writeback: Instruction writeback not ready.\n", step);
+
+            return true;
+        }
+
+        const SimInstruction& insn = entry.GetInsn();
+
+        //
+        if (!csim->O3ROB.WritebackInsn(insn, entry.GetDstValue()))
+        {
+            ShouldNotReachHere(" RAT::EvalO3Writeback ILLEGAL_STATE #ROBWritebackFail");
+            return false;
+        }
+
+        csim->O3RAT.Writeback(insn.GetFID());
+
+        if (!csim->O3Execution.PopInsn())
+        {
+            ShouldNotReachHere(" RAT::EvalO3Writeback ILLEGAL_STATE #ExecutionPopFail");
+            return false;
+        }
+
+        csim->O3Status.SetExecutionStatus(&STAGE_STATUS_BUSY);
+
+        if (info)
+            printf("[ %8d ] O3Writeback: FID #%d written-back to ROB. DstARF #%d.\n", step, insn.GetFID(), insn.GetDst());
 
         return true;
     }
 
-    inline bool EvalO3Commit(SimHandle csim, bool info, int step)
+    inline bool EvalO3Writeback(SimHandle csim, bool info, int step = 0)
     {
-        // TODO
+        bool result = EvalO3WritebackInternal(csim, info, step);
+
+        // eval later, always delayed
+        csim->O3Execution.Eval();
+
+        return result;
+    }
+
+    bool EvalO3CommitInternal(SimHandle csim, bool info, int step)
+    {
+        if (csim->O3ROB.IsEmpty())
+        {
+            csim->O3Status.SetROBStatus(&STAGE_STATUS_IDLE);
+
+            if (info)
+                printf("[ %8d ] O3Commit: ROB empty.\n", step);
+
+            return true;
+        }
+
+        //
+        SimReOrderBuffer::Entry entry;
+
+        if (!csim->O3ROB.NextInsn(&entry))
+        {
+            csim->O3Status.SetROBStatus(&STAGE_STATUS_WAIT);
+            
+            if (info)
+                printf("[ %8d ] O3Commit: ROB wait for further writeback.\n", step);
+
+            return true;
+        }
+
+        const SimInstruction& insn = entry.GetInsn();
+
+        //
+        if (insn.GetDst() >= 0)
+            csim->O3PRF.Set(insn.GetDst(), entry.GetDstValue());
+
+        csim->O3Scoreboard.Release(insn.GetFID());
+
+        csim->O3RAT.Commit(insn.GetDst());
+
+        if (!csim->O3ROB.PopInsn())
+        {
+            ShouldNotReachHere(" RAT::EvalO3Commit ILLEGAL_STATE #ROBPopFail");
+            return false;
+        }
+
+        csim->O3Status.SetROBStatus(&STAGE_STATUS_BUSY);
+
+        if (info)
+            printf("[ %8d ] O3Commit: Instruction committed. FID: %d.\n", step, insn.GetFID());
 
         return true;
+    }
+
+    inline bool EvalO3Commit(SimHandle csim, bool info, int step = 0)
+    {
+        bool result = EvalO3CommitInternal(csim, info, step);
+
+        // eval later, always delayed
+        csim->O3RAT.Eval();
+        csim->O3PRF.Eval();
+
+        return result;
     }
 
 
@@ -1724,6 +1883,17 @@ namespace VMC::RAT {
         SimHandle csim = GetCurrentHandle();
 
         // O3 (out-of-order) datapath
+        if (!EvalO3Fetch(csim, info, step))
+            return false;
+
+        if (!EvalO3Issue(csim, info, step))
+            return false;
+
+        if (!EvalO3Writeback(csim, info, step))
+            return false;
+
+        if (!EvalO3Commit(csim, info, step))
+            return false;
         
 
         // Ref (in-order) datapath
@@ -2847,6 +3017,12 @@ namespace VMC::RAT {
     bool            rdy;
     uint64_t        dstval;
     */
+
+    SimReOrderBuffer::Entry::Entry()
+        : insn      ()
+        , rdy       (false)
+        , dstval    (0)
+    { }
 
     SimReOrderBuffer::Entry::Entry(const SimInstruction& insn)
         : insn      (insn)
