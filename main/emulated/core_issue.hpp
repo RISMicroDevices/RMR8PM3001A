@@ -48,6 +48,8 @@ namespace MEMU::Core::Issue {
     public:
         class Entry {
         private:
+            int     FID;   // Instruction Fetch ID
+            bool    FV;    // Instruction On-flight Valid !!Removal Consideration!!
             bool    NRA;   // Not reallocate-able Flag
 
             int     PRF;   // PRF (Physical Register File) address
@@ -61,11 +63,15 @@ namespace MEMU::Core::Issue {
 
             void        Clear();
 
+            int         GetFID() const;
+            bool        GetFV() const; // !!Removal Consideration!!
             bool        GetNRA() const;
             int         GetPRF() const;
             int         GetARF() const;
             bool        GetValid() const;
 
+            void        SetFID(int val);
+            void        SetFV(bool val); // !!Removal Consideration!!
             void        SetNRA(bool val);
             void        SetPRF(int val);
             void        SetARF(int val);
@@ -134,8 +140,8 @@ namespace MEMU::Core::Issue {
         int                 GetNextEntry() const;
         void                Invalidate(int ARF);
         void                InvalidateAndRelease(int ARF);
-        void                Release(int ARF);
-        bool                Touch(bool FV, int ARF, int* PRF);
+        void                LandAndRelease(int ARF);
+        bool                Touch(bool FV, int FID, int ARF, int* PRF);
 
     public:
         RegisterAliasTable();
@@ -156,9 +162,11 @@ namespace MEMU::Core::Issue {
         void                    Clear();
         bool                    IsFull() const;
 
-        bool                    Touch(int ARF, int* PRF = 0);
-        void                    Commit(int ARF);
-        bool                    TouchAndCommit(int ARF, int* PRF = 0);
+        bool                    Touch(int FID, int ARF, int* PRF = 0);
+        void                    Writeback(int PRF);
+        void                    Commit(int PRF);
+        bool                    TouchAndWriteback(int FID, int ARF, int* PRF = 0);
+        bool                    TouchAndCommit(int FID, int ARF, int* PRF = 0);
 
         void                    WriteCheckpoint(int GC);
 
@@ -224,6 +232,8 @@ namespace MEMU::Core::Issue {
 // class MEMU::Core::Issue::RegisterAliasTable::Entry
 namespace MEMU::Core::Issue {
     /*
+    int     FID;
+    bool    FV;
     bool    NRA;
 
     int     PRF;
@@ -232,14 +242,18 @@ namespace MEMU::Core::Issue {
     */
 
     RegisterAliasTable::Entry::Entry()
-        : NRA   (false)
+        : FID   (0)
+        , FV    (false)
+        , NRA   (false)
         , PRF   (0)
         , ARF   (0)
         , V     (false)
     { }
 
     RegisterAliasTable::Entry::Entry(const RegisterAliasTable::Entry& obj)
-        : NRA   (obj.NRA)
+        : FID   (obj.FID)
+        , FV    (obj.FV)
+        , NRA   (obj.NRA)
         , PRF   (obj.PRF)
         , ARF   (obj.ARF)
         , V     (obj.V)
@@ -250,10 +264,22 @@ namespace MEMU::Core::Issue {
 
     void RegisterAliasTable::Entry::Clear()
     {
+        FID = 0;
+        FV  = false;
         NRA = false;
         PRF = 0;
         ARF = 0;
         V   = false;
+    }
+
+    inline int RegisterAliasTable::Entry::GetFID() const
+    {
+        return FID;
+    }
+
+    inline bool RegisterAliasTable::Entry::GetFV() const
+    {
+        return FV;
     }
 
     inline bool RegisterAliasTable::Entry::GetNRA() const
@@ -274,6 +300,16 @@ namespace MEMU::Core::Issue {
     inline bool RegisterAliasTable::Entry::GetValid() const
     {
         return V;
+    }
+
+    inline void RegisterAliasTable::Entry::SetFID(int val)
+    {
+        FID = val;
+    }
+
+    inline void RegisterAliasTable::Entry::SetFV(bool val)
+    {
+        FV = val;
     }
 
     inline void RegisterAliasTable::Entry::SetNRA(bool val)
@@ -308,6 +344,8 @@ namespace MEMU::Core::Issue {
 
     void RegisterAliasTable::Entry::operator=(const RegisterAliasTable::Entry& obj)
     {
+        FID = obj.FID;
+        FV = obj.FV;
         NRA = obj.NRA;
         PRF = obj.PRF;
         ARF = obj.ARF;
@@ -489,6 +527,7 @@ namespace MEMU::Core::Issue {
         if (!arf)
             return -1;
 
+        // PRF Query CAM
         for (int i = 0; i < rat_size; i++)
             if (entries[i].GetValid() && (entries[i].GetARF() == arf))
                 return entries[i].GetPRF();
@@ -516,6 +555,7 @@ namespace MEMU::Core::Issue {
 
     int RegisterAliasTable::GetNextEntry() const
     {
+        // Selection tree.
         for (int i = 0; i < rat_size; i++)
             if (!entries[i].GetNRA())
                 return i;
@@ -525,11 +565,14 @@ namespace MEMU::Core::Issue {
 
     void RegisterAliasTable::Invalidate(int ARF)
     {
+        // pre-touch
         // no self-existence
 
         if (!ARF)
             return;
 
+        // Invalidate all other same-ARF entries.
+        // Should be implemented with a CAM in actual circuit.
         for (int i = 0; i < rat_size; i++)
             if (entries[i].GetValid() && entries[i].GetARF() == ARF)
             {
@@ -538,21 +581,32 @@ namespace MEMU::Core::Issue {
 
                 modified.push_back(EntryModification(i, entry));
 
-                // *NOTICE: Break on invalidation, multiple V is fault, keep it.
-                //          Only matters in simulation situation.
+                // *NOTICE: Break on invalidation, multiple V is fault, keep it
+                //          Only in simulation situation.
                 break;
             }
     }
 
-    void RegisterAliasTable::Release(int ARF)
+    void RegisterAliasTable::LandAndRelease(int PRF)
     {
+        // post-touch
         // self-existence
 
-        if (!ARF)
-            return;
+        // In actual circuit design, ARF and PRF info can be passed through the 
+        // inter-pipeline datapath. There is no need to implement another ARF
+        // query CAM circuit.
+        Entry self = entries[PRF];
+        
+        int ARF = self.GetARF();
+        
+        // Land: Set FV to false
+        self.SetFV(false);
 
+        modified.push_back(EntryModification(PRF, self));
+
+        // Release: Set NRA of all non-FV same-ARF entries to false
         for (int i = 0; i < rat_size; i++)
-            if (!entries[i].GetValid() && entries[i].GetARF() == ARF)
+            if (!entries[i].GetFV() && entries[i].GetARF() == ARF)
             {
                 Entry entry = entries[i];
                 entry.SetNRA(false);
@@ -566,7 +620,9 @@ namespace MEMU::Core::Issue {
 
     void RegisterAliasTable::InvalidateAndRelease(int ARF)
     {
-        // no self-existence
+        // no self-existence, 0 clk on-flight
+
+        // This circumstance only exists in simulation.
 
         if (!ARF)
             return;
@@ -592,7 +648,7 @@ namespace MEMU::Core::Issue {
             }
     }
 
-    bool RegisterAliasTable::Touch(bool FV, int ARF, int* PRF)
+    bool RegisterAliasTable::Touch(bool FV, int FID, int ARF, int* PRF)
     {
         if (!ARF)
             return true;
@@ -610,6 +666,8 @@ namespace MEMU::Core::Issue {
 
         // Pre-touch means instruction on flight
         Entry entry = entries[index];
+        entry.SetFID    (FID);
+        entry.SetFV     (FV);
         entry.SetNRA    (true);
         entry.SetARF    (ARF);
         entry.SetValid  (true);
@@ -623,19 +681,29 @@ namespace MEMU::Core::Issue {
         return true;
     }
 
-    inline bool RegisterAliasTable::Touch(int ARF, int* PRF)
+    inline bool RegisterAliasTable::Touch(int FID, int ARF, int* PRF)
     {
-        return Touch(true, ARF, PRF);
+        return Touch(true, FID, ARF, PRF);
     }
 
-    void RegisterAliasTable::Commit(int ARF)
+    void RegisterAliasTable::Writeback(int PRF)
     {
-        Release(ARF);
+        // nothing need to be done in RAT
     }
 
-    bool RegisterAliasTable::TouchAndCommit(int ARF, int* PRF)
+    void RegisterAliasTable::Commit(int PRF)
     {
-        return Touch(false, ARF, PRF);
+        LandAndRelease(PRF);
+    }
+
+    bool RegisterAliasTable::TouchAndWriteback(int FID, int ARF, int* PRF)
+    {
+        return Touch(true, FID, ARF, PRF);
+    }
+
+    bool RegisterAliasTable::TouchAndCommit(int FID, int ARF, int* PRF)
+    {
+        return Touch(false, FID, ARF, PRF);
     }
 
     void RegisterAliasTable::WriteCheckpoint(int GC)
