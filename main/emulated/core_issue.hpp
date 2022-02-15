@@ -164,10 +164,8 @@ namespace MEMU::Core::Issue {
         bool                    IsFull() const;
 
         bool                    Touch(int FID, int ARF, int* PRF = 0);
-        bool                    TouchOnFlight(int FID, int ARF, int* PRF = 0);
         void                    Writeback(int FID);
         void                    Commit(int ARF);
-        bool                    CommitFID(int FID);
         bool                    TouchAndWriteback(int FID, int ARF, int* PRF = 0);
         bool                    TouchAndCommit(int FID, int ARF, int* PRF = 0);
 
@@ -566,29 +564,34 @@ namespace MEMU::Core::Issue {
 
     void RegisterAliasTable::Invalidate(int ARF)
     {
+        // no self-existence
+
         if (!ARF)
             return;
 
         for (int i = 0; i < rat_size; i++)
-            if (entries[i].GetARF() == ARF)
+            if (entries[i].GetValid() && entries[i].GetARF() == ARF)
             {
                 Entry entry = entries[i];
                 entry.SetValid(false);
 
                 modified.push_back(EntryModification(i, entry));
 
-                // *NOTICE: Break on invalidation, multiple V is fault, keep it
+                // *NOTICE: Break on invalidation, multiple V is fault, keep it.
+                //          Only matters in simulation situation.
                 break;
             }
     }
 
     void RegisterAliasTable::Release(int ARF)
     {
+        // self-existence
+
         if (!ARF)
             return;
 
         for (int i = 0; i < rat_size; i++)
-            if (entries[i].GetARF() == ARF)
+            if (!entries[i].GetValid() && entries[i].GetARF() == ARF)
             {
                 Entry entry = entries[i];
                 entry.SetNRA(false);
@@ -602,6 +605,8 @@ namespace MEMU::Core::Issue {
 
     void RegisterAliasTable::InvalidateAndRelease(int ARF)
     {
+        // no self-existence
+
         if (!ARF)
             return;
 
@@ -612,7 +617,7 @@ namespace MEMU::Core::Issue {
             {
                 Entry entry = entries[i];
                 
-                if (!invalidated)
+                if (!invalidated && entry.GetValid())
                 {
                     entry.SetValid(false);
                     invalidated = true;
@@ -675,11 +680,6 @@ namespace MEMU::Core::Issue {
 
     inline bool RegisterAliasTable::Touch(int FID, int ARF, int* PRF)
     {
-        return Touch(false, FID, ARF, PRF);
-    }
-
-    inline bool RegisterAliasTable::TouchOnFlight(int FID, int ARF, int* PRF)
-    {
         return Touch(true, FID, ARF, PRF);
     }
 
@@ -693,40 +693,14 @@ namespace MEMU::Core::Issue {
         Release(ARF);
     }
 
-    /* DEPRECATED */
-    bool RegisterAliasTable::CommitFID(int FID)
-    {
-        int ARF = -1;
-
-        for (int i = 0; i < rat_size; i++)
-            if (entries[i].GetFID() == FID && entries[i].GetNRA())
-            {
-                ARF = i;
-                break;
-            }
-
-        if (ARF == -1)
-            return false;
-
-        Release(ARF);
-
-        return true;
-    }
-
     bool RegisterAliasTable::TouchAndWriteback(int FID, int ARF, int* PRF)
     {
-        if (!Touch(false, FID, ARF, PRF))
-            return false;
-
-        return true;
+        return Touch(true, FID, ARF, PRF);
     }
 
     bool RegisterAliasTable::TouchAndCommit(int FID, int ARF, int* PRF)
     {
-        if (!Touch(false, FID, ARF, PRF))
-            return false;
-
-        return true;
+        return Touch(false, FID, ARF, PRF);
     }
 
     void RegisterAliasTable::WriteCheckpoint(int GC)
