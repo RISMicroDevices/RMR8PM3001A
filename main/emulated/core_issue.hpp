@@ -48,8 +48,6 @@ namespace MEMU::Core::Issue {
     public:
         class Entry {
         private:
-            int     FID;   // Instruction Fetch ID
-            bool    FV;    // Instruction On-flight Valid !!Removal Consideration!!
             bool    NRA;   // Not reallocate-able Flag
 
             int     PRF;   // PRF (Physical Register File) address
@@ -63,15 +61,11 @@ namespace MEMU::Core::Issue {
 
             void        Clear();
 
-            int         GetFID() const;
-            bool        GetFV() const; // !!Removal Consideration!!
             bool        GetNRA() const;
             int         GetPRF() const;
             int         GetARF() const;
             bool        GetValid() const;
 
-            void        SetFID(int val);
-            void        SetFV(bool val); // !!Removal Consideration!!
             void        SetNRA(bool val);
             void        SetPRF(int val);
             void        SetARF(int val);
@@ -140,9 +134,8 @@ namespace MEMU::Core::Issue {
         int                 GetNextEntry() const;
         void                Invalidate(int ARF);
         void                InvalidateAndRelease(int ARF);
-        void                Land(int ARF);
         void                Release(int ARF);
-        bool                Touch(bool FV, int FID, int ARF, int* PRF);
+        bool                Touch(bool FV, int ARF, int* PRF);
 
     public:
         RegisterAliasTable();
@@ -163,11 +156,9 @@ namespace MEMU::Core::Issue {
         void                    Clear();
         bool                    IsFull() const;
 
-        bool                    Touch(int FID, int ARF, int* PRF = 0);
-        void                    Writeback(int FID);
+        bool                    Touch(int ARF, int* PRF = 0);
         void                    Commit(int ARF);
-        bool                    TouchAndWriteback(int FID, int ARF, int* PRF = 0);
-        bool                    TouchAndCommit(int FID, int ARF, int* PRF = 0);
+        bool                    TouchAndCommit(int ARF, int* PRF = 0);
 
         void                    WriteCheckpoint(int GC);
 
@@ -233,8 +224,6 @@ namespace MEMU::Core::Issue {
 // class MEMU::Core::Issue::RegisterAliasTable::Entry
 namespace MEMU::Core::Issue {
     /*
-    int     FID;
-    bool    FV;
     bool    NRA;
 
     int     PRF;
@@ -243,18 +232,14 @@ namespace MEMU::Core::Issue {
     */
 
     RegisterAliasTable::Entry::Entry()
-        : FID   (0)
-        , FV    (false)
-        , NRA   (false)
+        : NRA   (false)
         , PRF   (0)
         , ARF   (0)
         , V     (false)
     { }
 
     RegisterAliasTable::Entry::Entry(const RegisterAliasTable::Entry& obj)
-        : FID   (obj.FID)
-        , FV    (obj.FV)
-        , NRA   (obj.NRA)
+        : NRA   (obj.NRA)
         , PRF   (obj.PRF)
         , ARF   (obj.ARF)
         , V     (obj.V)
@@ -265,22 +250,10 @@ namespace MEMU::Core::Issue {
 
     void RegisterAliasTable::Entry::Clear()
     {
-        FID = 0;
-        FV  = false;
         NRA = false;
         PRF = 0;
         ARF = 0;
         V   = false;
-    }
-
-    inline int RegisterAliasTable::Entry::GetFID() const
-    {
-        return FID;
-    }
-
-    inline bool RegisterAliasTable::Entry::GetFV() const
-    {
-        return FV;
     }
 
     inline bool RegisterAliasTable::Entry::GetNRA() const
@@ -301,16 +274,6 @@ namespace MEMU::Core::Issue {
     inline bool RegisterAliasTable::Entry::GetValid() const
     {
         return V;
-    }
-
-    inline void RegisterAliasTable::Entry::SetFID(int val)
-    {
-        FID = val;
-    }
-
-    inline void RegisterAliasTable::Entry::SetFV(bool val)
-    {
-        FV = val;
     }
 
     inline void RegisterAliasTable::Entry::SetNRA(bool val)
@@ -345,8 +308,6 @@ namespace MEMU::Core::Issue {
 
     void RegisterAliasTable::Entry::operator=(const RegisterAliasTable::Entry& obj)
     {
-        FID = obj.FID;
-        FV = obj.FV;
         NRA = obj.NRA;
         PRF = obj.PRF;
         ARF = obj.ARF;
@@ -631,21 +592,7 @@ namespace MEMU::Core::Issue {
             }
     }
 
-    void RegisterAliasTable::Land(int FID)
-    {
-        for (int i = 0; i < rat_size; i++)
-            if (entries[i].GetFID() == FID && entries[i].GetFV())
-            {
-                Entry entry = entries[i];
-                entry.SetFV(false);
-
-                modified.push_back(EntryModification(i, entry));
-
-                break;
-            }
-    }
-
-    bool RegisterAliasTable::Touch(bool FV, int FID, int ARF, int* PRF)
+    bool RegisterAliasTable::Touch(bool FV, int ARF, int* PRF)
     {
         if (!ARF)
             return true;
@@ -663,8 +610,6 @@ namespace MEMU::Core::Issue {
 
         // Pre-touch means instruction on flight
         Entry entry = entries[index];
-        entry.SetFID    (FID);
-        entry.SetFV     (FV);
         entry.SetNRA    (true);
         entry.SetARF    (ARF);
         entry.SetValid  (true);
@@ -678,14 +623,9 @@ namespace MEMU::Core::Issue {
         return true;
     }
 
-    inline bool RegisterAliasTable::Touch(int FID, int ARF, int* PRF)
+    inline bool RegisterAliasTable::Touch(int ARF, int* PRF)
     {
-        return Touch(true, FID, ARF, PRF);
-    }
-
-    void RegisterAliasTable::Writeback(int FID)
-    {
-        // nothing need to be done in RAT
+        return Touch(true, ARF, PRF);
     }
 
     void RegisterAliasTable::Commit(int ARF)
@@ -693,14 +633,9 @@ namespace MEMU::Core::Issue {
         Release(ARF);
     }
 
-    bool RegisterAliasTable::TouchAndWriteback(int FID, int ARF, int* PRF)
+    bool RegisterAliasTable::TouchAndCommit(int ARF, int* PRF)
     {
-        return Touch(true, FID, ARF, PRF);
-    }
-
-    bool RegisterAliasTable::TouchAndCommit(int FID, int ARF, int* PRF)
-    {
-        return Touch(false, FID, ARF, PRF);
+        return Touch(false, ARF, PRF);
     }
 
     void RegisterAliasTable::WriteCheckpoint(int GC)
