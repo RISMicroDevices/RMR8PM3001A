@@ -5,6 +5,8 @@
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
+#include <fstream>
+#include <iomanip>
 #include <string>
 #include <list>
 #include <vector>
@@ -119,11 +121,10 @@ namespace VMC::RAT {
     class SimO3ARF
     {
     private:
-        RegisterAliasTable*     const RAT;
         PhysicalRegisterFile*   const PRF;
 
     public:
-        SimO3ARF(RegisterAliasTable* RAT, PhysicalRegisterFile* PRF);
+        SimO3ARF(PhysicalRegisterFile* PRF);
         SimO3ARF(const SimO3ARF& obj);
 
         uint64_t    operator[](const int index) const;
@@ -173,6 +174,8 @@ namespace VMC::RAT {
         SimFetch();
         ~SimFetch();
 
+        const std::list<SimInstruction>& Get() const;
+
         int     GetCount() const;
         bool    IsEmpty() const;
 
@@ -189,6 +192,10 @@ namespace VMC::RAT {
     private:
         const int   size;
 
+        int         busy_index;
+        int         busy_FID;
+        int         release_FID;
+
         bool* const busy;
         int*  const FID;
 
@@ -203,6 +210,10 @@ namespace VMC::RAT {
         bool    IsBusy(int index) const;
         void    SetBusy(int index, int FID);
         void    Release(int FID);
+
+        void    ResetInput();
+
+        void    Eval();
     };
 
     class SimReservation // Only support ARF0-conv mode
@@ -245,7 +256,10 @@ namespace VMC::RAT {
         SimReservation(const SimReservation& obj);
         ~SimReservation();
 
+        const std::list<Entry>& Get() const;
+
         const SimScoreboard*    GetScoreboardRef() const;
+        
 
         void                    PushInsn(const SimInstruction& insn);
 
@@ -302,9 +316,11 @@ namespace VMC::RAT {
 
     public:
         SimExecution(uint64_t* ARF);
-        SimExecution(RegisterAliasTable* RAT, PhysicalRegisterFile* PRF);
+        SimExecution(PhysicalRegisterFile* PRF);
         SimExecution(const SimExecution& obj);
         ~SimExecution();
+
+        const std::list<Entry>& Get() const;
 
         int     GetCount() const;
         bool    IsEmpty() const;
@@ -350,6 +366,8 @@ namespace VMC::RAT {
         SimReOrderBuffer(const SimReOrderBuffer& obj);
         ~SimReOrderBuffer();
 
+        const std::list<Entry>& Get() const;
+
         int     GetCount() const;
         bool    IsEmpty() const;
 
@@ -378,45 +396,50 @@ namespace VMC::RAT {
 
     typedef struct {
 
-        RegisterAliasTable      O3RAT                       = RegisterAliasTable();
+        RegisterAliasTable          O3RAT                       = RegisterAliasTable();
 
-        PhysicalRegisterFile    O3PRF                       = PhysicalRegisterFile();
+        PhysicalRegisterFile        O3PRF                       = PhysicalRegisterFile();
 
-        SimFetch                O3Fetch                     = SimFetch();
+        SimFetch                    O3Fetch                     = SimFetch();
 
-        SimScoreboard           O3Scoreboard                = SimScoreboard(EMULATED_PRF_SIZE);
+        SimScoreboard               O3Scoreboard                = SimScoreboard(EMULATED_PRF_SIZE);
 
-        SimReservation          O3Reservation               = SimReservation(&O3Scoreboard);
+        SimReservation              O3Reservation               = SimReservation(&O3Scoreboard);
 
-        SimExecution            O3Execution                 = SimExecution(&O3RAT, &O3PRF);
+        SimExecution                O3Execution                 = SimExecution(&O3PRF);
 
-        SimReOrderBuffer        O3ROB                       = SimReOrderBuffer();
+        SimReOrderBuffer            O3ROB                       = SimReOrderBuffer();
 
-        SimO3PipeStatus         O3Status                    = SimO3PipeStatus();
+        SimO3PipeStatus             O3Status                    = SimO3PipeStatus();
 
-        uint64_t                RefARF[EMULATED_ARF_SIZE]   = { 0 };
+        uint64_t                    RefARF[EMULATED_ARF_SIZE]   = { 0 };
 
-        SimFetch                RefFetch                    = SimFetch();
+        SimFetch                    RefFetch                    = SimFetch();
 
-        SimScoreboard           RefScoreboard               = SimScoreboard(EMULATED_ARF_SIZE);
+        SimScoreboard               RefScoreboard               = SimScoreboard(EMULATED_ARF_SIZE);
 
-        SimReservation          RefReservation              = SimReservation(&RefScoreboard);
+        SimReservation              RefReservation              = SimReservation(&RefScoreboard);
 
-        SimExecution            RefExecution                = SimExecution(RefARF);
+        SimExecution                RefExecution                = SimExecution(RefARF);
 
-        SimRefPipeStatus        RefStatus                   = SimRefPipeStatus();
+        SimRefPipeStatus            RefStatus                   = SimRefPipeStatus();
 
-        int                     GlobalFID                   = 0;
+        int                         GlobalFID                   = 0;
 
-        bool                    FlagStepInfo                = SIM_DEFAULT_FLAG_STEPINFO;
+        bool                        FlagStepInfo                = SIM_DEFAULT_FLAG_STEPINFO;
 
-        bool                    FlagARF0Conv                = SIM_DEFAULT_FLAG_ARF0CONV;
+        bool                        FlagARF0Conv                = SIM_DEFAULT_FLAG_ARF0CONV;
 
-        uint64_t                RandMaxRegValue             = SIM_DEFAULT_RAND_MAX_REG_VALUE;
+        uint64_t                    RandMaxRegValue             = SIM_DEFAULT_RAND_MAX_REG_VALUE;
 
-        unsigned int            RandMaxRegIndex             = SIM_DEFAULT_RAND_MAX_REG_INDEX;
+        unsigned int                RandMaxRegIndex             = SIM_DEFAULT_RAND_MAX_REG_INDEX;
 
-        unsigned int            RandMaxInsnDelay            = SIM_DEFAULT_RAND_MAX_INSN_DELAY;
+        unsigned int                RandMaxInsnDelay            = SIM_DEFAULT_RAND_MAX_INSN_DELAY;
+
+        //
+        std::vector<SimInstruction> FetchHistory                = std::vector<SimInstruction>();
+
+        std::vector<SimInstruction> RenamedHistory              = std::vector<SimInstruction>();
 
     } SimContext, *SimHandle;
 }
@@ -458,7 +481,7 @@ namespace VMC::RAT {
 
     uint64_t RandRegValue(SimHandle handle)
     {
-        uint64_t val = rand() 
+        uint64_t val =  (uint64_t)rand() 
                      ^ ((uint64_t)rand() << 16) 
                      ^ ((uint64_t)rand() << 32) 
                      ^ ((uint64_t)rand() << 48);
@@ -534,7 +557,7 @@ namespace VMC::RAT {
             return true;
 
         int prf;
-        if (!handle->O3RAT.TouchAndCommit(handle->GlobalFID++, arf, &prf))
+        if (!handle->O3RAT.TouchAndCommit(-1, arf, &prf))
             return false;
 
         handle->O3PRF.Set(prf, val);
@@ -557,7 +580,7 @@ namespace VMC::RAT {
     }
 
     //
-    bool EvalRefFetchInternal(SimHandle csim, bool info, int step)
+    bool EvalRefFetch(SimHandle csim, bool info, int step)
     {
         if (csim->RefFetch.IsEmpty())
         {
@@ -590,7 +613,7 @@ namespace VMC::RAT {
 
         //
         csim->RefReservation.PushInsn(insn);
-        
+
         csim->RefFetch.PopInsn();
 
         csim->RefStatus.SetFetchStatus(&STAGE_STATUS_BUSY);
@@ -601,12 +624,7 @@ namespace VMC::RAT {
         return true;
     }
 
-    inline bool EvalRefFetch(SimHandle csim, bool info, int step = 0)
-    {
-        return EvalRefFetchInternal(csim, info, step);
-    }
-
-    bool EvalRefIssueInternal(SimHandle csim, bool info, int step)
+    bool EvalRefIssue(SimHandle csim, bool info, int step)
     {
         if (csim->RefReservation.IsEmpty())
         {
@@ -633,7 +651,9 @@ namespace VMC::RAT {
 
         //
         csim->RefExecution.PushInsn(insn);
-        csim->RefScoreboard.SetBusy(insn.GetDst(), insn.GetFID());
+
+        if (insn.GetDst()) // arf0conv on scoreboard
+            csim->RefScoreboard.SetBusy(insn.GetDst(), insn.GetFID());
 
         if (!csim->RefReservation.PopInsn())
         {
@@ -649,15 +669,7 @@ namespace VMC::RAT {
         return true;
     }
 
-    inline bool EvalRefIssue(SimHandle csim, bool info, int step = 0)
-    {
-        // Eval ahead, bypass exists
-        csim->RefReservation.Eval();
-
-        return EvalRefIssueInternal(csim, info, step);
-    }
-
-    bool EvalRefWritebackInternal(SimHandle csim, bool info, int step)
+    bool EvalRefWriteback(SimHandle csim, bool info, int step)
     {
         if (csim->RefExecution.IsEmpty())
         {
@@ -703,18 +715,40 @@ namespace VMC::RAT {
         return true;
     }
 
-    inline bool EvalRefWriteback(SimHandle csim, bool info, int step = 0)
+    void EvalRefCycle(SimHandle csim)
     {
-        bool result = EvalRefWritebackInternal(csim, info, step);
-
-        // Eval later, always delayed
+        csim->RefReservation.Eval();
+        csim->RefScoreboard.Eval();
         csim->RefExecution.Eval();
+    }
 
-        return result;
+    bool EvalRef(SimHandle csim, bool info, int step)
+    {
+        if (!EvalRefFetch(csim, info, step))
+        {
+            std::cout << "EvalRef: Interrupted at EvalRefFetch" << std::endl;
+            return false;
+        }
+
+        if (!EvalRefIssue(csim, info, step))
+        {
+            std::cout << "EvalRef: Interrupted at EvalRefIssue" << std::endl;
+            return false;
+        }
+
+        if (!EvalRefWriteback(csim, info, step))
+        {
+            std::cout << "EvalRef: Interrupted at EvalRefWriteback" << std::endl;
+            return false;
+        }
+
+        EvalRefCycle(csim);
+
+        return true;
     }
 
 
-    bool EvalO3FetchInternal(SimHandle csim, bool info, int step)
+    bool EvalO3Fetch(SimHandle csim, bool info, int step)
     {
         if (csim->O3Fetch.IsEmpty())
         {
@@ -738,7 +772,13 @@ namespace VMC::RAT {
         // Get src PRFs
         int src1prf = csim->O3RAT.GetAliasPRF(insn.GetSrc1());
         int src2prf = csim->O3RAT.GetAliasPRF(insn.GetSrc2());
-        
+
+        if (info)
+        {
+            printf("[ %8d ] O3Fetch: ARF converted. Src1 ARF #%d -> PRF #%d.\n", step, insn.GetSrc1(), src1prf);
+            printf("[ %8d ] O3Fetch: ARF converted. Src2 ARF #%d -> PRF #%d.\n", step, insn.GetSrc2(), src2prf);
+        }
+
         // Try to allocate RAT entry
         int dstprf = -1;
         
@@ -752,14 +792,22 @@ namespace VMC::RAT {
             return true;
         }
 
+        if (info)
+            printf("[ %8d ] O3Fetch: Dst ARF renamed. Dst ARF #%d -> PRF #%d.\n", step, insn.GetDst(), dstprf);
+
         // Re-write/modify instruction after RAT
         insn.SetSrc1(src1prf);
         insn.SetSrc2(src2prf);
         insn.SetDst(dstprf);
 
+        // Rename history
+        csim->RenamedHistory.push_back(insn);
+
         // Push to issue queue and broadcast to ROB
         csim->O3Reservation.PushInsn(insn);
         csim->O3ROB.TouchInsn(insn);
+
+        csim->O3Scoreboard.SetBusy(insn.GetDst(), insn.GetFID());
 
         csim->O3Fetch.PopInsn();
 
@@ -771,16 +819,7 @@ namespace VMC::RAT {
         return true;
     }
 
-    inline bool EvalO3Fetch(SimHandle csim, bool info, int step = 0)
-    {
-        bool result = EvalO3FetchInternal(csim, info, step);
-
-        //csim->O3RAT.Eval();   moved to commit stage
-
-        return result;
-    }
-
-    bool EvalO3IssueInternal(SimHandle csim, bool info, int step)
+    bool EvalO3Issue(SimHandle csim, bool info, int step)
     {
         if (csim->O3Reservation.IsEmpty())
         {
@@ -800,14 +839,44 @@ namespace VMC::RAT {
             csim->O3Status.SetReservationStatus(&STAGE_STATUS_WAIT);
 
             if (info)
-                printf("[ %8d ] O3Issue: Issue pause on scoreboard. PRF not ready.\n", step);
+                printf("[ %8d ] O3Issue: Issue pause on scoreboard. PRF not ready or reservation delay.\n", step);
+
+            if (info)
+            {
+                int count = 0;
+
+                printf("[ %8d ] O3Issue: Not ready PRFs:", step);
+
+                for (int i = 0; i < EMULATED_PRF_SIZE; i++)
+                {
+                    if (!csim->O3Scoreboard.IsBusy(i))
+                        continue;
+                    
+                    printf(" #%d", i);
+
+                    count++;
+                }
+
+                printf(" (%d in total)\n", count);
+            }
 
             return true;
         }
 
         //
-        csim->O3Execution.PushInsn(insn);
-        csim->O3Scoreboard.SetBusy(insn.GetDst(), insn.GetFID());
+        if (info)
+        {
+            SimExecution::Entry entry;
+
+            csim->O3Execution.PushInsn(insn, &entry);
+
+            printf("[ %8d ] O3Issue: Read src1 PRF #%d value: %ld (0x%016lx).\n", step, insn.GetSrc1(), entry.GetSrc1Value(), entry.GetSrc1Value());
+            printf("[ %8d ] O3Issue: Read src2 PRF #%d value: %ld (0x%016lx).\n", step, insn.GetSrc2(), entry.GetSrc2Value(), entry.GetSrc2Value());
+        }
+        else
+        {
+            csim->O3Execution.PushInsn(insn);
+        }
 
         if (!csim->O3Reservation.PopInsn())
         {
@@ -823,15 +892,7 @@ namespace VMC::RAT {
         return true;
     }
 
-    inline bool EvalO3Issue(SimHandle csim, bool info, int step = 0)
-    {
-        // Eval ahead, bypass exists
-        csim->O3Reservation.Eval();
-
-        return EvalO3IssueInternal(csim, info, step);
-    }
-
-    bool EvalO3WritebackInternal(SimHandle csim, bool info, int step)
+    bool EvalO3Writeback(SimHandle csim, bool info, int step)
     {
         if (csim->O3Execution.IsEmpty())
         {
@@ -865,8 +926,6 @@ namespace VMC::RAT {
             return false;
         }
 
-        csim->O3RAT.Writeback(insn.GetFID());
-
         if (!csim->O3Execution.PopInsn())
         {
             ShouldNotReachHere(" RAT::EvalO3Writeback ILLEGAL_STATE #ExecutionPopFail");
@@ -881,17 +940,7 @@ namespace VMC::RAT {
         return true;
     }
 
-    inline bool EvalO3Writeback(SimHandle csim, bool info, int step = 0)
-    {
-        bool result = EvalO3WritebackInternal(csim, info, step);
-
-        // eval later, always delayed
-        csim->O3Execution.Eval();
-
-        return result;
-    }
-
-    bool EvalO3CommitInternal(SimHandle csim, bool info, int step)
+    bool EvalO3Commit(SimHandle csim, bool info, int step)
     {
         if (csim->O3ROB.IsEmpty())
         {
@@ -922,6 +971,9 @@ namespace VMC::RAT {
         if (insn.GetDst() >= 0)
             csim->O3PRF.Set(insn.GetDst(), entry.GetDstValue());
 
+        if (info)
+            printf("[ %8d ] O3Commit: Written back to PRF #%d: %ld (0x%016lx).\n", step, insn.GetDst(), entry.GetDstValue(), entry.GetDstValue());
+
         csim->O3Scoreboard.Release(insn.GetFID());
 
         csim->O3RAT.Commit(insn.GetDst());
@@ -940,15 +992,44 @@ namespace VMC::RAT {
         return true;
     }
 
-    inline bool EvalO3Commit(SimHandle csim, bool info, int step = 0)
+    void EvalO3Cycle(SimHandle csim)
     {
-        bool result = EvalO3CommitInternal(csim, info, step);
-
-        // eval later, always delayed
+        csim->O3Reservation.Eval();
+        csim->O3Scoreboard.Eval();
+        csim->O3Execution.Eval();
         csim->O3RAT.Eval();
         csim->O3PRF.Eval();
+    }
 
-        return result;
+    bool EvalO3(SimHandle csim, bool info, int step)
+    {
+        if (!EvalO3Fetch(csim, info, step))
+        {
+            std::cout << "EvalO3: Interrupted at EvalO3Fetch" << std::endl;
+            return false;
+        }
+
+        if (!EvalO3Issue(csim, info, step))
+        {
+            std::cout << "EvalO3: Interrupted at EvalO3Issue" << std::endl;
+            return false;    
+        }
+
+        if (!EvalO3Writeback(csim, info, step))
+        {
+            std::cout << "EvalO3: Interrupted at EvalO3Writeback" << std::endl;
+            return false;
+        }
+
+        if (!EvalO3Commit(csim, info, step))
+        {
+            std::cout << "EvalO3: Interrupted at EvalO3Commit" << std::endl;
+            return false;
+        }
+
+        EvalO3Cycle(csim);
+
+        return true;
     }
 
 
@@ -1010,6 +1091,17 @@ namespace VMC::RAT {
     std::cout << "- rat0.arf.get <index> [-U|-S|-NEQ] Get specified ARF register value" << std::endl;  \
     std::cout << "- rat0.diffsim.arf.set.random <count>" << std::endl; \
     std::cout << "                                    Random difftest of immediate register writes" << std::endl; \
+    std::cout << "- rat0.diffsim.insn.push <insncode> [delay] [dstARF] [srcARF1] [srcARF2] [imm]" << std::endl; \
+    std::cout << "                                    Push a specified instruction" << std::endl; \
+    std::cout << "- rat0.diffsim.insn.push.random <count>" << std::endl; \
+    std::cout << "                                    Push specified count of random instructions" << std::endl; \
+    std::cout << "- rat0.diffsim.insn.eval.step       Differential evaluate RAT by one step" << std::endl; \
+    std::cout << "- rat0.diffsim.insn.eval.stepout [-SF|-T <count>]" << std::endl; \
+    std::cout << "                                    Differential evaluate RAT with all instructions or specified steps" << std::endl; \
+    std::cout << "- rat0.diffsim.insn.dump [-R|-range <startFID> <endFID>]" << std::endl; \
+    std::cout << "                                    Dump history instructions." << std::endl; \
+    std::cout << "- rat0.diffsim.insn.dumpfile <filename> [-R|-range <startFID> <endFID>]" << std::endl; \
+    std::cout << "                                    Dump history instructions to file." << std::endl; \
 
     // rat0.infobystep [true|false]
     bool _RAT0_INFOBYSTEP(void* handle, const std::string& cmd,
@@ -1287,7 +1379,6 @@ namespace VMC::RAT {
             return false;
         }
 
-
         SetRefARF(csim, index, value);
 
         //
@@ -1511,7 +1602,6 @@ namespace VMC::RAT {
     {
         bool enFilterV   = false, filterV;
         bool enFilterNRA = false, filterNRA;
-        bool enFilterFV  = false, filterFV;
         bool enFilterZ   = false, filterZ;
 
         for (int i = 0; i < params.size(); i++)
@@ -1548,11 +1638,6 @@ namespace VMC::RAT {
                 enFilterNRA = true;
                 filterNRA   = filterFlag;
             }
-            else if (suffix.compare("FV") == 0)
-            {
-                enFilterFV  = true;
-                filterFV    = filterFlag;
-            }
             else if (suffix.compare("Z") == 0)
             {
                 enFilterZ   = true;
@@ -1583,14 +1668,6 @@ namespace VMC::RAT {
                 std::cout << "(\'-NRA\': Listing all entries with NRA flag of 0)" << std::endl;
         }
 
-        if (enFilterFV)
-        {
-            if (filterFV)
-                std::cout << "(\'+FV\':  Listing all entries with FV flag of 1)" << std::endl;
-            else
-                std::cout << "(\'-FV\':  Listing all entries with FV flag of 0)" << std::endl;
-        }
-
         if (enFilterZ)
         {
             if (filterZ)
@@ -1599,8 +1676,8 @@ namespace VMC::RAT {
                 std::cout << "(\'-Z\':   Listing all entries with non-zero PRF)" << std::endl;
         }
 
-        std::cout << "PRF        ARF        V        NRA        FID        FV        Value" << std::endl;
-        std::cout << "-----      -----      ---      -----      -----      ----      ------------------" << std::endl;
+        std::cout << "PRF        ARF        V        NRA        FV        FID         Value" << std::endl;
+        std::cout << "-----      -----      ---      -----      ----      ------      ------------------" << std::endl;
 
         SimHandle csim = GetCurrentHandle();
         for (int i = 0; i < csim->O3RAT.GetSize(); i++)
@@ -1613,9 +1690,6 @@ namespace VMC::RAT {
             if (enFilterNRA && filterNRA != entry.GetNRA())
                 continue;
 
-            if (enFilterFV && filterFV != entry.GetFV())
-                continue;
-
             if (enFilterZ && filterZ == (bool)entry.GetValue(csim->O3PRF))
                 continue;
 
@@ -1623,8 +1697,8 @@ namespace VMC::RAT {
             printf("%-5d      ", entry.GetARF());
             printf("%-3d      ", entry.GetValid());
             printf("%-5d      ", entry.GetNRA());
-            printf("%-5d      ", entry.GetFID());
             printf("%-4d      ", entry.GetFV());
+            printf("%-6d      ", entry.GetFID());
             printf("0x%016lx\n"  , entry.GetValue(csim->O3PRF));
         }
 
@@ -1816,6 +1890,8 @@ namespace VMC::RAT {
         csim->O3Fetch.PushInsn(insn);
         csim->RefFetch.PushInsn(insn);
 
+        csim->FetchHistory.push_back(insn);
+
         return true;
     }
 
@@ -1871,6 +1947,8 @@ namespace VMC::RAT {
 
             csim->O3Fetch.PushInsn(insn);
             csim->RefFetch.PushInsn(insn);
+
+            csim->FetchHistory.push_back(insn);
         }
 
         return true;
@@ -1883,30 +1961,12 @@ namespace VMC::RAT {
         SimHandle csim = GetCurrentHandle();
 
         // O3 (out-of-order) datapath
-        if (!EvalO3Fetch(csim, info, step))
-            return false;
-
-        if (!EvalO3Issue(csim, info, step))
-            return false;
-
-        if (!EvalO3Writeback(csim, info, step))
-            return false;
-
-        if (!EvalO3Commit(csim, info, step))
-            return false;
-        
+        bool O3 = EvalO3(csim, info, step);
 
         // Ref (in-order) datapath
-        if (!EvalRefFetch(csim, info, step))
-            return false;
+        bool Ref = EvalRef(csim, info, step);
 
-        if (!EvalRefIssue(csim, info, step))
-            return false;
-
-        if (!EvalRefWriteback(csim, info, step))
-            return false;
-
-        return true;
+        return O3 && Ref;
     }
 
 
@@ -1987,6 +2047,9 @@ namespace VMC::RAT {
 
         int step = 0;
 
+        int perfc_ref = 0;
+        int perfc_o3  = 0;
+
         if (csim->FlagStepInfo)
             printf("[ -------- ] --------------------------------\n");
 
@@ -2000,6 +2063,12 @@ namespace VMC::RAT {
                 return false;
             }
 
+            if (!IsRefAllIdle(csim))
+                perfc_ref++;
+
+            if (!IsO3AllIdle(csim))
+                perfc_o3++;
+
             if (csim->FlagStepInfo)
             {
                 printf("[ %8d ] ", step);
@@ -2009,6 +2078,14 @@ namespace VMC::RAT {
                 DispO3Status(csim);
 
                 printf("[ -------- ] --------------------------------\n");
+            }
+
+            if (perfc_o3 > perfc_ref)
+            {
+                std::cout << "[ \033[1;33mWARN\033[0m     ] EvalO3 (Out-of-Order) slacked back then EvalRef (In-Order)." << std::endl;
+                std::cout << "[ \033[1;33mWARN\033[0m     ] EvalO3 might be in dead loop. Stopped step-out process." << std::endl;
+
+                break;
             }
 
             if (flagT)
@@ -2023,8 +2100,174 @@ namespace VMC::RAT {
 
         std::cout << "Finished stepout. " << step << " step(s) walked in total." << std::endl;
 
+        std::cout << "Performance counter:" << std::endl;
+
+        printf("- EvalRef: %d/%d (%.2f%%)\n", perfc_ref, step, (float)perfc_ref / step * 100);
+        printf("- EvalO3:  %d/%d (%.2f%%)\n", perfc_o3,  step, (float)perfc_o3  / step * 100);
+
         return true;
     }
+
+
+    
+    //
+    void __common_RAT0_DIFFSIM_INSN_DUMP(const SimInstruction& insn, std::ostream& os)
+    {
+        os << "FID(" << std::setw(8) << std::setfill(' ') << insn.GetFID() << ") ";
+        os << "#" << insn.GetDelay() << " ";
+
+        switch (insn.GetInsnCode())
+        {
+            case INSN_CODE_NOP:
+                os << "NOP  ";
+                break;
+
+            case INSN_CODE_AND:
+                os << "AND  ";
+                break;
+
+            case INSN_CODE_OR:
+                os << "OR   ";
+                break;
+
+            case INSN_CODE_XOR:
+                os << "XOR  ";
+                break;
+
+            case INSN_CODE_ADD:
+                os << "ADD  ";
+                break;
+
+            case INSN_CODE_SUB:
+                os << "SUB  ";
+                break;
+
+            case INSN_CODE_ANDI:
+                os << "ANDI ";
+                break;
+
+            case INSN_CODE_ORI:
+                os << "ORI  ";
+                break;
+
+            case INSN_CODE_XORI:
+                os << "XORI ";
+                break;
+
+            case INSN_CODE_ADDI:
+                os << "ADDI ";
+                break;
+
+            case INSN_CODE_SUBI:
+                os << "SUBI ";
+                break;
+            
+            default:
+                ShouldNotReachHere(" ::InsnDump #UnknownInstructionCode");
+        }
+    
+        os << std::setw(2) << std::setfill(' ') << insn.GetDst()  << " ";
+        os << std::setw(2) << std::setfill(' ') << insn.GetSrc1() << " ";
+        os << std::setw(2) << std::setfill(' ') << insn.GetSrc2() << " ";
+
+        os << "0x" << std::setw(16) << std::setfill('0') << std::hex << insn.GetImmediate() << std::dec;
+        os << std::resetiosflags << std::endl;
+    }
+
+
+    //
+    bool __common_RAT0_DIFFSIM_INSN_DUMP_EX(int offset, 
+                                            const std::vector<std::string>& params,
+                                            std::ostream& os)
+    {
+        bool flagR      = false;
+        bool flagRange  = false;
+
+        int startFID = 0;
+        int endFID   = 0;
+        
+        for (int i = offset; i < params.size(); i++)
+        {
+            std::string param = params[i];
+            
+            if (param.compare("-R") == 0)
+                flagR = true;
+            else if (param.compare("-range") == 0)
+            {
+                flagRange = true;
+
+                if ((i + 2) < params.size())
+                {
+                    std::istringstream(params[i + 1]) >> startFID;
+                    std::istringstream(params[i + 2]) >> endFID;
+
+                    i += 2;
+                }
+                else
+                {
+                    std::cout << "Param " << i << " \'-range\' requires more parameters." << std::endl;
+                    return false;
+                }
+            }
+        }
+
+        //
+        SimHandle csim = GetCurrentHandle();
+
+        const std::vector<SimInstruction>& history 
+            = flagR ? csim->RenamedHistory : csim->FetchHistory;
+
+        for (int i = startFID; (i < history.size()) && (!flagRange || i <= endFID); i++)
+            __common_RAT0_DIFFSIM_INSN_DUMP(history[i], os);
+
+        return true;
+    }
+
+
+    // rat0.diffsim.insn.dump [-R|-range <startFID> <endFID>]
+    bool _RAT0_DIFFSIM_INSN_DUMP(void* handle, const std::string& cmd,
+                                               const std::string& paramline,
+                                               const std::vector<std::string>& params)
+    {
+        return __common_RAT0_DIFFSIM_INSN_DUMP_EX(0, params, std::cout);
+    }
+
+
+    // rat0.diffsim.insn.dumpfile <filename> [-R|-range <startFID> <endFID>]
+    bool _RAT0_DIFFSIM_INSN_DUMPFILE(void* handle, const std::string& cmd,
+                                                   const std::string& paramline,
+                                                   const std::vector<std::string>& params)
+    {
+        if (params.empty())
+        {
+            std::cout << "Too much or too less parameter(s) for \'rat0.diffsim.insn.dumpfile\'." << std::endl;
+            return false;
+        }
+
+        std::ofstream fos(params[0]);
+
+        if (!fos)
+        {
+            std::cout << "Failed to open or create file." << std::endl;
+            return false;
+        }
+
+        bool result = __common_RAT0_DIFFSIM_INSN_DUMP_EX(0, params, fos);
+
+        fos.close();
+
+        return result;
+    }
+
+
+    // rat0.diffsim.o3.fetch.dump
+
+
+    // rat0.diffsim.o3.rob.dump
+
+
+    // rat0.diffsim.o3.reservation.dump
+
 
 
     void SetupCommands(VMCHandle handle)
@@ -2046,6 +2289,8 @@ namespace VMC::RAT {
         RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.push.random")    , &_RAT0_DIFFSIM_INSN_PUSH_RANDOM });
         RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.eval.step")      , &_RAT0_DIFFSIM_INSN_EVAL_STEP });
         RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.eval.stepout")   , &_RAT0_DIFFSIM_INSN_EVAL_STEPOUT });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.dump")           , &_RAT0_DIFFSIM_INSN_DUMP });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.dumpfile")       , &_RAT0_DIFFSIM_INSN_DUMPFILE });
     }
 }
 
@@ -2211,18 +2456,15 @@ namespace VMC::RAT {
 // class VMC::RAT::SimO3ARF
 namespace VMC::RAT {
     /*
-    RegisterAliasTable*     RAT;
     PhysicalRegisterFile*   PRF;
     */
 
-    SimO3ARF::SimO3ARF(RegisterAliasTable* RAT, PhysicalRegisterFile* PRF)
-        : RAT   (RAT)
-        , PRF   (PRF)
+    SimO3ARF::SimO3ARF(PhysicalRegisterFile* PRF)
+        : PRF   (PRF)
     { }
 
     SimO3ARF::SimO3ARF(const SimO3ARF& obj)
-        : RAT   (obj.RAT)
-        , PRF   (obj.PRF)
+        : PRF   (obj.PRF)
     { }
 
     uint64_t SimO3ARF::operator[](const int index) const
@@ -2230,13 +2472,7 @@ namespace VMC::RAT {
         if (index == -1)
             return 0;
 
-        if (!index)
-            return 0;
-
-        int  mappedPRF = RAT->GetAliasPRF(index);
-        bool mapped    = mappedPRF >= 0;
-
-        return mapped ? PRF->Get(mappedPRF) : 0;
+        return PRF->Get(index);
     }
 }
 
@@ -2391,6 +2627,11 @@ namespace VMC::RAT {
     SimFetch::~SimFetch()
     { }
 
+    inline const std::list<SimInstruction>& SimFetch::Get() const
+    {
+        return fetched;
+    }
+
     inline int SimFetch::GetCount() const
     {
         return fetched.size();
@@ -2439,20 +2680,30 @@ namespace VMC::RAT {
     /*
     const int   size;
 
+    int         busy_index;
+    int         busy_FID;
+    int         release_FID;
+
     bool* const busy;
     int*  const FID;
     */
 
     SimScoreboard::SimScoreboard(int size)
-        : size  (size)
-        , busy  (new bool[size]())
-        , FID   (new int[size])
+        : size          (size)
+        , busy_index    (-1)
+        , busy_FID      (-1)
+        , release_FID   (-1)
+        , busy          (new bool[size]())
+        , FID           (new int[size])
     { }
 
     SimScoreboard::SimScoreboard(const SimScoreboard& obj)
-        : size  (obj.size)
-        , busy  (new bool[obj.size]())
-        , FID   (new int[obj.size])
+        : size          (obj.size)
+        , busy_index    (obj.busy_index)
+        , busy_FID      (obj.busy_FID)
+        , release_FID   (obj.release_FID)
+        , busy          (new bool[obj.size]())
+        , FID           (new int[obj.size])
     {
         memcpy(busy, obj.busy, obj.size * sizeof(bool));
         memcpy(FID,  obj.FID,  obj.size * sizeof(int));
@@ -2474,18 +2725,12 @@ namespace VMC::RAT {
         if (index == -1)
             return false;
 
-        if (!index)
-            return false;
-
         return busy[index];
     }
 
     inline int SimScoreboard::GetFID(int index) const
     {
         if (index == -1)
-            return -1;
-
-        if (!index)
             return -1;
 
         if (busy[index])
@@ -2499,25 +2744,43 @@ namespace VMC::RAT {
         if (index == -1)
             return;
 
-        if (!index)
-            return;
-
-        this->busy[index] = true;
-        this->FID[index]  = FID;
+        busy_index = index;
+        busy_FID   = FID;
     }
 
-    void SimScoreboard::Release(int FID)
+    inline void SimScoreboard::Release(int FID)
     {
-        for (int i = 1; i < size; i++)
-        {
-            if (this->FID[i] == FID && this->busy[i])
-            {
-                this->busy[i] = false;
+        release_FID = FID;
+    }
 
-                // only one destination register for one instruction
-                break;
-            }
+    void SimScoreboard::ResetInput()
+    {
+        busy_index  = -1;
+        busy_FID    = -1;
+        release_FID = -1;
+    }
+
+    void SimScoreboard::Eval()
+    {
+        if (busy_index >= 0)
+        {
+            this->busy[busy_index] = true;
+            this->FID [busy_index] = busy_FID;
         }
+
+        if (release_FID >= 0)
+            for (int i = 0; i < size; i++) 
+            {
+                if (this->FID[i] == release_FID && this->busy[i])
+                {
+                    this->busy[i] = false;
+
+                    // only one destination register for one instruction
+                    break;
+                }
+            }
+
+        ResetInput();
     }
 }
 
@@ -2634,12 +2897,19 @@ namespace VMC::RAT {
     SimReservation::~SimReservation()
     { }
 
+    inline const std::list<SimReservation::Entry>& SimReservation::Get() const
+    {
+        return entries;
+    }
+
     void SimReservation::PushInsn(const SimInstruction& insn)
     {
         Entry entry = Entry(insn);
+        /*
         entry.SetSrc1Ready(insn.GetSrc1() ? !scoreboard->IsBusy(insn.GetSrc1()) : true);
         entry.SetSrc2Ready(insn.GetSrc2() ? !scoreboard->IsBusy(insn.GetSrc2()) : true);
         entry.SetDstReady( insn.GetDst()  ? !scoreboard->IsBusy(insn.GetDst())  : true);
+        */
 
         entries.push_back(entry);
     }
@@ -2914,10 +3184,10 @@ namespace VMC::RAT {
         , next      (entries.end())
     { }
 
-    SimExecution::SimExecution(RegisterAliasTable* RAT, PhysicalRegisterFile* PRF)
+    SimExecution::SimExecution(PhysicalRegisterFile* PRF)
         : ref       (false)
         , refARF    (nullptr)
-        , o3ARF     (new SimO3ARF(RAT, PRF))
+        , o3ARF     (new SimO3ARF(PRF))
         , entries   (list<Entry>())
         , next      (entries.end())
     { }
@@ -2936,6 +3206,11 @@ namespace VMC::RAT {
             delete refARF;
         else
             delete o3ARF;
+    }
+
+    inline const std::list<SimExecution::Entry>& SimExecution::Get() const
+    {
+        return entries;
     }
 
     inline int SimExecution::GetCount() const
@@ -3090,6 +3365,11 @@ namespace VMC::RAT {
 
     SimReOrderBuffer::~SimReOrderBuffer()
     { }
+
+    inline const std::list<SimReOrderBuffer::Entry>& SimReOrderBuffer::Get() const
+    {
+        return entries;
+    }
 
     inline int SimReOrderBuffer::GetCount() const
     {
