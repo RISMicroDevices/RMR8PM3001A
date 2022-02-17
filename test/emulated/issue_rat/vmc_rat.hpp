@@ -359,7 +359,6 @@ namespace VMC::RAT {
     
     private:
         std::list<Entry>            entries;
-        std::list<Entry>::iterator  next;
 
     public:
         SimReOrderBuffer();
@@ -392,7 +391,7 @@ namespace VMC::RAT {
 
     static constexpr int            SIM_DEFAULT_RAND_MAX_REG_INDEX  = RAND_MAX_REG_INDEX_MAX;
 
-    static constexpr int            SIM_DEFAULT_RAND_MAX_INSN_DELAY = 8;
+    static constexpr int            SIM_DEFAULT_RAND_MAX_INSN_DELAY = 32;
 
     typedef struct {
 
@@ -440,6 +439,14 @@ namespace VMC::RAT {
         std::vector<SimInstruction> FetchHistory                = std::vector<SimInstruction>();
 
         std::vector<SimInstruction> RenamedHistory              = std::vector<SimInstruction>();
+
+        int                         O3FetchCount                = 0;
+
+        int                         O3CommitCount               = 0;
+
+        int                         RefFetchCount               = 0;
+
+        int                         RefCommitCount              = 0;
 
     } SimContext, *SimHandle;
 }
@@ -616,6 +623,8 @@ namespace VMC::RAT {
 
         csim->RefFetch.PopInsn();
 
+        csim->RefFetchCount++;
+
         csim->RefStatus.SetFetchStatus(&STAGE_STATUS_BUSY);
 
         if (info)
@@ -706,6 +715,8 @@ namespace VMC::RAT {
         }
 
         csim->RefScoreboard.Release(insn.GetFID());
+
+        csim->RefCommitCount++;
 
         csim->RefStatus.SetExecutionStatus(&STAGE_STATUS_BUSY);
 
@@ -810,6 +821,8 @@ namespace VMC::RAT {
         csim->O3Scoreboard.SetBusy(insn.GetDst(), insn.GetFID());
 
         csim->O3Fetch.PopInsn();
+
+        csim->O3FetchCount++;
 
         csim->O3Status.SetFetchStatus(&STAGE_STATUS_BUSY);
 
@@ -935,7 +948,7 @@ namespace VMC::RAT {
         csim->O3Status.SetExecutionStatus(&STAGE_STATUS_BUSY);
 
         if (info)
-            printf("[ %8d ] O3Writeback: FID #%d written-back to ROB. DstARF #%d.\n", step, insn.GetFID(), insn.GetDst());
+            printf("[ %8d ] O3Writeback: FID #%d written-back to ROB. DstPRF #%d.\n", step, insn.GetFID(), insn.GetDst());
 
         return true;
     }
@@ -974,7 +987,21 @@ namespace VMC::RAT {
         if (info)
             printf("[ %8d ] O3Commit: Written back to PRF #%d: %ld (0x%016lx).\n", step, insn.GetDst(), entry.GetDstValue(), entry.GetDstValue());
 
+        // assert
+        if (insn.GetDst() >= 0 && csim->O3Scoreboard.GetFID(insn.GetDst()) != insn.GetFID())
+        {
+            printf("[ \033[1;31mASSERT\033[0m   ] O3Commit: Scoreboard commit FID not identical.\n");
+            return false;
+        }
+
         csim->O3Scoreboard.Release(insn.GetFID());
+
+        // assert
+        if (insn.GetDst() >= 0 && csim->O3RAT.GetEntry(insn.GetDst()).GetFID() != insn.GetFID())
+        {
+            printf("[ \033[1;31mASSERT\033[0m   ] O3Commit: RAT commit FID not identical.\n");
+            return false;
+        }
 
         csim->O3RAT.Commit(insn.GetDst());
 
@@ -983,6 +1010,8 @@ namespace VMC::RAT {
             ShouldNotReachHere(" RAT::EvalO3Commit ILLEGAL_STATE #ROBPopFail");
             return false;
         }
+
+        csim->O3CommitCount++;
 
         csim->O3Status.SetROBStatus(&STAGE_STATUS_BUSY);
 
@@ -1096,12 +1125,17 @@ namespace VMC::RAT {
     std::cout << "- rat0.diffsim.insn.push.random <count>" << std::endl; \
     std::cout << "                                    Push specified count of random instructions" << std::endl; \
     std::cout << "- rat0.diffsim.insn.eval.step       Differential evaluate RAT by one step" << std::endl; \
-    std::cout << "- rat0.diffsim.insn.eval.stepout [-SF|-T <count>]" << std::endl; \
+    std::cout << "- rat0.diffsim.insn.eval.stepout [-SF|-WWDG|-T <count>]" << std::endl; \
     std::cout << "                                    Differential evaluate RAT with all instructions or specified steps" << std::endl; \
     std::cout << "- rat0.diffsim.insn.dump [-R|-range <startFID> <endFID>]" << std::endl; \
     std::cout << "                                    Dump history instructions." << std::endl; \
     std::cout << "- rat0.diffsim.insn.dumpfile <filename> [-R|-range <startFID> <endFID>]" << std::endl; \
     std::cout << "                                    Dump history instructions to file." << std::endl; \
+    std::cout << "- rat0.diffsim.o3.fetch.dump        Dump all current O3Fetch entries." << std::endl; \
+    std::cout << "- rat0.diffsim.o3.scoreboard.dump   Dump all current O3Scoreboard entries." << std::endl; \
+    std::cout << "- rat0.diffsim.o3.reservation.dump  Dump all current O3Reservation entries." << std::endl; \
+    std::cout << "- rat0.diffsim.o3.rob.dump          Dump all current O3ReOrderBuffer entries." << std::endl; \
+
 
     // rat0.infobystep [true|false]
     bool _RAT0_INFOBYSTEP(void* handle, const std::string& cmd,
@@ -1344,6 +1378,8 @@ namespace VMC::RAT {
                 else
                     printf("\033[1;32m");
             }
+            else if (ref)
+                printf("\033[1;33m");
 
             printf("%-5d      ", i);
 
@@ -1970,148 +2006,9 @@ namespace VMC::RAT {
     }
 
 
-    // rat0.diffsim.insn.eval.step
-    bool _RAT0_DIFFSIM_INSN_EVAL_STEP(void* handle, const std::string& cmd,
-                                                    const std::string& paramline,
-                                                    const std::vector<std::string>& params)
-    {
-        SimHandle csim = GetCurrentHandle();
-
-        if (!csim->FlagARF0Conv)
-        {
-            std::cout << "Only support ARF0-conv mode." << std::endl;
-            return false;
-        }
-
-        if (!params.empty())
-        {
-            std::cout << "Too much or too less parameter(s) for \'rat0.diffsim.insn.eval.step\'" << std::endl;
-            return false;
-        }
-
-        if (!__common_RAT0_DIFFSIM_INSN_EVAL(csim->FlagStepInfo))
-        {
-            std::cout << "Eval failure." << std::endl;
-            return false;
-        }
-
-        DispRefStatus(csim);
-        DispO3Status(csim);
-
-        return true;
-    }
-
-
-    // rat0.diffsim.insn.eval.stepout [-SF|-T <count>]
-    bool _RAT0_DIFFSIM_INSN_EVAL_STEPOUT(void* handle, const std::string& cmd,
-                                                       const std::string& paramline,
-                                                       const std::vector<std::string>& params)
-    {
-        // TODO: implement flag -SF if further debug required
-
-        SimHandle csim = GetCurrentHandle();
-
-        if (!csim->FlagARF0Conv)
-        {
-            std::cout << "Only support ARF0-conv mode." << std::endl;
-            return false;
-        }
-
-        bool flagT = false;
-
-        int varT = 0;
-
-        for (int i = 0; i < params.size(); i++)
-        {
-            std::string param = params[i];
-
-            if (param.compare("-T") == 0)
-            {
-                if (i + 1 < params.size())
-                {
-                    flagT = true;
-                    std::istringstream(params[++i]) >> varT;
-                }
-                else
-                {
-                    std::cout << "Param " << i << " \'" << param << "\' needs more parameter(s)." << std::endl;
-                    return false;
-                }
-            }
-            else
-            {
-                std::cout << "Param " << i << " \'" << param << "\' is invalid." << std::endl;
-                return false;
-            }
-        }
-
-        int step = 0;
-
-        int perfc_ref = 0;
-        int perfc_o3  = 0;
-
-        if (csim->FlagStepInfo)
-            printf("[ -------- ] --------------------------------\n");
-
-        do 
-        {
-            step++;
-
-            if (!__common_RAT0_DIFFSIM_INSN_EVAL(csim->FlagStepInfo, step))
-            {
-                std::cout << "Eval failure at step " << step << "." << std::endl;
-                return false;
-            }
-
-            if (!IsRefAllIdle(csim))
-                perfc_ref++;
-
-            if (!IsO3AllIdle(csim))
-                perfc_o3++;
-
-            if (csim->FlagStepInfo)
-            {
-                printf("[ %8d ] ", step);
-                DispRefStatus(csim);
-
-                printf("[ %8d ] ", step);
-                DispO3Status(csim);
-
-                printf("[ -------- ] --------------------------------\n");
-            }
-
-            if (perfc_o3 > perfc_ref)
-            {
-                std::cout << "[ \033[1;33mWARN\033[0m     ] EvalO3 (Out-of-Order) slacked back then EvalRef (In-Order)." << std::endl;
-                std::cout << "[ \033[1;33mWARN\033[0m     ] EvalO3 might be in dead loop. Stopped step-out process." << std::endl;
-
-                break;
-            }
-
-            if (flagT)
-            {
-                if (step < varT)
-                    continue;
-
-                break;
-            }
-        }
-        while (!IsRefAllIdle(csim) || !IsO3AllIdle(csim));
-
-        std::cout << "Finished stepout. " << step << " step(s) walked in total." << std::endl;
-
-        std::cout << "Performance counter:" << std::endl;
-
-        printf("- EvalRef: %d/%d (%.2f%%)\n", perfc_ref, step, (float)perfc_ref / step * 100);
-        printf("- EvalO3:  %d/%d (%.2f%%)\n", perfc_o3,  step, (float)perfc_o3  / step * 100);
-
-        return true;
-    }
-
-
-    
     //
-    void __common_RAT0_DIFFSIM_INSN_DUMP(const SimInstruction& insn, std::ostream& os)
+    void __common_RAT0_DIFFSIM_INSN_DUMP(const SimInstruction& insn, 
+                                         std::ostream& os)
     {
         os << "FID(" << std::setw(8) << std::setfill(' ') << insn.GetFID() << ") ";
         os << "#" << insn.GetDelay() << " ";
@@ -2174,6 +2071,310 @@ namespace VMC::RAT {
         os << std::resetiosflags << std::endl;
     }
 
+    //
+    inline void __common_RAT0_DIFFSIM_ROB_DUMP(const SimReOrderBuffer::Entry& entry,
+                                               std::ostream& os)
+    {
+        os << "ROB_READY(" << entry.IsReady() << ") ";
+        __common_RAT0_DIFFSIM_INSN_DUMP(entry.GetInsn(), os);
+    }
+
+    //
+    inline void __common_RAT0_DIFFSIM_RESERVATION_DUMP(const SimReservation::Entry& entry,
+                                                       std::ostream& os)
+    {
+        os << "DST_READY(" << entry.IsDstReady()  << ") ";
+        os << "S1_READY("  << entry.IsSrc1Ready() << ") ";
+        os << "S2_READY("  << entry.IsSrc2Ready() << ") ";
+        __common_RAT0_DIFFSIM_INSN_DUMP(entry.GetInsn(), os);
+    } 
+
+    // 
+    inline void __common_RAT0_DIFFSIM_SCOREBOARD_DUMP(SimHandle csim,
+                                                      int index)
+    {
+        std::cout << "PRF(" << std::setw(2) << std::setfill(' ') << index << ") ";
+        std::cout << "BUSY(1) ";
+        std::cout << "FID(" << std::setw(8) << std::setfill(' ') << csim->O3Scoreboard.GetFID(index) << ")" << std::endl;
+    }
+
+
+    // rat0.diffsim.insn.eval.step
+    bool _RAT0_DIFFSIM_INSN_EVAL_STEP(void* handle, const std::string& cmd,
+                                                    const std::string& paramline,
+                                                    const std::vector<std::string>& params)
+    {
+        SimHandle csim = GetCurrentHandle();
+
+        if (!csim->FlagARF0Conv)
+        {
+            std::cout << "Only support ARF0-conv mode." << std::endl;
+            return false;
+        }
+
+        if (!params.empty())
+        {
+            std::cout << "Too much or too less parameter(s) for \'rat0.diffsim.insn.eval.step\'" << std::endl;
+            return false;
+        }
+
+        if (!__common_RAT0_DIFFSIM_INSN_EVAL(csim->FlagStepInfo))
+        {
+            std::cout << "Eval failure." << std::endl;
+            return false;
+        }
+
+        DispRefStatus(csim);
+        DispO3Status(csim);
+
+        return true;
+    }
+
+
+    // rat0.diffsim.insn.eval.stepout [-SF|-WWDG|-T <count>]
+    bool _RAT0_DIFFSIM_INSN_EVAL_STEPOUT(void* handle, const std::string& cmd,
+                                                       const std::string& paramline,
+                                                       const std::vector<std::string>& params)
+    {
+        // TODO: implement flag -SF if further debug required
+
+        SimHandle csim = GetCurrentHandle();
+
+        if (!csim->FlagARF0Conv)
+        {
+            std::cout << "Only support ARF0-conv mode." << std::endl;
+            return false;
+        }
+
+        bool flagT    = false;
+        bool flagNWDG = false;
+
+        int varT = 0;
+
+        for (int i = 0; i < params.size(); i++)
+        {
+            std::string param = params[i];
+
+            if (param.compare("-T") == 0)
+            {
+                if (i + 1 < params.size())
+                {
+                    flagT = true;
+                    std::istringstream(params[++i]) >> varT;
+                }
+                else
+                {
+                    std::cout << "Param " << i << " \'" << param << "\' needs more parameter(s)." << std::endl;
+                    return false;
+                }
+            }
+            else if (param.compare("-NWDG") == 0)
+                flagNWDG = true;
+            else
+            {
+                std::cout << "Param " << i << " \'" << param << "\' is invalid." << std::endl;
+                return false;
+            }
+        }
+
+        int step = 0;
+
+        int perfc_ref = 0;
+        int perfc_o3  = 0;
+
+        //
+        int insncnt       = 0;
+        int insncnt_digit = 1;
+
+        int updatecnt     = 0;
+
+        bool finish_ref_fetch   = false;
+        bool finish_ref_commit  = false;
+        bool finish_o3_fetch    = false;
+        bool finish_o3_commit   = false;
+
+        bool first_cursor = true;
+
+        //
+        csim->O3FetchCount  = 0;
+        csim->O3CommitCount = 0;
+
+        csim->RefFetchCount  = 0;
+        csim->RefCommitCount = 0;
+
+        if (csim->FlagStepInfo)
+            printf("[ -------- ] --------------------------------\n");
+        else
+        {
+            //
+            insncnt = csim->RefFetch.GetCount();
+
+            while (insncnt /= 10)
+                insncnt_digit++;
+
+            //
+            insncnt = csim->RefFetch.GetCount();
+
+            std::cout << "Instruction count " << insncnt << " in total in fetch queue." << std::endl;
+        }
+
+        do 
+        {
+            step++;
+
+            if (!__common_RAT0_DIFFSIM_INSN_EVAL(csim->FlagStepInfo, step))
+            {
+                std::cout << "Eval failure at step " << step << "." << std::endl;
+                return false;
+            }
+
+            if (!IsRefAllIdle(csim))
+                perfc_ref++;
+
+            if (!IsO3AllIdle(csim))
+                perfc_o3++;
+
+            if (csim->FlagStepInfo)
+            {
+                printf("[ %8d ] ", step);
+                DispRefStatus(csim);
+
+                printf("[ %8d ] ", step);
+                DispO3Status(csim);
+
+                printf("[ -------- ] --------------------------------\n");
+            }
+
+            if (!flagNWDG && perfc_o3 > perfc_ref)
+            {
+                std::cout << "[ \033[1;33mWARN\033[0m     ] EvalO3 (Out-of-Order) slacked back then EvalRef (In-Order)." << std::endl;
+                std::cout << "[ \033[1;33mWARN\033[0m     ] EvalO3 might be in dead loop. Stopped step-out process." << std::endl;
+
+                //
+                std::cout << "[ \033[1;33mWARN\033[0m     ] Dump O3Fetch entries." << std::endl;
+
+                std::list<SimInstruction> o3fetch = csim->O3Fetch.Get();
+                std::list<SimInstruction>::const_iterator o3fetch_iter = o3fetch.begin();
+                for (; o3fetch_iter != o3fetch.end(); o3fetch_iter++)
+                {
+                    std::cout << "[ \033[1;33mWARN\033[0m     ] - ";
+                    __common_RAT0_DIFFSIM_INSN_DUMP(*o3fetch_iter, std::cout);
+                }
+
+                //
+                std::cout << "[ \033[1;33mWARN\033[0m     ] Dump O3Scoreboard entries." << std::endl;
+
+                for (int i = 0; i < EMULATED_PRF_SIZE; i++)
+                {
+                    if (csim->O3Scoreboard.IsBusy(i))
+                    {
+                        std::cout << "[ \033[1;33mWARN\033[0m     ] - ";
+                        __common_RAT0_DIFFSIM_SCOREBOARD_DUMP(csim, i);
+                    }
+                }
+
+                //
+                std::cout << "[ \033[1;33mWARN\033[0m     ] Dump O3Reservation entries." << std::endl;
+
+                std::list<SimReservation::Entry> o3reservation = csim->O3Reservation.Get();
+                std::list<SimReservation::Entry>::const_iterator o3reservation_iter = o3reservation.begin();
+                for (; o3reservation_iter != o3reservation.end(); o3reservation_iter++)
+                {
+                    std::cout << "[ \033[1;33mWARN\033[0m     ] - ";
+                    __common_RAT0_DIFFSIM_RESERVATION_DUMP(*o3reservation_iter, std::cout);
+                }
+
+                //
+                std::cout << "[ \033[1;33mWARN\033[0m     ] Dump O3ROB entries." << std::endl;
+
+                std::list<SimReOrderBuffer::Entry> o3rob = csim->O3ROB.Get();
+                std::list<SimReOrderBuffer::Entry>::const_iterator o3rob_iter = o3rob.begin();
+                for (; o3rob_iter != o3rob.end(); o3rob_iter++)
+                {
+                    std::cout << "[ \033[1;33mWARN\033[0m     ] - ";
+                    __common_RAT0_DIFFSIM_ROB_DUMP(*o3rob_iter, std::cout);
+                }
+
+                break;
+            }
+
+            if (!csim->FlagStepInfo
+                && (updatecnt == 22133 
+                    || (!finish_ref_fetch  && (finish_ref_fetch  = csim->RefFetchCount == insncnt)) 
+                    || (!finish_ref_commit && (finish_ref_commit = csim->RefCommitCount == insncnt))
+                    || (!finish_o3_fetch   && (finish_o3_fetch   = csim->O3FetchCount == insncnt))
+                    || (!finish_o3_commit  && (finish_o3_commit  = csim->O3CommitCount == insncnt))))
+            {
+                updatecnt = 0;
+
+                std::cout << "\33[?25l";
+
+                if (!first_cursor)
+                    std::cout << "\033[3A" << std::endl;
+                else
+                    first_cursor = false;
+
+                //
+                std::cout << "EvalRef: ";
+                std::cout << "Fetch: ";
+                if (csim->RefFetchCount == insncnt)
+                    std::cout << "\033[1;32m";
+                else
+                    std::cout << "\033[1;33m";
+                std::cout << std::setw(insncnt_digit) << std::setfill(' ') << csim->RefFetchCount << "\033[0m";
+                std::cout << "/" << insncnt << "  ";
+
+                std::cout << "Commit: ";
+                if (csim->RefCommitCount == insncnt)
+                    std::cout << "\033[1;32m";
+                else
+                    std::cout << "\033[1;33m";
+                std::cout << std::setw(insncnt_digit) << std::setfill(' ') << csim->RefCommitCount << "\033[0m";
+                std::cout << "/" << insncnt << std::endl;
+
+                //
+                std::cout << "EvalO3:  ";
+                std::cout << "Fetch: ";
+                if (csim->O3FetchCount == insncnt)
+                    std::cout << "\033[1;32m";
+                else
+                    std::cout << "\033[1;33m";
+                std::cout << std::setw(insncnt_digit) << std::setfill(' ') << csim->O3FetchCount << "\033[0m";
+                std::cout << "/" << insncnt << "  ";
+
+                std::cout << "Commit: ";
+                if (csim->O3CommitCount == insncnt)
+                    std::cout << "\033[1;32m";
+                else
+                    std::cout << "\033[1;33m";
+                std::cout << std::setw(insncnt_digit) << std::setfill(' ') << csim->O3CommitCount << "\033[0m";
+                std::cout << "/" << insncnt << std::endl;
+
+                std::cout << "\33[?25h";
+            }
+            else
+                updatecnt++;
+
+            if (flagT)
+            {
+                if (step < varT)
+                    continue;
+
+                break;
+            }
+        }
+        while (!IsRefAllIdle(csim) || !IsO3AllIdle(csim));
+
+        std::cout << "Finished stepout. " << step << " step(s) walked in total." << std::endl;
+
+        std::cout << "Performance counter:" << std::endl;
+
+        printf("- EvalRef: %d/%d (%.2f%%)\n", perfc_ref, step, (float)perfc_ref / step * 100);
+        printf("- EvalO3:  %d/%d (%.2f%%)\n", perfc_o3,  step, (float)perfc_o3  / step * 100);
+
+        return true;
+    }
+
 
     //
     bool __common_RAT0_DIFFSIM_INSN_DUMP_EX(int offset, 
@@ -2208,6 +2409,11 @@ namespace VMC::RAT {
                     std::cout << "Param " << i << " \'-range\' requires more parameters." << std::endl;
                     return false;
                 }
+            }
+            else
+            {
+                std::cout << "Param " << i << " \'" << param << "\' is invalid." << std::endl;
+                return false;
             }
         }
 
@@ -2261,12 +2467,103 @@ namespace VMC::RAT {
 
 
     // rat0.diffsim.o3.fetch.dump
+    bool _RAT0_DIFFSIM_O3_FETCH_DUMP(void* handle, const std::string& cmd,
+                                                   const std::string& paramline,
+                                                   const std::vector<std::string>& params)
+    {
+        if (!params.empty())
+        {
+            std::cout << "Too much or too less parameter(s) for \'rat0.diffsim.o3.fetch.dump\'." << std::endl;
+            return false;
+        }
+
+        //
+        SimHandle csim = GetCurrentHandle();
+
+        //
+        const std::list<SimInstruction>& insns = csim->O3Fetch.Get();
+        
+        std::list<SimInstruction>::const_iterator iter = insns.begin();
+        for (; iter != insns.end(); iter++)
+            __common_RAT0_DIFFSIM_INSN_DUMP(*iter, std::cout);
+
+        return true;
+    }
 
 
     // rat0.diffsim.o3.rob.dump
+    bool _RAT0_DIFFSIM_O3_ROB_DUMP(void* handle, const std::string& cmd,
+                                                 const std::string& paramline,
+                                                 const std::vector<std::string>& params)
+    {
+        if (!params.empty())
+        {
+            std::cout << "Too much or too less parameter(s) for \'rat0.diffsim.o3.rob.dump\'." << std::endl;
+            return false;
+        }
+
+        //
+        SimHandle csim = GetCurrentHandle();
+
+        //
+        const std::list<SimReOrderBuffer::Entry>& entries = csim->O3ROB.Get();
+
+        std::list<SimReOrderBuffer::Entry>::const_iterator iter = entries.begin();
+        for (; iter != entries.end(); iter++)
+            __common_RAT0_DIFFSIM_ROB_DUMP(*iter, std::cout);
+
+        return true;
+    }
 
 
     // rat0.diffsim.o3.reservation.dump
+    bool _RAT0_DIFFSIM_O3_RESERVATION_DUMP(void* handle, const std::string& cmd,
+                                                         const std::string& paramline,
+                                                         const std::vector<std::string>& params)
+    {
+        if (!params.empty())
+        {
+            std::cout << "Too much or too less parameter(s) for \'rat0.diffsim.o3.reservation.dump\'." << std::endl;
+            return false;
+        }
+
+        //
+        SimHandle csim = GetCurrentHandle();
+
+        //
+        const std::list<SimReservation::Entry>& entries = csim->O3Reservation.Get();
+
+        std::list<SimReservation::Entry>::const_iterator iter = entries.begin();
+        for (; iter != entries.end(); iter++)
+            __common_RAT0_DIFFSIM_RESERVATION_DUMP(*iter, std::cout);
+
+        return true;
+    }
+
+
+    // rat0.diffsim.o3.scoreboard.dump
+    bool _RAT0_DIFFSIM_O3_SCOREBOARD_DUMP(void* handle, const std::string& cmd,
+                                                        const std::string& paramline,
+                                                        const std::vector<std::string>& params)
+    {
+        if (!params.empty())
+        {
+            std::cout << "Too much or too less parameter(s) for \'rat0.diffsim.o3.scoreboard.dump\'." << std::endl;
+            return false;
+        }
+
+        //
+        SimHandle csim = GetCurrentHandle();
+
+        //
+        for (int i = 0; i < EMULATED_PRF_SIZE; i++)
+        {
+            if (csim->O3Scoreboard.IsBusy(i))
+                __common_RAT0_DIFFSIM_SCOREBOARD_DUMP(csim, i);
+        }
+
+        return true;
+    }
 
 
 
@@ -2291,6 +2588,10 @@ namespace VMC::RAT {
         RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.eval.stepout")   , &_RAT0_DIFFSIM_INSN_EVAL_STEPOUT });
         RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.dump")           , &_RAT0_DIFFSIM_INSN_DUMP });
         RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.dumpfile")       , &_RAT0_DIFFSIM_INSN_DUMPFILE });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.o3.fetch.dump")       , &_RAT0_DIFFSIM_O3_FETCH_DUMP });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.o3.rob.dump")         , &_RAT0_DIFFSIM_O3_ROB_DUMP });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.o3.reservation.dump") , &_RAT0_DIFFSIM_O3_RESERVATION_DUMP });
+        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.o3.scoreboard.dump")  , &_RAT0_DIFFSIM_O3_SCOREBOARD_DUMP });
     }
 }
 
@@ -3355,12 +3656,10 @@ namespace VMC::RAT {
 
     SimReOrderBuffer::SimReOrderBuffer()
         : entries   (std::list<Entry>())
-        , next      (entries.end())
     { }
 
     SimReOrderBuffer::SimReOrderBuffer(const SimReOrderBuffer& obj)
         : entries   (obj.entries)
-        , next      (entries.end())
     { }
 
     SimReOrderBuffer::~SimReOrderBuffer()
@@ -3415,28 +3714,12 @@ namespace VMC::RAT {
 
     bool SimReOrderBuffer::NextInsn(Entry* entry)
     {
-        if (next != entries.end())
+        if (entries.front().IsReady())
         {
             if (entry)
-                *entry = *next;
+                *entry = entries.front();
 
             return true;
-        }
-
-        std::list<Entry>::iterator iter = entries.begin();
-        while (iter != entries.end())
-        {
-            if (iter->IsReady())
-            {
-                next = iter;
-
-                if (entry)
-                    *entry = *iter;
-
-                return true;
-            }
-
-            iter++;
         }
 
         return false;
@@ -3444,12 +3727,11 @@ namespace VMC::RAT {
 
     bool SimReOrderBuffer::PopInsn()
     {
-        if (next == entries.end() && !NextInsn())
+        if (entries.empty())
             return false;
 
-        entries.erase(next);
-        next = entries.end();
-        
+        entries.pop_front();
+
         return true;
     }
 }
