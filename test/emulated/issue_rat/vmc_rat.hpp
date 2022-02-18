@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstdint>
 #include <cstdlib>
+#include <algorithm>
 #include <iostream>
 #include <sstream>
 #include <fstream>
@@ -187,17 +188,45 @@ namespace VMC::RAT {
         bool    PopInsn();
     };
 
+
+    static constexpr int SCOREBOARD_STATUS_BUSY     = -1;
+
+    static constexpr int SCOREBOARD_STATUS_IN_ARF   = 0;
+
+    static constexpr int SCOREBOARD_STATUS_IN_ROB   = 1;
+
+    static constexpr int SCOREBOARD_STATUS_FORWARD  = 2; // unused
+
     class SimScoreboard // Only support ARF0-conv mode
     {
+    public:
+        class Modification {
+        private:
+            int index;
+            int status;
+            int FID;
+
+        public:
+            Modification();
+            Modification(int index, int status, int FID);
+            ~Modification();
+
+            void    SetIndex(int index);
+            void    SetStatus(int status);
+            void    SetFID(int FID);
+
+            int     GetIndex() const;
+            int     GetStatus() const;
+            int     GetFID() const;
+        };
+
     private:
-        const int   size;
+        const int               size;
 
-        int         busy_index;
-        int         busy_FID;
-        int         release_FID;
+        std::list<Modification> modification;
 
-        bool* const busy;
-        int*  const FID;
+        int*              const status;
+        int*              const FID;
 
     public:
         SimScoreboard(int size);
@@ -208,8 +237,8 @@ namespace VMC::RAT {
 
         int     GetFID(int index) const;
         bool    IsBusy(int index) const;
-        void    SetBusy(int index, int FID);
-        void    Release(int FID);
+        int     GetStatus(int index) const;
+        void    SetStatus(int index, int status, int FID = -1);
 
         void    ResetInput();
 
@@ -326,6 +355,7 @@ namespace VMC::RAT {
         bool    IsEmpty() const;
 
         void    PushInsn(const SimInstruction& insn, Entry* entry = nullptr);
+        void    PushInsnEx(const SimInstruction& insn, uint64_t src1val, uint64_t src2val, Entry* entry = nullptr);
 
         bool    NextInsn(Entry* entry = nullptr);
         bool    PopInsn();
@@ -369,6 +399,8 @@ namespace VMC::RAT {
 
         int     GetCount() const;
         bool    IsEmpty() const;
+
+        bool    GetDstValue(int FID, uint64_t* dst) const;
 
         void    TouchInsn(const SimInstruction& insn);
         bool    WritebackInsn(const SimInstruction& insn, uint64_t value);
@@ -447,6 +479,8 @@ namespace VMC::RAT {
         int                         RefFetchCount               = 0;
 
         int                         RefCommitCount              = 0;
+
+        int                         O3ROBCountMax               = 0;
 
     } SimContext, *SimHandle;
 }
@@ -662,7 +696,7 @@ namespace VMC::RAT {
         csim->RefExecution.PushInsn(insn);
 
         if (insn.GetDst()) // arf0conv on scoreboard
-            csim->RefScoreboard.SetBusy(insn.GetDst(), insn.GetFID());
+            csim->RefScoreboard.SetStatus(insn.GetDst(), SCOREBOARD_STATUS_BUSY, insn.GetFID());
 
         if (!csim->RefReservation.PopInsn())
         {
@@ -714,7 +748,7 @@ namespace VMC::RAT {
             return false;
         }
 
-        csim->RefScoreboard.Release(insn.GetFID());
+        csim->RefScoreboard.SetStatus(insn.GetDst(), SCOREBOARD_STATUS_IN_ARF);
 
         csim->RefCommitCount++;
 
@@ -818,7 +852,7 @@ namespace VMC::RAT {
         csim->O3Reservation.PushInsn(insn);
         csim->O3ROB.TouchInsn(insn);
 
-        csim->O3Scoreboard.SetBusy(insn.GetDst(), insn.GetFID());
+        csim->O3Scoreboard.SetStatus(insn.GetDst(), SCOREBOARD_STATUS_BUSY, insn.GetFID());
 
         csim->O3Fetch.PopInsn();
 
@@ -877,20 +911,68 @@ namespace VMC::RAT {
         }
 
         //
-        if (info)
+        uint64_t src1val;
+        uint64_t src2val;
+
+        int src1status = csim->O3Scoreboard.GetStatus(insn.GetSrc1());
+        int src2status = csim->O3Scoreboard.GetStatus(insn.GetSrc2());
+
+        switch (src1status)
         {
-            SimExecution::Entry entry;
+            case SCOREBOARD_STATUS_IN_ARF:
+                src1val = SimO3ARF(&(csim->O3PRF))[insn.GetSrc1()];
 
-            csim->O3Execution.PushInsn(insn, &entry);
+                if (info)
+                    printf("[ %8d ] O3Issue: Read src1 PRF #%d value: %ld (0x%016lx).\n", step, insn.GetSrc1(), src1val, src1val);
 
-            printf("[ %8d ] O3Issue: Read src1 PRF #%d value: %ld (0x%016lx).\n", step, insn.GetSrc1(), entry.GetSrc1Value(), entry.GetSrc1Value());
-            printf("[ %8d ] O3Issue: Read src2 PRF #%d value: %ld (0x%016lx).\n", step, insn.GetSrc2(), entry.GetSrc2Value(), entry.GetSrc2Value());
+                break;
+
+            case SCOREBOARD_STATUS_IN_ROB:
+                if (!csim->O3ROB.GetDstValue(csim->O3Scoreboard.GetFID(insn.GetSrc1()), &src1val))
+                {
+                    ShouldNotReachHere(" RAT::EvalO3Issue ILLEGAL_STATE #ROBForwardFailure(src1)");
+                    return false;
+                }
+
+                if (info)
+                    printf("[ %8d ] O3Issue: Read src1 PRF #%d value: %ld (0x%016lx) from ROB.\n", step, insn.GetSrc1(), src1val, src1val);
+
+                break;
+
+            default:
+                ShouldNotReachHere(" RAT::EvalO3Issue ILLEGAL_STATUE #ScoreboardStatus(src1)");
+                return false;
         }
-        else
+
+        switch (src2status)
         {
-            csim->O3Execution.PushInsn(insn);
+            case SCOREBOARD_STATUS_IN_ARF:
+                src2val = SimO3ARF(&(csim->O3PRF))[insn.GetSrc2()];
+
+                if (info)
+                    printf("[ %8d ] O3Issue: Read src2 PRF #%d value: %ld (0x%016lx).\n", step, insn.GetSrc2(), src2val, src2val);
+
+                break;
+
+            case SCOREBOARD_STATUS_IN_ROB:
+                if (!csim->O3ROB.GetDstValue(csim->O3Scoreboard.GetFID(insn.GetSrc2()), &src2val))
+                {
+                    ShouldNotReachHere(" RAT::EvalO3Issue ILLEGAL_STATE #ROBForwardFailure(src2)");
+                    return false;
+                }
+
+                if (info)
+                    printf("[ %8d ] O3Issue: Read src2 PRF #%d value: %ld (0x%016lx) from ROB.\n", step, insn.GetSrc2(), src2val, src2val);
+
+                break;
+
+            default:
+                ShouldNotReachHere(" RAT::EvalO3Issue ILLEGAL_STATUE #ScoreboardStatus(src2)");
+                return false;
         }
 
+        csim->O3Execution.PushInsnEx(insn, src1val, src2val);
+        
         if (!csim->O3Reservation.PopInsn())
         {
             ShouldNotReachHere(" RAT::EvalO3Issue ILLEGAL_STATE #ReservationPopFail");
@@ -938,6 +1020,8 @@ namespace VMC::RAT {
             ShouldNotReachHere(" RAT::EvalO3Writeback ILLEGAL_STATE #ROBWritebackFail");
             return false;
         }
+
+        csim->O3Scoreboard.SetStatus(insn.GetDst(), SCOREBOARD_STATUS_IN_ROB);
 
         if (!csim->O3Execution.PopInsn())
         {
@@ -994,7 +1078,7 @@ namespace VMC::RAT {
             return false;
         }
 
-        csim->O3Scoreboard.Release(insn.GetFID());
+        csim->O3Scoreboard.SetStatus(insn.GetDst(), SCOREBOARD_STATUS_IN_ARF);
 
         // assert
         if (insn.GetDst() >= 0 && csim->O3RAT.GetEntry(insn.GetDst()).GetFID() != insn.GetFID())
@@ -1028,6 +1112,8 @@ namespace VMC::RAT {
         csim->O3Execution.Eval();
         csim->O3RAT.Eval();
         csim->O3PRF.Eval();
+
+        csim->O3ROBCountMax = max(csim->O3ROBCountMax, csim->O3ROB.GetCount());
     }
 
     bool EvalO3(SimHandle csim, bool info, int step)
@@ -2372,6 +2458,8 @@ namespace VMC::RAT {
         printf("- EvalRef: %d/%d (%.2f%%)\n", perfc_ref, step, (float)perfc_ref / step * 100);
         printf("- EvalO3:  %d/%d (%.2f%%)\n", perfc_o3,  step, (float)perfc_o3  / step * 100);
 
+        printf("- O3ROBCountMax: %d\n", csim->O3ROBCountMax);
+
         return true;
     }
 
@@ -2976,49 +3064,99 @@ namespace VMC::RAT {
 }
 
 
+// class VMC::RAT::SimScoreboard::Modification
+namespace VMC::RAT {
+    /*
+    int index;
+    int status;
+    int FID;
+    */
+
+    SimScoreboard::Modification::Modification()
+        : index     (-1)
+        , status    (SCOREBOARD_STATUS_IN_ARF)
+        , FID       (-1)
+    { }
+
+    SimScoreboard::Modification::Modification(int index, int status, int FID)
+        : index     (index)
+        , status    (status)
+        , FID       (FID)
+    { }
+
+    SimScoreboard::Modification::~Modification()
+    { }
+
+    inline void SimScoreboard::Modification::SetIndex(int index)
+    {
+        this->index = index;
+    }
+
+    inline void SimScoreboard::Modification::SetStatus(int status)
+    {
+        this->status = status;
+    }
+
+    inline void SimScoreboard::Modification::SetFID(int FID)
+    {
+        this->FID = FID;
+    }
+
+    inline int SimScoreboard::Modification::GetIndex() const
+    {
+        return index;
+    }
+
+    inline int SimScoreboard::Modification::GetStatus() const
+    {
+        return status;
+    }
+
+    inline int SimScoreboard::Modification::GetFID() const
+    {
+        return FID;
+    }
+}
+
+
 // class VMC::RAT::SimScoreboard
 namespace VMC::RAT {
     /*
-    const int   size;
+    const int               size;
 
-    int         busy_index;
-    int         busy_FID;
-    int         release_FID;
+    std::list<Modification> modification;
 
-    bool* const busy;
-    int*  const FID;
+    int*              const status;
+    int*              const FID;
     */
 
     SimScoreboard::SimScoreboard(int size)
         : size          (size)
-        , busy_index    (-1)
-        , busy_FID      (-1)
-        , release_FID   (-1)
-        , busy          (new bool[size]())
+        , modification  (std::list<Modification>())
+        , status        (new int[size]())
         , FID           (new int[size])
     { }
 
     SimScoreboard::SimScoreboard(const SimScoreboard& obj)
         : size          (obj.size)
-        , busy_index    (obj.busy_index)
-        , busy_FID      (obj.busy_FID)
-        , release_FID   (obj.release_FID)
-        , busy          (new bool[obj.size]())
+        , modification  (obj.modification)
+        , status        (new int[obj.size]())
         , FID           (new int[obj.size])
     {
-        memcpy(busy, obj.busy, obj.size * sizeof(bool));
-        memcpy(FID,  obj.FID,  obj.size * sizeof(int));
+        memcpy(status, obj.status, obj.size * sizeof(int));
+        memcpy(FID,    obj.FID,    obj.size * sizeof(int));
     }
 
     SimScoreboard::~SimScoreboard()
     {
-        delete busy;
+        delete status;
         delete FID;
     }
 
-    void SimScoreboard::Clear()
+    inline void SimScoreboard::Clear()
     {
-        memset(busy, 0, size * sizeof(bool));
+        memset(status, 0, size * sizeof(int));
+        modification.clear();
     }
 
     inline bool SimScoreboard::IsBusy(int index) const
@@ -3026,7 +3164,7 @@ namespace VMC::RAT {
         if (index == -1)
             return false;
 
-        return busy[index];
+        return status[index] == SCOREBOARD_STATUS_BUSY;
     }
 
     inline int SimScoreboard::GetFID(int index) const
@@ -3034,52 +3172,40 @@ namespace VMC::RAT {
         if (index == -1)
             return -1;
 
-        if (busy[index])
-            return FID[index];
-        
-        return -1;
+        return FID[index];
     }
 
-    inline void SimScoreboard::SetBusy(int index, int FID)
+    inline int SimScoreboard::GetStatus(int index) const
+    {
+        if (index == -1)
+            return SCOREBOARD_STATUS_IN_ARF;
+
+        return status[index];
+    }
+
+    inline void SimScoreboard::SetStatus(int index, int status, int FID)
     {
         if (index == -1)
             return;
 
-        busy_index = index;
-        busy_FID   = FID;
+        modification.push_back(Modification(index, status, FID));
     }
 
-    inline void SimScoreboard::Release(int FID)
+    inline void SimScoreboard::ResetInput()
     {
-        release_FID = FID;
-    }
-
-    void SimScoreboard::ResetInput()
-    {
-        busy_index  = -1;
-        busy_FID    = -1;
-        release_FID = -1;
+        modification.clear();
     }
 
     void SimScoreboard::Eval()
     {
-        if (busy_index >= 0)
+        std::list<Modification>::iterator iter = modification.begin();
+        for (; iter != modification.end(); iter++)
         {
-            this->busy[busy_index] = true;
-            this->FID [busy_index] = busy_FID;
+            status[iter->GetIndex()] = iter->GetStatus();
+
+            if (iter->GetFID() != -1)
+                FID[iter->GetIndex()] = iter->GetFID();
         }
-
-        if (release_FID >= 0)
-            for (int i = 0; i < size; i++) 
-            {
-                if (this->FID[i] == release_FID && this->busy[i])
-                {
-                    this->busy[i] = false;
-
-                    // only one destination register for one instruction
-                    break;
-                }
-            }
 
         ResetInput();
     }
@@ -3537,6 +3663,16 @@ namespace VMC::RAT {
         entries.push_back(newEntry);
     }
 
+    void SimExecution::PushInsnEx(const SimInstruction& insn, uint64_t src1val, uint64_t src2val, Entry* entry)
+    {
+        Entry newEntry(insn, src1val, src2val);
+
+        if (entry)
+            *entry = newEntry;
+
+        entries.push_back(newEntry);
+    }
+
     bool SimExecution::NextInsn(Entry* entry)
     {
         if (next != entries.end())
@@ -3678,6 +3814,22 @@ namespace VMC::RAT {
     inline bool SimReOrderBuffer::IsEmpty() const
     {
         return entries.empty();
+    }
+
+    bool SimReOrderBuffer::GetDstValue(int FID, uint64_t* dst) const
+    {
+        std::list<Entry>::const_iterator iter = entries.begin();
+        for(; iter != entries.end(); iter++)
+        {
+            if (iter->IsReady() && iter->GetFID() == FID)
+            {
+                *dst = iter->GetDstValue();
+
+                return true;
+            }
+        }
+
+        return false;
     }
 
     void SimReOrderBuffer::TouchInsn(const SimInstruction& insn)
