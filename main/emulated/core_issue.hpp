@@ -14,7 +14,6 @@
 #define EMULATED_PRF_SIZE                           64
 
 #define EMULATED_RAT_SIZE                           EMULATED_PRF_SIZE
-#define EMULATED_RAT_GC_COUNT                       EMULATED_GC_COUNT
 
 using namespace std;
 
@@ -78,7 +77,7 @@ namespace MEMU::Core::Issue {
             void        SetValid(bool val);
 
             uint64_t    GetValue(const PhysicalRegisterFile& prf) const;
-            void        SetValue(PhysicalRegisterFile& prf, uint64_t val);
+            void        SetValue(PhysicalRegisterFile& prf, uint64_t val) const;
 
             void        operator=(const Entry& obj);
         };
@@ -123,36 +122,12 @@ namespace MEMU::Core::Issue {
             void    Apply(Entry& dst) const;
         };
 
-        class GlobalCheckpoint {
-        private:
-            constexpr static int    gc_size = EMULATED_RAT_SIZE;
-
-            bitset<gc_size>         V; // Saved Mapping entry Valid
-
-        public:
-            GlobalCheckpoint();
-            GlobalCheckpoint(const GlobalCheckpoint& obj);
-            ~GlobalCheckpoint();
-
-            constexpr int               GetSize() const;
-
-            bool                        GetValid(int index) const;
-            void                        SetValid(int index, bool valid);
-
-            void                        SetAll();
-            void                        ResetAll();
-        };
-
     private:
         constexpr static int    rat_size     = EMULATED_RAT_SIZE;
-        constexpr static int    rat_gc_count = EMULATED_RAT_GC_COUNT;
 
         Entry*                  entries     /*[rat_size]*/;
-        GlobalCheckpoint*       checkpoints /*[rat_gc_count]*/;  
 
         EntryModification*      modification    /*[rat_size]*/; 
-        int                     rollback;
-        int                     snapshot;
 
     private:
         int                 GetNextEntry() const;
@@ -167,15 +142,11 @@ namespace MEMU::Core::Issue {
         ~RegisterAliasTable();
 
         constexpr int           GetSize() const;
-        constexpr int           GetCheckpointCount() const;
 
         const Entry&            GetEntry(int index) const;
         void                    SetEntry(int index, const Entry& entry);
 
-        const GlobalCheckpoint& GetCheckpoint(int index) const;
-        void                    SetCheckpoint(int index, const GlobalCheckpoint& checkpoint);
-
-        int                     GetAliasPRF(int arf);
+        int                     GetAliasPRF(int arf) const;
 
         void                    Clear();
         bool                    IsFull() const;
@@ -186,13 +157,102 @@ namespace MEMU::Core::Issue {
         bool                    TouchAndWriteback(int FID, int ARF, int* PRF = 0);
         bool                    TouchAndCommit(int FID, int ARF, int* PRF = 0);
 
-        void                    WriteCheckpoint(int GC);
-
-        void                    Rollback(int GC);
-
         void                    ResetInput();
 
         virtual void            Eval() override;
+    };
+
+
+    class ShadowRegisterAliasTable final : public MEMU::Emulated
+    {
+    public:
+        class Entry {
+        private:
+            int     PRF;    // Physical Register File address
+            int     ARF;    // Architectural Register File address
+            bool    V;      // Entry valid
+            bool    NRA;    // Not reallocate-able flag
+        
+        public:
+            Entry();
+            Entry(const Entry& obj);
+            ~Entry();
+
+            void        Clear();
+
+            int         GetPRF() const;
+            int         GetARF() const;
+            bool        GetNRA() const;
+            bool        GetValid() const;
+
+            void        SetPRF(int val);
+            void        SetARF(int val);
+            void        SetNRA(bool val);
+            void        SetValid(bool val);
+
+            uint64_t    GetValue(const PhysicalRegisterFile& prf) const;
+            void        SetValue(PhysicalRegisterFile& prf, uint64_t val) const;
+
+            void        operator=(const Entry& obj);
+        };
+
+        class EntryModification {
+        private:
+            bool    modified;
+
+            bool    modified_ARF;
+            bool    modified_V;
+            bool    modified_NRA;
+
+            int     ARF;
+            bool    V;
+            bool    NRA;
+
+        public:
+            EntryModification();
+            EntryModification(const EntryModification& obj);
+            ~EntryModification();
+
+            bool    IsModified() const;
+
+            bool    IsARFModified() const;
+            bool    IsNRAModified() const;
+            bool    IsValidModified() const;
+
+            void    SetARF(int ARF);
+            void    SetNRA(bool NRA);
+            void    SetValid(bool V);
+
+            void    Reset();
+            void    Apply(Entry& dst) const;
+        };
+
+    private:
+        constexpr static int    rat_size     = EMULATED_RAT_SIZE;
+
+        Entry*                  entries      /*[rat_size]*/;
+
+        EntryModification*      modification /*[rat_size]*/;
+
+    public:
+        ShadowRegisterAliasTable();
+        ShadowRegisterAliasTable(const ShadowRegisterAliasTable& obj);
+        ~ShadowRegisterAliasTable();
+
+        constexpr int       GetSize() const;
+
+        const Entry&        GetEntry(int index) const;
+        void                SetEntry(int index, const Entry& entry);
+
+        int                 GetAliasPRF(int arf) const;
+
+        void                Clear();
+
+        void                Commit(int PRF, int ARF);
+
+        void                ResetInput();
+
+        virtual void        Eval() override;
     };
 }
 
@@ -355,7 +415,7 @@ namespace MEMU::Core::Issue {
         return prf.Get(PRF);
     }
 
-    inline void RegisterAliasTable::Entry::SetValue(PhysicalRegisterFile& prf, uint64_t val)
+    inline void RegisterAliasTable::Entry::SetValue(PhysicalRegisterFile& prf, uint64_t val) const
     {
         prf.Set(PRF, val);
     }
@@ -368,51 +428,6 @@ namespace MEMU::Core::Issue {
         PRF = obj.PRF;
         ARF = obj.ARF;
         V = obj.V;
-    }
-}
-
-
-// class MEMU::Core::Issue::RegisterAliasTable::GlobalCheckpoint
-namespace MEMU::Core::Issue {
-    /*
-    constexpr static int    gc_size = EMULATED_RAT_SIZE;
-
-    bitset<gc_size>         V;
-    */
-
-    RegisterAliasTable::GlobalCheckpoint::GlobalCheckpoint()
-    { }
-
-    RegisterAliasTable::GlobalCheckpoint::GlobalCheckpoint(const RegisterAliasTable::GlobalCheckpoint& obj)
-        : V(obj.V)
-    { }
-
-    RegisterAliasTable::GlobalCheckpoint::~GlobalCheckpoint()
-    { }
-
-    constexpr int RegisterAliasTable::GlobalCheckpoint::GetSize() const
-    {
-        return gc_size;
-    }
-
-    inline bool RegisterAliasTable::GlobalCheckpoint::GetValid(int index) const
-    {
-        return V[index];
-    }
-
-    inline void RegisterAliasTable::GlobalCheckpoint::SetValid(int index, bool valid)
-    {
-        V[index] = valid;
-    }
-
-    inline void RegisterAliasTable::GlobalCheckpoint::SetAll()
-    {
-        V.set();
-    }
-
-    inline void RegisterAliasTable::GlobalCheckpoint::ResetAll()
-    {
-        V.reset();
     }
 }
 
@@ -574,19 +589,14 @@ namespace MEMU::Core::Issue {
     constexpr static int    rat_size     = EMULATED_RAT_SIZE;
     constexpr static int    rat_gc_count = EMULATED_RAT_GC_COUNT;
 
-    Entry*                  entries     //[rat_size];
-    GlobalCheckpoint*       checkpoints //[rat_gc_count];  
+    Entry*                  entries     // [rat_size];
 
-    list<EntryModification> modified;
-    int                     rollback;
+    EntryModification*      modified;   // [rat_size]
     */
 
     RegisterAliasTable::RegisterAliasTable()
         : entries           (new Entry[rat_size]())
-        , checkpoints       (new GlobalCheckpoint[rat_gc_count]())
         , modification      (new EntryModification[rat_size]())
-        , rollback          (-1)
-        , snapshot          (-1)
     { 
         for (int i = 0; i < rat_size; i++)
             entries[i].SetPRF(i);
@@ -594,30 +604,24 @@ namespace MEMU::Core::Issue {
 
     RegisterAliasTable::RegisterAliasTable(const RegisterAliasTable& obj)
         : entries           (new Entry[rat_size])
-        , checkpoints       (new GlobalCheckpoint[rat_gc_count])
-        , modification      (obj.modification)
-        , rollback          (obj.rollback)
-        , snapshot          (obj.snapshot)
+        , modification      (new EntryModification[rat_size])
     {
-        memcpy(entries, obj.entries, rat_size * sizeof(Entry));
-        memcpy(checkpoints, obj.checkpoints, rat_gc_count * sizeof(GlobalCheckpoint));
+        for (int i = 0; i < rat_size; i++)
+        {
+            entries[i] = obj.entries[i];
+            modification[i] = obj.modification[i];
+        }
     }
     
     RegisterAliasTable::~RegisterAliasTable()
     {
         delete[] entries;
-        delete[] checkpoints;
         delete[] modification;
     }
 
     constexpr int RegisterAliasTable::GetSize() const
     {
         return rat_size;
-    }
-
-    constexpr int RegisterAliasTable::GetCheckpointCount() const
-    {
-        return rat_gc_count;
     }
 
     const RegisterAliasTable::Entry& RegisterAliasTable::GetEntry(int index) const
@@ -630,17 +634,7 @@ namespace MEMU::Core::Issue {
         entries[index] = entry;
     }
 
-    const RegisterAliasTable::GlobalCheckpoint& RegisterAliasTable::GetCheckpoint(int index) const
-    {
-        return checkpoints[index];
-    }
-
-    void RegisterAliasTable::SetCheckpoint(int index, const GlobalCheckpoint& checkpoint)
-    {
-        checkpoints[index] = checkpoint;
-    }
-
-    int RegisterAliasTable::GetAliasPRF(int arf)
+    int RegisterAliasTable::GetAliasPRF(int arf) const
     {
         if (!arf)
             return -1;
@@ -811,42 +805,326 @@ namespace MEMU::Core::Issue {
         return Touch(false, FID, ARF, PRF);
     }
 
-    void RegisterAliasTable::WriteCheckpoint(int GC)
-    {
-        snapshot = GC;
-    }
-
-    void RegisterAliasTable::Rollback(int GC)
-    {
-        rollback = GC;
-    }
-
     void RegisterAliasTable::ResetInput()
     {
         for (int i = 0; i < rat_size; i++)
             modification[i].Reset();
-
-        rollback = -1;
-        snapshot = -1;
     }
 
     void RegisterAliasTable::Eval()
     {
-        // Write checkpoint
-        if (snapshot >= 0)
+        // Write entries
+        for (int i = 0; i < rat_size; i++)
         {
-            for (int i = 0; i < rat_size; i++)
-                checkpoints[snapshot].SetValid(i, entries[i].GetValid());
+            if (modification[i].IsModified())
+                modification[i].Apply(entries[i]);
         }
 
-        // Recovery from checkpoint
-        if (rollback >= 0)
+        //
+        ResetInput();
+    }
+}
+
+
+// class MEMU::Core::Issue::ShadowRegisterAliasTable::Entry
+namespace MEMU::Core::Issue {
+    /*
+    int     PRF;    // Physical Register File address
+    int     ARF;    // Architectural Register File address
+    bool    V;      // Entry valid
+    bool    NRA;    // Not reallocate-able flag
+    */
+
+    ShadowRegisterAliasTable::Entry::Entry()
+        : PRF   (0)
+        , ARF   (0)
+        , V     (false)
+        , NRA   (false)
+    { }
+
+    ShadowRegisterAliasTable::Entry::Entry(const Entry& obj)
+        : PRF   (obj.PRF)
+        , ARF   (obj.ARF)
+        , V     (obj.V)
+        , NRA   (obj.NRA)
+    { }
+
+    ShadowRegisterAliasTable::Entry::~Entry()
+    { }
+
+    void ShadowRegisterAliasTable::Entry::Clear()
+    {
+        PRF = 0;
+        ARF = 0;
+        V   = false;
+        NRA = false;
+    }
+
+    inline int ShadowRegisterAliasTable::Entry::GetPRF() const
+    {
+        return PRF;
+    }
+
+    inline int ShadowRegisterAliasTable::Entry::GetARF() const
+    {
+        return ARF;
+    }
+
+    inline bool ShadowRegisterAliasTable::Entry::GetNRA() const
+    {
+        return NRA;
+    }
+
+    inline bool ShadowRegisterAliasTable::Entry::GetValid() const
+    {
+        return V;
+    }
+
+    inline void ShadowRegisterAliasTable::Entry::SetPRF(int val)
+    {
+        this->PRF = val;
+    }
+
+    inline void ShadowRegisterAliasTable::Entry::SetARF(int val)
+    {
+        this->ARF = val;
+    }
+
+    inline void ShadowRegisterAliasTable::Entry::SetNRA(bool val)
+    {
+        this->NRA = val;
+    }
+
+    inline void ShadowRegisterAliasTable::Entry::SetValid(bool val)
+    {
+        this->V = val;
+    }
+
+    inline uint64_t ShadowRegisterAliasTable::Entry::GetValue(const PhysicalRegisterFile& prf) const
+    {
+        return prf.Get(PRF);
+    }
+
+    inline void ShadowRegisterAliasTable::Entry::SetValue(PhysicalRegisterFile& prf, uint64_t val) const
+    {
+        prf.Set(PRF, val);
+    }
+
+    void ShadowRegisterAliasTable::Entry::operator=(const Entry& obj)
+    {
+        this->PRF = obj.PRF;
+        this->ARF = obj.ARF;
+        this->V   = obj.V;
+        this->NRA = obj.NRA;
+    }
+}
+
+
+// class MEMU::Core::Issue::ShadowRegisterAliasTable::EntryModification
+namespace MEMU::Core::Issue {
+    /*
+    bool    modified;
+
+    bool    modified_ARF;
+    bool    modified_V;
+    bool    modified_NRA;
+
+    int     ARF;
+    bool    V;
+    bool    NRA;
+    */
+
+    ShadowRegisterAliasTable::EntryModification::EntryModification()
+        : modified      (false)
+        , modified_ARF  (false)
+        , modified_V    (false)
+        , modified_NRA  (false)
+        , ARF           (0)
+        , V             (0)
+        , NRA           (0)
+    { }
+
+    ShadowRegisterAliasTable::EntryModification::EntryModification(const EntryModification& obj)
+        : modified      (obj.modified)
+        , modified_ARF  (obj.modified_ARF)
+        , modified_V    (obj.modified_V)
+        , modified_NRA  (obj.modified_NRA)
+        , ARF           (obj.ARF)
+        , V             (obj.V)
+        , NRA           (obj.NRA)
+    { }
+
+    ShadowRegisterAliasTable::EntryModification::~EntryModification()
+    { }
+
+    inline bool ShadowRegisterAliasTable::EntryModification::IsModified() const
+    {
+        return modified;
+    }
+
+    inline bool ShadowRegisterAliasTable::EntryModification::IsARFModified() const
+    {
+        return modified_ARF;
+    }
+
+    inline bool ShadowRegisterAliasTable::EntryModification::IsNRAModified() const
+    {
+        return modified_NRA;
+    }
+
+    inline bool ShadowRegisterAliasTable::EntryModification::IsValidModified() const
+    {
+        return modified_V;
+    }
+
+    inline void ShadowRegisterAliasTable::EntryModification::SetARF(int ARF)
+    {
+        modified     = true;
+        modified_ARF = true;
+
+        this->ARF = ARF;
+    }
+
+    inline void ShadowRegisterAliasTable::EntryModification::SetNRA(bool NRA)
+    {
+        modified     = true;
+        modified_NRA = true;
+
+        this->NRA = NRA;
+    }
+
+    inline void ShadowRegisterAliasTable::EntryModification::SetValid(bool V)
+    {
+        modified   = true;
+        modified_V = true;
+
+        this->V = V;
+    }
+
+    void ShadowRegisterAliasTable::EntryModification::Reset()
+    {
+        modified     = false;
+
+        modified_ARF = false;
+        modified_V   = false;
+        modified_NRA = false;
+    }
+
+    void ShadowRegisterAliasTable::EntryModification::Apply(Entry& dst) const
+    {
+        if (modified_ARF)
+            dst.SetARF(ARF);
+
+        if (modified_V)
+            dst.SetValid(V);
+
+        if (modified_NRA)
+            dst.SetNRA(NRA);
+    }
+}
+
+
+// class MEMU::Core::Issue::ShadowRegisterAliasTable
+namespace MEMU::Core::Issue {
+    /*
+    constexpr static int    rat_size     = EMULATED_RAT_SIZE;
+
+    Entry*                  entries;
+
+    EntryModification*      modification;
+    */
+
+    ShadowRegisterAliasTable::ShadowRegisterAliasTable()
+        : entries       (new Entry[rat_size]())
+        , modification  (new EntryModification[rat_size]())
+    { 
+        for (int i = 0; i < rat_size; i++)
+            entries[i].SetPRF(i);
+    }
+
+    ShadowRegisterAliasTable::ShadowRegisterAliasTable(const ShadowRegisterAliasTable& obj)
+        : entries       (new Entry[rat_size])
+        , modification  (new EntryModification[rat_size])
+    {
+        for (int i = 0; i < rat_size; i++)
         {
-            for (int i = 0; i < rat_size; i++)
-                entries[i].SetValid(checkpoints[rollback].GetValid(i));
+            entries[i] = obj.entries[i];
+            modification[i] = obj.modification[i];   
         }
-        
-        // Write entries
+    }
+
+    ShadowRegisterAliasTable::~ShadowRegisterAliasTable()
+    { 
+        delete[] entries;
+        delete[] modification;
+    }
+
+    constexpr int ShadowRegisterAliasTable::GetSize() const
+    {
+        return rat_size;
+    }
+
+    const ShadowRegisterAliasTable::Entry& ShadowRegisterAliasTable::GetEntry(int index) const
+    {
+        return entries[index];
+    }
+
+    void ShadowRegisterAliasTable::SetEntry(int index, const ShadowRegisterAliasTable::Entry& entry)
+    {
+        entries[index] = entry;
+    }
+
+    int ShadowRegisterAliasTable::GetAliasPRF(int arf) const
+    {
+        if (!arf)
+            return -1;
+
+        // Query in CAM
+        for (int i = 0; i < rat_size; i++)
+            if (entries[i].GetValid() && entries[i].GetARF() == arf)
+                return entries[i].GetPRF();
+
+        return -1;
+    }
+
+    void ShadowRegisterAliasTable::Clear()
+    {
+        for (int i = 0; i < rat_size; i++)
+        {
+            entries[i].Clear();
+            entries[i].SetPRF(i);
+        }
+    }
+
+    void ShadowRegisterAliasTable::Commit(int PRF, int ARF)
+    {
+        if (!ARF)
+            return;
+
+        // Shadow commit: 
+        // Record ARF-PRF relation and assert NRA
+        modification[PRF].SetARF(ARF);
+        modification[PRF].SetValid(true);
+        modification[PRF].SetNRA(true);
+
+        // De-assert all other same-ARF NRAs
+        for (int i = 0; i < rat_size; i++)
+            if (entries[i].GetARF() == ARF)
+            {
+                if (!modification[i].IsNRAModified())
+                    modification[i].SetNRA(false);
+            }
+    }
+
+    void ShadowRegisterAliasTable::ResetInput()
+    {
+        for (int i = 0; i < rat_size; i++)
+            modification[i].Reset();
+    }
+
+    void ShadowRegisterAliasTable::Eval()
+    {
+        //
         for (int i = 0; i < rat_size; i++)
         {
             if (modification[i].IsModified())
