@@ -145,9 +145,9 @@ namespace VMC::RAT {
     public:
         SimInstruction();
         SimInstruction(int FID, int delay, int insncode, int dst);
-        SimInstruction(int FID, int delay, int insncode, int dst, int imm);
+        SimInstruction(int FID, int delay, int insncode, int dst, uint64_t imm);
         SimInstruction(int FID, int delay, int insncode, int dst, int src1, int src2);
-        SimInstruction(int FID, int delay, int insncode, int dst, int src1, int src2, int imm);
+        SimInstruction(int FID, int delay, int insncode, int dst, int src1, int src2, uint64_t imm);
         SimInstruction(const SimInstruction& obj);
         ~SimInstruction();
 
@@ -164,6 +164,12 @@ namespace VMC::RAT {
         void        SetSrc2(int src2);
         void        SetInsnCode(int insncode);
         void        SetImmediate(uint64_t imm);
+    };
+
+    class SimInstructionMemory {
+
+        // TODO
+
     };
 
     class SimFetch
@@ -443,6 +449,8 @@ namespace VMC::RAT {
 
         SimO3PipeStatus             O3Status                    = SimO3PipeStatus();
 
+        int                         O3PC                        = 0;
+
         uint64_t                    RefARF[EMULATED_ARF_SIZE]   = { 0 };
 
         SimFetch                    RefFetch                    = SimFetch();
@@ -454,6 +462,8 @@ namespace VMC::RAT {
         SimExecution                RefExecution                = SimExecution(RefARF);
 
         SimRefPipeStatus            RefStatus                   = SimRefPipeStatus();
+
+        int                         RefPC                       = 0;
 
         int                         GlobalFID                   = 0;
 
@@ -481,6 +491,8 @@ namespace VMC::RAT {
         int                         RefCommitCount              = 0;
 
         int                         O3ROBCountMax               = 0;
+
+        int                         O3ReservationCountMax       = 0;
 
     } SimContext, *SimHandle;
 }
@@ -972,7 +984,7 @@ namespace VMC::RAT {
         }
 
         csim->O3Execution.PushInsnEx(insn, src1val, src2val);
-        
+
         if (!csim->O3Reservation.PopInsn())
         {
             ShouldNotReachHere(" RAT::EvalO3Issue ILLEGAL_STATE #ReservationPopFail");
@@ -1087,7 +1099,8 @@ namespace VMC::RAT {
             return false;
         }
 
-        csim->O3RAT.Commit(insn.GetDst());
+        if (insn.GetDst() >= 0)
+            csim->O3RAT.Commit(insn.GetDst());
 
         if (!csim->O3ROB.PopInsn())
         {
@@ -1113,6 +1126,7 @@ namespace VMC::RAT {
         csim->O3RAT.Eval();
         csim->O3PRF.Eval();
 
+        csim->O3ReservationCountMax = max(csim->O3ReservationCountMax, csim->O3Reservation.GetCount());
         csim->O3ROBCountMax = max(csim->O3ROBCountMax, csim->O3ROB.GetCount());
     }
 
@@ -2459,6 +2473,7 @@ namespace VMC::RAT {
         printf("- EvalO3:  %d/%d (%.2f%%)\n", perfc_o3,  step, (float)perfc_o3  / step * 100);
 
         printf("- O3ROBCountMax: %d\n", csim->O3ROBCountMax);
+        printf("- O3ReservationCountMax: %d\n", csim->O3ReservationCountMax);
 
         return true;
     }
@@ -2898,7 +2913,7 @@ namespace VMC::RAT {
         , imm       (0)
     { }
 
-    SimInstruction::SimInstruction(int FID, int delay, int insncode, int dst, int imm)
+    SimInstruction::SimInstruction(int FID, int delay, int insncode, int dst, uint64_t imm)
         : FID       (FID)
         , delay     (delay)
         , dst       (dst)
@@ -2918,7 +2933,7 @@ namespace VMC::RAT {
         , imm       (0)
     { }
 
-    SimInstruction::SimInstruction(int FID, int delay, int insncode, int dst, int src1, int src2, int imm)
+    SimInstruction::SimInstruction(int FID, int delay, int insncode, int dst, int src1, int src2, uint64_t imm)
         : FID       (FID)
         , delay     (delay)
         , dst       (dst)
