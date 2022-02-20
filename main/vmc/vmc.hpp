@@ -624,6 +624,8 @@ namespace VMC::Basic {
         else
             std::istringstream(param) >> seed;
 
+        srand(seed);
+
         printf("Random seed set: %u (0x%08x)\n", seed, seed);
 
         return true;
