@@ -42,6 +42,99 @@ namespace MEMU::Core::Issue {
     };
 
 
+     class ShadowRegisterAliasTable final : public MEMU::Emulated
+    {
+    public:
+        class Entry {
+        private:
+            int     PRF;    // Physical Register File address
+            int     ARF;    // Architectural Register File address
+            bool    V;      // Entry valid
+            bool    NRA;    // Not reallocate-able flag
+        
+        public:
+            Entry();
+            Entry(const Entry& obj);
+            ~Entry();
+
+            void        Clear();
+
+            int         GetPRF() const;
+            int         GetARF() const;
+            bool        GetNRA() const;
+            bool        GetValid() const;
+
+            void        SetPRF(int val);
+            void        SetARF(int val);
+            void        SetNRA(bool val);
+            void        SetValid(bool val);
+
+            uint64_t    GetValue(const PhysicalRegisterFile& prf) const;
+            void        SetValue(PhysicalRegisterFile& prf, uint64_t val) const;
+
+            void        operator=(const Entry& obj);
+        };
+
+        class EntryModification {
+        private:
+            bool    modified;
+
+            bool    modified_ARF;
+            bool    modified_V;
+            bool    modified_NRA;
+
+            int     ARF;
+            bool    V;
+            bool    NRA;
+
+        public:
+            EntryModification();
+            EntryModification(const EntryModification& obj);
+            ~EntryModification();
+
+            bool    IsModified() const;
+
+            bool    IsARFModified() const;
+            bool    IsNRAModified() const;
+            bool    IsValidModified() const;
+
+            void    SetARF(int ARF);
+            void    SetNRA(bool NRA);
+            void    SetValid(bool V);
+
+            void    Reset();
+            void    Apply(Entry& dst) const;
+        };
+
+    private:
+        constexpr static int    rat_size     = EMULATED_RAT_SIZE;
+
+        Entry*                  entries      /*[rat_size]*/;
+
+        EntryModification*      modification /*[rat_size]*/;
+
+    public:
+        ShadowRegisterAliasTable();
+        ShadowRegisterAliasTable(const ShadowRegisterAliasTable& obj);
+        ~ShadowRegisterAliasTable();
+
+        constexpr int       GetSize() const;
+
+        const Entry&        GetEntry(int index) const;
+        void                SetEntry(int index, const Entry& entry);
+
+        int                 GetAliasPRF(int arf) const;
+
+        void                Clear();
+
+        void                Commit(int PRF, int ARF);
+
+        void                ResetInput();
+
+        virtual void        Eval() override;
+    };
+
+
     class RegisterAliasTable final : public MEMU::Emulated
     {
     public:
@@ -157,102 +250,11 @@ namespace MEMU::Core::Issue {
         bool                    TouchAndWriteback(int FID, int ARF, int* PRF = 0);
         bool                    TouchAndCommit(int FID, int ARF, int* PRF = 0);
 
+        void                    Restore(const ShadowRegisterAliasTable& sRAT);
+
         void                    ResetInput();
 
         virtual void            Eval() override;
-    };
-
-
-    class ShadowRegisterAliasTable final : public MEMU::Emulated
-    {
-    public:
-        class Entry {
-        private:
-            int     PRF;    // Physical Register File address
-            int     ARF;    // Architectural Register File address
-            bool    V;      // Entry valid
-            bool    NRA;    // Not reallocate-able flag
-        
-        public:
-            Entry();
-            Entry(const Entry& obj);
-            ~Entry();
-
-            void        Clear();
-
-            int         GetPRF() const;
-            int         GetARF() const;
-            bool        GetNRA() const;
-            bool        GetValid() const;
-
-            void        SetPRF(int val);
-            void        SetARF(int val);
-            void        SetNRA(bool val);
-            void        SetValid(bool val);
-
-            uint64_t    GetValue(const PhysicalRegisterFile& prf) const;
-            void        SetValue(PhysicalRegisterFile& prf, uint64_t val) const;
-
-            void        operator=(const Entry& obj);
-        };
-
-        class EntryModification {
-        private:
-            bool    modified;
-
-            bool    modified_ARF;
-            bool    modified_V;
-            bool    modified_NRA;
-
-            int     ARF;
-            bool    V;
-            bool    NRA;
-
-        public:
-            EntryModification();
-            EntryModification(const EntryModification& obj);
-            ~EntryModification();
-
-            bool    IsModified() const;
-
-            bool    IsARFModified() const;
-            bool    IsNRAModified() const;
-            bool    IsValidModified() const;
-
-            void    SetARF(int ARF);
-            void    SetNRA(bool NRA);
-            void    SetValid(bool V);
-
-            void    Reset();
-            void    Apply(Entry& dst) const;
-        };
-
-    private:
-        constexpr static int    rat_size     = EMULATED_RAT_SIZE;
-
-        Entry*                  entries      /*[rat_size]*/;
-
-        EntryModification*      modification /*[rat_size]*/;
-
-    public:
-        ShadowRegisterAliasTable();
-        ShadowRegisterAliasTable(const ShadowRegisterAliasTable& obj);
-        ~ShadowRegisterAliasTable();
-
-        constexpr int       GetSize() const;
-
-        const Entry&        GetEntry(int index) const;
-        void                SetEntry(int index, const Entry& entry);
-
-        int                 GetAliasPRF(int arf) const;
-
-        void                Clear();
-
-        void                Commit(int PRF, int ARF);
-
-        void                ResetInput();
-
-        virtual void        Eval() override;
     };
 }
 
@@ -320,7 +322,7 @@ namespace MEMU::Core::Issue {
     */
 
     RegisterAliasTable::Entry::Entry()
-        : FID   (0)
+        : FID   (-1)
         , FV    (false)
         , NRA   (false)
         , PRF   (0)
@@ -342,7 +344,7 @@ namespace MEMU::Core::Issue {
 
     void RegisterAliasTable::Entry::Clear()
     {
-        FID = 0;
+        FID = -1;
         FV  = false;
         NRA = false;
         PRF = 0;
@@ -803,6 +805,19 @@ namespace MEMU::Core::Issue {
     bool RegisterAliasTable::TouchAndCommit(int FID, int ARF, int* PRF)
     {
         return Touch(false, FID, ARF, PRF);
+    }
+
+    void RegisterAliasTable::Restore(const ShadowRegisterAliasTable& sRAT)
+    {
+        // HIGHEST PRIORITY write
+        for (int i = 0; i < rat_size; i++)
+        {
+            const ShadowRegisterAliasTable::Entry& entry = sRAT.GetEntry(i);
+
+            modification[i].SetARF(entry.GetARF());
+            modification[i].SetNRA(entry.GetNRA());
+            modification[i].SetValid(entry.GetValid());
+        }
     }
 
     void RegisterAliasTable::ResetInput()
