@@ -43,7 +43,23 @@ namespace VMC::RAT {
 
     static constexpr int INSN_CODE_SUBI     = 10;
 
+    static constexpr int INSN_CODE_BEQ      = 11;
+
+    static constexpr int INSN_CODE_BNE      = 12;
+
+    static constexpr int INSN_CODE_BGE      = 13;
+
+    static constexpr int INSN_CODE_BGT      = 14;
+
     static constexpr int INSN_COUNT         = 11;
+
+    inline static bool IsBranchInsn(int insncode)
+    {
+        return insncode == INSN_CODE_BEQ
+            || insncode == INSN_CODE_BNE
+            || insncode == INSN_CODE_BGE
+            || insncode == INSN_CODE_BGT;
+    }
 
     //
     class SimStageStatus {
@@ -136,39 +152,88 @@ namespace VMC::RAT {
     private:
         int         FID;
         int         delay;
-        int         dst;
-        int         src1;
-        int         src2;
+        int         dstARF;
+        int         src1ARF;
+        int         src2ARF;
         int         insncode;
         uint64_t    imm;
 
     public:
         SimInstruction();
-        SimInstruction(int FID, int delay, int insncode, int dst);
-        SimInstruction(int FID, int delay, int insncode, int dst, uint64_t imm);
-        SimInstruction(int FID, int delay, int insncode, int dst, int src1, int src2);
-        SimInstruction(int FID, int delay, int insncode, int dst, int src1, int src2, uint64_t imm);
+        SimInstruction(int FID, int delay, int insncode, int dstARF);
+        SimInstruction(int FID, int delay, int insncode, int dstARF, uint64_t imm);
+        SimInstruction(int FID, int delay, int insncode, int dstARF, int src1ARF, int src2ARF);
+        SimInstruction(int FID, int delay, int insncode, int dstARF, int src1ARF, int src2ARF, uint64_t imm);
         SimInstruction(const SimInstruction& obj);
         ~SimInstruction();
 
         int         GetFID() const;
         int         GetDelay() const;
-        int         GetDst() const;
-        int         GetSrc1() const;
-        int         GetSrc2() const;
+        int         GetDstARF() const;
+        int         GetSrc1ARF() const;
+        int         GetSrc2ARF() const;
         int         GetInsnCode() const;
         uint64_t    GetImmediate() const;
 
-        void        SetDst(int dst);
-        void        SetSrc1(int src1);
-        void        SetSrc2(int src2);
+        void        SetDstARF(int dst);
+        void        SetSrc1ARF(int src1);
+        void        SetSrc2ARF(int src2);
         void        SetInsnCode(int insncode);
         void        SetImmediate(uint64_t imm);
     };
 
-    class SimInstructionMemory {
+    class SimFetchedInstruction : public SimInstruction
+    {
+    private:
+        int         pc;
+        int         dstPRF;
+        int         src1PRF;
+        int         src2PRF;
 
-        // TODO
+    public:
+        SimFetchedInstruction();
+        SimFetchedInstruction(const SimInstruction& obj);
+        SimFetchedInstruction(const SimInstruction& obj, int pc);
+        SimFetchedInstruction(const SimInstruction& obj, int pc, int dstPRF, int src1PRF, int src2PRF);
+        SimFetchedInstruction(const SimFetchedInstruction& obj);
+        ~SimFetchedInstruction();
+
+        int         GetPC() const;
+        int         GetDstPRF() const;
+        int         GetSrc1PRF() const;
+        int         GetSrc2PRF() const;
+
+        bool        IsBranch() const;
+
+        void        SetPC(int pc);
+        void        SetDstPRF(int dst);
+        void        SetSrc1PRF(int src1);
+        void        SetSrc2PRF(int src2);
+    };
+
+    class SimInstructionMemory {
+    private:
+        int                 capacity;
+        SimInstruction*     memory;
+
+        int                 position;
+
+    public:
+        SimInstructionMemory(int capacity);
+        SimInstructionMemory(const SimInstructionMemory& obj);
+        SimInstructionMemory(const SimInstructionMemory& obj, int new_capacity);
+        ~SimInstructionMemory();
+
+        int                     GetCapacity() const;
+        bool                    CheckBound(bool address) const;
+
+        const SimInstruction&   GetInsn(int address) const;
+        SimInstruction&         GetInsn(int address);
+        void                    SetInsn(int address, const SimInstruction& insn);
+
+        int                     GetPosition() const;
+        void                    SetPosition(int pos);
+        bool                    PushInsn(const SimInstruction& insn);
 
     };
 
@@ -256,29 +321,29 @@ namespace VMC::RAT {
     public:
         class Entry {
         private:
-            SimInstruction  insn;
-            bool            src1rdy;
-            bool            src2rdy;
-            bool            dstrdy;
+            SimFetchedInstruction   insn;
+            bool                    src1rdy;
+            bool                    src2rdy;
+            bool                    dstrdy;
 
         public:
-            Entry(const SimInstruction& insn);
-            Entry(const SimInstruction& insn, bool src1rdy, bool src2rdy, bool dstrdy);
+            Entry(const SimFetchedInstruction& insn);
+            Entry(const SimFetchedInstruction& insn, bool src1rdy, bool src2rdy, bool dstrdy);
             Entry(const Entry& obj);
             ~Entry();
 
-            const SimInstruction&   GetInsn() const;
-            bool                    IsSrc1Ready() const;
-            bool                    IsSrc2Ready() const;
-            bool                    IsDstReady() const;
-            bool                    IsReady() const;
-            int                     GetSrc1() const;
-            int                     GetSrc2() const;
-            int                     GetDst() const;
+            const SimFetchedInstruction&    GetInsn() const;
+            bool                            IsSrc1Ready() const;
+            bool                            IsSrc2Ready() const;
+            bool                            IsDstReady() const;
+            bool                            IsReady() const;
+            int                             GetSrc1() const;
+            int                             GetSrc2() const;
+            int                             GetDst() const;
 
-            void                    SetSrc1Ready(bool rdy = true);
-            void                    SetSrc2Ready(bool rdy = true);
-            void                    SetDstReady(bool rdy = true);
+            void                            SetSrc1Ready(bool rdy = true);
+            void                            SetSrc2Ready(bool rdy = true);
+            void                            SetDstReady(bool rdy = true);
         };
 
     private:
@@ -296,9 +361,9 @@ namespace VMC::RAT {
         const SimScoreboard*    GetScoreboardRef() const;
         
 
-        void                    PushInsn(const SimInstruction& insn);
+        void                    PushInsn(const SimFetchedInstruction& insn);
 
-        bool                    NextInsn(SimInstruction* insn = nullptr);
+        bool                    NextInsn(SimFetchedInstruction* insn = nullptr);
         bool                    PopInsn();
 
         void                    Clear();
@@ -313,33 +378,45 @@ namespace VMC::RAT {
     public:
         class Entry {
         private:
-            SimInstruction  insn;
-            uint64_t        src1val;
-            uint64_t        src2val;
-            int             delay;
-            bool            dstrdy;
-            uint64_t        dstval;
+            SimFetchedInstruction   insn;
+            uint64_t                src1val;
+            uint64_t                src2val;
+            int                     delay;
+            bool                    dstrdy;
+            uint64_t                dstval;
+
+            bool                    branch;
+            bool                    branch_rdy;
+            bool                    branch_taken;
+            int                     branch_target;
 
         public:
             Entry();
-            Entry(const SimInstruction& insn);
-            Entry(const SimInstruction& insn, uint64_t src1val, uint64_t src2val);
+            Entry(const SimFetchedInstruction& insn);
+            Entry(const SimFetchedInstruction& insn, uint64_t src1val, uint64_t src2val);
             Entry(const Entry& entry);
             ~Entry();
 
-            const SimInstruction&   GetInsn() const;
-            uint64_t                GetSrc1Value() const;
-            uint64_t                GetSrc2Value() const;
-            bool                    IsReady() const;
-            bool                    IsDstReady() const;
-            uint64_t                GetDstValue() const;
+            const SimFetchedInstruction&    GetInsn() const;
+            uint64_t                        GetSrc1Value() const;
+            uint64_t                        GetSrc2Value() const;
+            bool                            IsReady() const;
+            bool                            IsDstReady() const;
+            uint64_t                        GetDstValue() const;
+            bool                            IsBranch() const;
+            bool                            IsBranchReady() const;
+            bool                            IsBranchTaken() const;
+            int                             GetBranchTarget() const;
 
-            void                    SetSrc1Value(uint64_t value);
-            void                    SetSrc2Value(uint64_t value);
-            void                    SetDstReady(bool ready = true);
-            void                    SetDstValue(uint64_t value);
 
-            void                    Eval();
+            void                            SetSrc1Value(uint64_t value);
+            void                            SetSrc2Value(uint64_t value);
+            void                            SetDstReady(bool ready = true);
+            void                            SetDstValue(uint64_t value);
+            void                            SetBranchReady(bool ready = true);
+            void                            SetBranchTarget(bool taken, int target = -1);
+
+            void                            Eval();
         };
 
     private:
@@ -360,8 +437,8 @@ namespace VMC::RAT {
         int     GetCount() const;
         bool    IsEmpty() const;
 
-        void    PushInsn(const SimInstruction& insn, Entry* entry = nullptr);
-        void    PushInsnEx(const SimInstruction& insn, uint64_t src1val, uint64_t src2val, Entry* entry = nullptr);
+        void    PushInsn(const SimFetchedInstruction& insn, Entry* entry = nullptr);
+        void    PushInsnEx(const SimFetchedInstruction& insn, uint64_t src1val, uint64_t src2val, Entry* entry = nullptr);
 
         bool    NextInsn(Entry* entry = nullptr);
         bool    PopInsn();
@@ -374,23 +451,27 @@ namespace VMC::RAT {
     public:
         class Entry {
         private:
-            SimInstruction  insn;
-            bool            rdy;
-            uint64_t        dstval;
+            SimFetchedInstruction   insn;
+            bool                    rdy;
+            uint64_t                dstval;
+
+            bool                    branch;
+            bool                    branch_taken;
+            int                     branch_target;
 
         public:
             Entry();
-            Entry(const SimInstruction& insn);
+            Entry(const SimFetchedInstruction& insn);
             Entry(const Entry& obj);
             ~Entry();
 
-            const SimInstruction&   GetInsn() const;
-            int                     GetFID() const;
-            bool                    IsReady() const;
-            uint64_t                GetDstValue() const;
+            const SimFetchedInstruction&    GetInsn() const;
+            int                             GetFID() const;
+            bool                            IsReady() const;
+            uint64_t                        GetDstValue() const;
 
-            void                    SetReady(bool ready = true);
-            void                    SetDstValue(uint64_t value);
+            void                            SetReady(bool ready = true);
+            void                            SetDstValue(uint64_t value);
         };
     
     private:
@@ -408,8 +489,8 @@ namespace VMC::RAT {
 
         bool    GetDstValue(int FID, uint64_t* dst) const;
 
-        void    TouchInsn(const SimInstruction& insn);
-        bool    WritebackInsn(const SimInstruction& insn, uint64_t value);
+        void    TouchInsn(const SimFetchedInstruction& insn);
+        bool    WritebackInsn(const SimFetchedInstruction& insn, uint64_t value);
 
         bool    NextInsn(Entry* entry = nullptr);
         bool    PopInsn();
@@ -431,11 +512,20 @@ namespace VMC::RAT {
 
     static constexpr int            SIM_DEFAULT_RAND_MAX_INSN_DELAY = 32;
 
+    //
+    static constexpr int            SIM_INSN_MEMORY_CAPACITY        = 1024 * 1024 * 32;
+
     typedef struct {
+
+        SimInstructionMemory        InsnMemory                  = SimInstructionMemory(SIM_INSN_MEMORY_CAPACITY);
 
         RegisterAliasTable          O3RAT                       = RegisterAliasTable();
 
         PhysicalRegisterFile        O3PRF                       = PhysicalRegisterFile();
+
+        int                         O3PC                        = 0;
+
+        int                         O3FGR                       = 0;
 
         SimFetch                    O3Fetch                     = SimFetch();
 
@@ -449,9 +539,11 @@ namespace VMC::RAT {
 
         SimO3PipeStatus             O3Status                    = SimO3PipeStatus();
 
-        int                         O3PC                        = 0;
-
         uint64_t                    RefARF[EMULATED_ARF_SIZE]   = { 0 };
+
+        int                         RefPC                       = 0;
+
+        int                         RefFGR                      = 0;
 
         SimFetch                    RefFetch                    = SimFetch();
 
@@ -462,8 +554,6 @@ namespace VMC::RAT {
         SimExecution                RefExecution                = SimExecution(RefARF);
 
         SimRefPipeStatus            RefStatus                   = SimRefPipeStatus();
-
-        int                         RefPC                       = 0;
 
         int                         GlobalFID                   = 0;
 
@@ -480,7 +570,8 @@ namespace VMC::RAT {
         //
         std::vector<SimInstruction> FetchHistory                = std::vector<SimInstruction>();
 
-        std::vector<SimInstruction> RenamedHistory              = std::vector<SimInstruction>();
+        std::vector<SimFetchedInstruction> 
+                                    RenamedHistory              = std::vector<SimFetchedInstruction>();
 
         int                         O3FetchCount                = 0;
 
@@ -517,7 +608,11 @@ namespace VMC::RAT {
 
     void Setup(VMCHandle handle)
     {
+        printf("Initializating VMC simulation memory...\n");
+
         CURRENT_HANDLE = NewHandle();
+
+        printf("\033[1A");
 
         SetupCommands(handle);
     }
@@ -665,9 +760,11 @@ namespace VMC::RAT {
         }
 
         //
-        csim->RefReservation.PushInsn(insn);
+        csim->RefReservation.PushInsn(SimFetchedInstruction(insn, csim->RefPC));
 
         csim->RefFetch.PopInsn();
+
+        csim->FetchHistory.push_back(insn);
 
         csim->RefFetchCount++;
 
@@ -692,7 +789,7 @@ namespace VMC::RAT {
         }
 
         //
-        SimInstruction insn;
+        SimFetchedInstruction insn;
 
         if (!csim->RefReservation.NextInsn(&insn))
         {
@@ -707,8 +804,8 @@ namespace VMC::RAT {
         //
         csim->RefExecution.PushInsn(insn);
 
-        if (insn.GetDst()) // arf0conv on scoreboard
-            csim->RefScoreboard.SetStatus(insn.GetDst(), SCOREBOARD_STATUS_BUSY, insn.GetFID());
+        if (insn.GetDstARF()) // arf0conv on scoreboard
+            csim->RefScoreboard.SetStatus(insn.GetDstARF(), SCOREBOARD_STATUS_BUSY, insn.GetFID());
 
         if (!csim->RefReservation.PopInsn())
         {
@@ -752,7 +849,7 @@ namespace VMC::RAT {
         const SimInstruction& insn = entry.GetInsn();
 
         //
-        SetRefARF(csim, insn.GetDst(), entry.GetDstValue());
+        SetRefARF(csim, insn.GetDstARF(), entry.GetDstValue());
 
         if (!csim->RefExecution.PopInsn())
         {
@@ -760,14 +857,14 @@ namespace VMC::RAT {
             return false;
         }
 
-        csim->RefScoreboard.SetStatus(insn.GetDst(), SCOREBOARD_STATUS_IN_ARF);
+        csim->RefScoreboard.SetStatus(insn.GetDstARF(), SCOREBOARD_STATUS_IN_ARF);
 
         csim->RefCommitCount++;
 
         csim->RefStatus.SetExecutionStatus(&STAGE_STATUS_BUSY);
 
         if (info)
-            printf("[ %8d ] RefWriteback: FID #%d written-back. DstARF #%d.\n", step, insn.GetFID(), insn.GetDst());
+            printf("[ %8d ] RefWriteback: FID #%d written-back. DstARF #%d.\n", step, insn.GetFID(), insn.GetDstARF());
 
         return true;
     }
@@ -827,19 +924,19 @@ namespace VMC::RAT {
         }
 
         // Get src PRFs
-        int src1prf = csim->O3RAT.GetAliasPRF(insn.GetSrc1());
-        int src2prf = csim->O3RAT.GetAliasPRF(insn.GetSrc2());
+        int src1prf = csim->O3RAT.GetAliasPRF(insn.GetSrc1ARF());
+        int src2prf = csim->O3RAT.GetAliasPRF(insn.GetSrc2ARF());
 
         if (info)
         {
-            printf("[ %8d ] O3Fetch: ARF converted. Src1 ARF #%d -> PRF #%d.\n", step, insn.GetSrc1(), src1prf);
-            printf("[ %8d ] O3Fetch: ARF converted. Src2 ARF #%d -> PRF #%d.\n", step, insn.GetSrc2(), src2prf);
+            printf("[ %8d ] O3Fetch: ARF converted. Src1 ARF #%d -> PRF #%d.\n", step, insn.GetSrc1ARF(), src1prf);
+            printf("[ %8d ] O3Fetch: ARF converted. Src2 ARF #%d -> PRF #%d.\n", step, insn.GetSrc2ARF(), src2prf);
         }
 
         // Try to allocate RAT entry
         int dstprf = -1;
         
-        if (!csim->O3RAT.Touch(insn.GetFID(), insn.GetDst(), &dstprf))
+        if (!csim->O3RAT.Touch(insn.GetFID(), insn.GetDstARF(), &dstprf))
         {
             csim->O3Status.SetFetchStatus(&STAGE_STATUS_WAIT);
 
@@ -850,21 +947,19 @@ namespace VMC::RAT {
         }
 
         if (info)
-            printf("[ %8d ] O3Fetch: Dst ARF renamed. Dst ARF #%d -> PRF #%d.\n", step, insn.GetDst(), dstprf);
+            printf("[ %8d ] O3Fetch: Dst ARF renamed. Dst ARF #%d -> PRF #%d.\n", step, insn.GetDstARF(), dstprf);
 
         // Re-write/modify instruction after RAT
-        insn.SetSrc1(src1prf);
-        insn.SetSrc2(src2prf);
-        insn.SetDst(dstprf);
+        SimFetchedInstruction renamed_insn(insn, csim->O3PC, dstprf, src1prf, src2prf);
 
         // Rename history
-        csim->RenamedHistory.push_back(insn);
+        csim->RenamedHistory.push_back(renamed_insn);
 
         // Push to issue queue and broadcast to ROB
-        csim->O3Reservation.PushInsn(insn);
-        csim->O3ROB.TouchInsn(insn);
+        csim->O3Reservation.PushInsn(renamed_insn);
+        csim->O3ROB.TouchInsn(renamed_insn);
 
-        csim->O3Scoreboard.SetStatus(insn.GetDst(), SCOREBOARD_STATUS_BUSY, insn.GetFID());
+        csim->O3Scoreboard.SetStatus(dstprf, SCOREBOARD_STATUS_BUSY, renamed_insn.GetFID());
 
         csim->O3Fetch.PopInsn();
 
@@ -873,7 +968,7 @@ namespace VMC::RAT {
         csim->O3Status.SetFetchStatus(&STAGE_STATUS_BUSY);
 
         if (info)
-            printf("[ %8d ] O3Fetch: Instruction fetched and renamed, passed to reseravtion. FID #%d.\n", step, insn.GetFID());
+            printf("[ %8d ] O3Fetch: Instruction fetched and renamed, passed to reseravtion. FID #%d.\n", step, renamed_insn.GetFID());
 
         return true;
     }
@@ -891,7 +986,7 @@ namespace VMC::RAT {
         }
 
         //
-        SimInstruction insn;
+        SimFetchedInstruction insn;
 
         if (!csim->O3Reservation.NextInsn(&insn))
         {
@@ -926,28 +1021,28 @@ namespace VMC::RAT {
         uint64_t src1val;
         uint64_t src2val;
 
-        int src1status = csim->O3Scoreboard.GetStatus(insn.GetSrc1());
-        int src2status = csim->O3Scoreboard.GetStatus(insn.GetSrc2());
+        int src1status = csim->O3Scoreboard.GetStatus(insn.GetSrc1PRF());
+        int src2status = csim->O3Scoreboard.GetStatus(insn.GetSrc2PRF());
 
         switch (src1status)
         {
             case SCOREBOARD_STATUS_IN_ARF:
-                src1val = SimO3ARF(&(csim->O3PRF))[insn.GetSrc1()];
+                src1val = SimO3ARF(&(csim->O3PRF))[insn.GetSrc1PRF()];
 
                 if (info)
-                    printf("[ %8d ] O3Issue: Read src1 PRF #%d value: %ld (0x%016lx).\n", step, insn.GetSrc1(), src1val, src1val);
+                    printf("[ %8d ] O3Issue: Read src1 PRF #%d value: %ld (0x%016lx).\n", step, insn.GetSrc1PRF(), src1val, src1val);
 
                 break;
 
             case SCOREBOARD_STATUS_IN_ROB:
-                if (!csim->O3ROB.GetDstValue(csim->O3Scoreboard.GetFID(insn.GetSrc1()), &src1val))
+                if (!csim->O3ROB.GetDstValue(csim->O3Scoreboard.GetFID(insn.GetSrc1PRF()), &src1val))
                 {
                     ShouldNotReachHere(" RAT::EvalO3Issue ILLEGAL_STATE #ROBForwardFailure(src1)");
                     return false;
                 }
 
                 if (info)
-                    printf("[ %8d ] O3Issue: Read src1 PRF #%d value: %ld (0x%016lx) from ROB.\n", step, insn.GetSrc1(), src1val, src1val);
+                    printf("[ %8d ] O3Issue: Read src1 PRF #%d value: %ld (0x%016lx) from ROB.\n", step, insn.GetSrc1PRF(), src1val, src1val);
 
                 break;
 
@@ -959,22 +1054,22 @@ namespace VMC::RAT {
         switch (src2status)
         {
             case SCOREBOARD_STATUS_IN_ARF:
-                src2val = SimO3ARF(&(csim->O3PRF))[insn.GetSrc2()];
+                src2val = SimO3ARF(&(csim->O3PRF))[insn.GetSrc2PRF()];
 
                 if (info)
-                    printf("[ %8d ] O3Issue: Read src2 PRF #%d value: %ld (0x%016lx).\n", step, insn.GetSrc2(), src2val, src2val);
+                    printf("[ %8d ] O3Issue: Read src2 PRF #%d value: %ld (0x%016lx).\n", step, insn.GetSrc2PRF(), src2val, src2val);
 
                 break;
 
             case SCOREBOARD_STATUS_IN_ROB:
-                if (!csim->O3ROB.GetDstValue(csim->O3Scoreboard.GetFID(insn.GetSrc2()), &src2val))
+                if (!csim->O3ROB.GetDstValue(csim->O3Scoreboard.GetFID(insn.GetSrc2PRF()), &src2val))
                 {
                     ShouldNotReachHere(" RAT::EvalO3Issue ILLEGAL_STATE #ROBForwardFailure(src2)");
                     return false;
                 }
 
                 if (info)
-                    printf("[ %8d ] O3Issue: Read src2 PRF #%d value: %ld (0x%016lx) from ROB.\n", step, insn.GetSrc2(), src2val, src2val);
+                    printf("[ %8d ] O3Issue: Read src2 PRF #%d value: %ld (0x%016lx) from ROB.\n", step, insn.GetSrc2PRF(), src2val, src2val);
 
                 break;
 
@@ -1024,7 +1119,7 @@ namespace VMC::RAT {
             return true;
         }
 
-        const SimInstruction& insn = entry.GetInsn();
+        const SimFetchedInstruction& insn = entry.GetInsn();
 
         //
         if (!csim->O3ROB.WritebackInsn(insn, entry.GetDstValue()))
@@ -1033,7 +1128,7 @@ namespace VMC::RAT {
             return false;
         }
 
-        csim->O3Scoreboard.SetStatus(insn.GetDst(), SCOREBOARD_STATUS_IN_ROB);
+        csim->O3Scoreboard.SetStatus(insn.GetDstPRF(), SCOREBOARD_STATUS_IN_ROB);
 
         if (!csim->O3Execution.PopInsn())
         {
@@ -1044,7 +1139,7 @@ namespace VMC::RAT {
         csim->O3Status.SetExecutionStatus(&STAGE_STATUS_BUSY);
 
         if (info)
-            printf("[ %8d ] O3Writeback: FID #%d written-back to ROB. DstPRF #%d.\n", step, insn.GetFID(), insn.GetDst());
+            printf("[ %8d ] O3Writeback: FID #%d written-back to ROB. DstPRF #%d.\n", step, insn.GetFID(), insn.GetDstPRF());
 
         return true;
     }
@@ -1074,33 +1169,33 @@ namespace VMC::RAT {
             return true;
         }
 
-        const SimInstruction& insn = entry.GetInsn();
+        const SimFetchedInstruction& insn = entry.GetInsn();
 
         //
-        if (insn.GetDst() >= 0)
-            csim->O3PRF.Set(insn.GetDst(), entry.GetDstValue());
+        if (insn.GetDstPRF() >= 0)
+            csim->O3PRF.Set(insn.GetDstPRF(), entry.GetDstValue());
 
         if (info)
-            printf("[ %8d ] O3Commit: Written back to PRF #%d: %ld (0x%016lx).\n", step, insn.GetDst(), entry.GetDstValue(), entry.GetDstValue());
+            printf("[ %8d ] O3Commit: Written back to PRF #%d: %ld (0x%016lx).\n", step, insn.GetDstPRF(), entry.GetDstValue(), entry.GetDstValue());
 
         // assert
-        if (insn.GetDst() >= 0 && csim->O3Scoreboard.GetFID(insn.GetDst()) != insn.GetFID())
+        if (insn.GetDstPRF() >= 0 && csim->O3Scoreboard.GetFID(insn.GetDstPRF()) != insn.GetFID())
         {
             printf("[ \033[1;31mASSERT\033[0m   ] O3Commit: Scoreboard commit FID not identical.\n");
             return false;
         }
 
-        csim->O3Scoreboard.SetStatus(insn.GetDst(), SCOREBOARD_STATUS_IN_ARF);
+        csim->O3Scoreboard.SetStatus(insn.GetDstPRF(), SCOREBOARD_STATUS_IN_ARF);
 
         // assert
-        if (insn.GetDst() >= 0 && csim->O3RAT.GetEntry(insn.GetDst()).GetFID() != insn.GetFID())
+        if (insn.GetDstPRF() >= 0 && csim->O3RAT.GetEntry(insn.GetDstPRF()).GetFID() != insn.GetFID())
         {
             printf("[ \033[1;31mASSERT\033[0m   ] O3Commit: RAT commit FID not identical.\n");
             return false;
         }
 
-        if (insn.GetDst() >= 0)
-            csim->O3RAT.Commit(insn.GetDst());
+        if (insn.GetDstPRF() >= 0)
+            csim->O3RAT.Commit(insn.GetDstPRF());
 
         if (!csim->O3ROB.PopInsn())
         {
@@ -1231,7 +1326,6 @@ namespace VMC::RAT {
     std::cout << "                                    Dump history instructions." << std::endl; \
     std::cout << "- rat0.diffsim.insn.dumpfile <filename> [-R|-range <startFID> <endFID>]" << std::endl; \
     std::cout << "                                    Dump history instructions to file." << std::endl; \
-    std::cout << "- rat0.diffsim.o3.fetch.dump        Dump all current O3Fetch entries." << std::endl; \
     std::cout << "- rat0.diffsim.o3.scoreboard.dump   Dump all current O3Scoreboard entries." << std::endl; \
     std::cout << "- rat0.diffsim.o3.reservation.dump  Dump all current O3Reservation entries." << std::endl; \
     std::cout << "- rat0.diffsim.o3.rob.dump          Dump all current O3ReOrderBuffer entries." << std::endl; \
@@ -2026,8 +2120,6 @@ namespace VMC::RAT {
         csim->O3Fetch.PushInsn(insn);
         csim->RefFetch.PushInsn(insn);
 
-        csim->FetchHistory.push_back(insn);
-
         return true;
     }
 
@@ -2083,8 +2175,6 @@ namespace VMC::RAT {
 
             csim->O3Fetch.PushInsn(insn);
             csim->RefFetch.PushInsn(insn);
-
-            csim->FetchHistory.push_back(insn);
         }
 
         return true;
@@ -2107,7 +2197,7 @@ namespace VMC::RAT {
 
 
     //
-    void __common_RAT0_DIFFSIM_INSN_DUMP(const SimInstruction& insn, 
+    void __common_RAT0_DIFFSIM_INSN_DUMP(const SimFetchedInstruction& insn, 
                                          std::ostream& os)
     {
         os << "FID(" << std::setw(8) << std::setfill(' ') << insn.GetFID() << ") ";
@@ -2163,9 +2253,9 @@ namespace VMC::RAT {
                 ShouldNotReachHere(" ::InsnDump #UnknownInstructionCode");
         }
     
-        os << std::setw(2) << std::setfill(' ') << insn.GetDst()  << " ";
-        os << std::setw(2) << std::setfill(' ') << insn.GetSrc1() << " ";
-        os << std::setw(2) << std::setfill(' ') << insn.GetSrc2() << " ";
+        os << std::setw(2) << std::setfill(' ') << insn.GetDstPRF()  << " ";
+        os << std::setw(2) << std::setfill(' ') << insn.GetSrc1PRF() << " ";
+        os << std::setw(2) << std::setfill(' ') << insn.GetSrc2PRF() << " ";
 
         os << "0x" << std::setw(16) << std::setfill('0') << std::hex << insn.GetImmediate() << std::dec;
         os << std::resetiosflags << std::endl;
@@ -2358,7 +2448,7 @@ namespace VMC::RAT {
                 for (; o3fetch_iter != o3fetch.end(); o3fetch_iter++)
                 {
                     std::cout << "[ \033[1;33mWARN\033[0m     ] - ";
-                    __common_RAT0_DIFFSIM_INSN_DUMP(*o3fetch_iter, std::cout);
+                    __common_RAT0_DIFFSIM_INSN_DUMP(SimFetchedInstruction(*o3fetch_iter), std::cout);
                 }
 
                 //
@@ -2523,11 +2613,22 @@ namespace VMC::RAT {
         //
         SimHandle csim = GetCurrentHandle();
 
-        const std::vector<SimInstruction>& history 
-            = flagR ? csim->RenamedHistory : csim->FetchHistory;
+        if (flagR)
+        {
+            const std::vector<SimFetchedInstruction>& history 
+                = csim->RenamedHistory;
 
-        for (int i = startFID; (i < history.size()) && (!flagRange || i <= endFID); i++)
-            __common_RAT0_DIFFSIM_INSN_DUMP(history[i], os);
+            for (int i = startFID; (i < history.size()) && (!flagRange || i <= endFID); i++)
+                __common_RAT0_DIFFSIM_INSN_DUMP(history[i], os);
+        }
+        else
+        {
+            const std::vector<SimInstruction>& history
+                = csim->FetchHistory;
+
+            for (int i = startFID; (i < history.size()) && (!flagRange || i <= endFID); i++)
+                __common_RAT0_DIFFSIM_INSN_DUMP(SimFetchedInstruction(history[i]), os);
+        }
 
         return true;
     }
@@ -2566,31 +2667,6 @@ namespace VMC::RAT {
         fos.close();
 
         return result;
-    }
-
-
-    // rat0.diffsim.o3.fetch.dump
-    bool _RAT0_DIFFSIM_O3_FETCH_DUMP(void* handle, const std::string& cmd,
-                                                   const std::string& paramline,
-                                                   const std::vector<std::string>& params)
-    {
-        if (!params.empty())
-        {
-            std::cout << "Too much or too less parameter(s) for \'rat0.diffsim.o3.fetch.dump\'." << std::endl;
-            return false;
-        }
-
-        //
-        SimHandle csim = GetCurrentHandle();
-
-        //
-        const std::list<SimInstruction>& insns = csim->O3Fetch.Get();
-        
-        std::list<SimInstruction>::const_iterator iter = insns.begin();
-        for (; iter != insns.end(); iter++)
-            __common_RAT0_DIFFSIM_INSN_DUMP(*iter, std::cout);
-
-        return true;
     }
 
 
@@ -2691,7 +2767,6 @@ namespace VMC::RAT {
         RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.eval.stepout")   , &_RAT0_DIFFSIM_INSN_EVAL_STEPOUT });
         RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.dump")           , &_RAT0_DIFFSIM_INSN_DUMP });
         RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.insn.dumpfile")       , &_RAT0_DIFFSIM_INSN_DUMPFILE });
-        RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.o3.fetch.dump")       , &_RAT0_DIFFSIM_O3_FETCH_DUMP });
         RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.o3.rob.dump")         , &_RAT0_DIFFSIM_O3_ROB_DUMP });
         RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.o3.reservation.dump") , &_RAT0_DIFFSIM_O3_RESERVATION_DUMP });
         RegisterCommand(handle, CommandHandler{ std::string("rat0.diffsim.o3.scoreboard.dump")  , &_RAT0_DIFFSIM_O3_SCOREBOARD_DUMP });
@@ -2896,49 +2971,49 @@ namespace VMC::RAT {
     SimInstruction::SimInstruction()
         : FID       (-1)
         , delay     (0)
-        , dst       (0)
-        , src1      (0)
-        , src2      (0)
+        , dstARF    (0)
+        , src1ARF   (0)
+        , src2ARF   (0)
         , insncode  (INSN_CODE_NOP)
         , imm       (0)
     { }
 
-    SimInstruction::SimInstruction(int FID, int delay, int insncode, int dst)
+    SimInstruction::SimInstruction(int FID, int delay, int insncode, int dstARF)
         : FID       (FID)
         , delay     (delay)
-        , dst       (dst)
-        , src1      (0)
-        , src2      (0)
+        , dstARF    (dstARF)
+        , src1ARF   (0)
+        , src2ARF   (0)
         , insncode  (insncode)
         , imm       (0)
     { }
 
-    SimInstruction::SimInstruction(int FID, int delay, int insncode, int dst, uint64_t imm)
+    SimInstruction::SimInstruction(int FID, int delay, int insncode, int dstARF, uint64_t imm)
         : FID       (FID)
         , delay     (delay)
-        , dst       (dst)
-        , src1      (0)
-        , src2      (0)
+        , dstARF    (dstARF)
+        , src1ARF   (0)
+        , src2ARF   (0)
         , insncode  (insncode)
         , imm       (imm)
     { }
 
-    SimInstruction::SimInstruction(int FID, int delay, int insncode, int dst, int src1, int src2)
+    SimInstruction::SimInstruction(int FID, int delay, int insncode, int dstARF, int src1ARF, int src2ARF)
         : FID       (FID)
         , delay     (delay)
-        , dst       (dst)
-        , src1      (src1)
-        , src2      (src2)
+        , dstARF    (dstARF)
+        , src1ARF   (src1ARF)
+        , src2ARF   (src2ARF)
         , insncode  (insncode)
         , imm       (0)
     { }
 
-    SimInstruction::SimInstruction(int FID, int delay, int insncode, int dst, int src1, int src2, uint64_t imm)
+    SimInstruction::SimInstruction(int FID, int delay, int insncode, int dstARF, int src1ARF, int src2ARF, uint64_t imm)
         : FID       (FID)
         , delay     (delay)
-        , dst       (dst)
-        , src1      (src1)
-        , src2      (src2)
+        , dstARF    (dstARF)
+        , src1ARF   (src1ARF)
+        , src2ARF   (src2ARF)
         , insncode  (insncode)
         , imm       (imm)
     { }
@@ -2946,9 +3021,9 @@ namespace VMC::RAT {
     SimInstruction::SimInstruction(const SimInstruction& obj)
         : FID       (obj.FID)
         , delay     (obj.delay)
-        , dst       (obj.dst)
-        , src1      (obj.src1)
-        , src2      (obj.src2)
+        , dstARF    (obj.dstARF)
+        , src1ARF   (obj.src1ARF)
+        , src2ARF   (obj.src2ARF)
         , insncode  (obj.insncode)
         , imm       (obj.imm)
     { }
@@ -2966,19 +3041,19 @@ namespace VMC::RAT {
         return delay;
     }
 
-    inline int SimInstruction::GetDst() const
+    inline int SimInstruction::GetDstARF() const
     {
-        return dst;
+        return dstARF;
     }
 
-    inline int SimInstruction::GetSrc1() const
+    inline int SimInstruction::GetSrc1ARF() const
     {
-        return src1;
+        return src1ARF;
     }
 
-    inline int SimInstruction::GetSrc2() const
+    inline int SimInstruction::GetSrc2ARF() const
     {
-        return src2;
+        return src2ARF;
     }
 
     inline uint64_t SimInstruction::GetImmediate() const
@@ -2991,19 +3066,19 @@ namespace VMC::RAT {
         return insncode;
     }
 
-    inline void SimInstruction::SetDst(int dst)
+    inline void SimInstruction::SetDstARF(int dstARF)
     {
-        this->dst = dst;
+        this->dstARF = dstARF;
     }
 
-    inline void SimInstruction::SetSrc1(int src1)
+    inline void SimInstruction::SetSrc1ARF(int src1ARF)
     {
-        this->src1 = src1;
+        this->src1ARF = src1ARF;
     }
 
-    inline void SimInstruction::SetSrc2(int src2)
+    inline void SimInstruction::SetSrc2ARF(int src2ARF)
     {
-        this->src2 = src2;
+        this->src2ARF = src2ARF;
     }
 
     inline void SimInstruction::SetInsnCode(int insncode)
@@ -3014,6 +3089,186 @@ namespace VMC::RAT {
     inline void SimInstruction::SetImmediate(uint64_t imm)
     {
         this->imm = imm;
+    }
+}
+
+
+// class VMC::RAT::SimFetchedInstruction
+namespace VMC::RAT {
+    SimFetchedInstruction::SimFetchedInstruction()
+        : SimInstruction    ()
+        , pc                (-1)
+        , dstPRF            (0)
+        , src1PRF           (0)
+        , src2PRF           (0)
+    { }
+
+    SimFetchedInstruction::SimFetchedInstruction(const SimInstruction& obj)
+        : SimInstruction    (obj)
+        , pc                (-1)
+        , dstPRF            (obj.GetDstARF())
+        , src1PRF           (obj.GetSrc1ARF())
+        , src2PRF           (obj.GetSrc2ARF())
+    { }
+
+    SimFetchedInstruction::SimFetchedInstruction(const SimInstruction& obj, int pc)
+        : SimInstruction    (obj)
+        , pc                (pc)
+        , dstPRF            (obj.GetDstARF())
+        , src1PRF           (obj.GetSrc1ARF())
+        , src2PRF           (obj.GetSrc2ARF())
+    { }
+
+    SimFetchedInstruction::SimFetchedInstruction(const SimInstruction& obj, int pc, int dstPRF, int src1PRF, int src2PRF)
+        : SimInstruction    (obj)
+        , pc                (pc)
+        , dstPRF            (dstPRF)
+        , src1PRF           (src1PRF)
+        , src2PRF           (src2PRF)
+    { }
+
+    SimFetchedInstruction::SimFetchedInstruction(const SimFetchedInstruction& obj)
+        : SimInstruction    (obj)
+        , pc                (obj.pc)
+        , dstPRF            (obj.dstPRF)
+        , src1PRF           (obj.src1PRF)
+        , src2PRF           (obj.src2PRF)
+    { }
+
+    SimFetchedInstruction::~SimFetchedInstruction()
+    { }
+
+    inline int SimFetchedInstruction::GetPC() const
+    {
+        return pc;
+    }
+
+    inline int SimFetchedInstruction::GetDstPRF() const
+    {
+        return dstPRF;
+    }
+
+    inline int SimFetchedInstruction::GetSrc1PRF() const
+    {
+        return src1PRF;
+    }
+
+    inline int SimFetchedInstruction::GetSrc2PRF() const
+    {
+        return src2PRF;
+    }
+
+    inline bool SimFetchedInstruction::IsBranch() const
+    {
+        return IsBranchInsn(GetInsnCode());
+    }
+
+    inline void SimFetchedInstruction::SetPC(int pc)
+    {
+        this->pc = pc;
+    }
+
+    inline void SimFetchedInstruction::SetDstPRF(int dstPRF)
+    {
+        this->dstPRF = dstPRF;
+    }
+
+    inline void SimFetchedInstruction::SetSrc1PRF(int src1PRF)
+    {
+        this->src1PRF = src1PRF;
+    }
+
+    inline void SimFetchedInstruction::SetSrc2PRF(int src2PRF)
+    {
+        this->src2PRF = src2PRF;
+    }
+}
+
+
+// class VMC::RAT::SimInstructionMemory
+namespace VMC::RAT {
+    SimInstructionMemory::SimInstructionMemory(int capacity)
+        : capacity  (capacity)
+        , memory    (new SimInstruction[capacity]())
+        , position  (0)
+    { }
+
+    SimInstructionMemory::SimInstructionMemory(const SimInstructionMemory& obj)
+        : capacity  (obj.capacity)
+        , memory    (new SimInstruction[obj.capacity])
+        , position  (obj.position)
+    { 
+        // Cause WARNING
+        // memcpy(memory, obj.memory, sizeof(SimInstruction) * capacity);
+
+        for (int i = 0; i < capacity; i++)
+            this->memory[i] = obj.memory[i];
+    }
+
+    SimInstructionMemory::SimInstructionMemory(const SimInstructionMemory& obj, int new_capacity)
+        : capacity  (new_capacity)
+        , memory    (new SimInstruction[new_capacity])
+        , position  (min(new_capacity, obj.position))
+    {
+        // Cause WARNING
+        // memcpy(memory, obj.memory, sizeof(SimInstruction) * min(new_capacity, obj.capacity));
+
+        for (int i = 0; i < obj.capacity && i < new_capacity; i++)
+            new (&memory[i]) SimInstruction(obj.memory[i]);
+
+        for (int i = obj.capacity; i < new_capacity; i++)
+            new (&memory[i]) SimInstruction();
+    }
+
+    SimInstructionMemory::~SimInstructionMemory()
+    {
+        delete[] memory;
+    }
+
+    inline int SimInstructionMemory::GetCapacity() const
+    {
+        return capacity;
+    }
+
+    inline bool SimInstructionMemory::CheckBound(bool address) const
+    {
+        return address >= 0 && address < capacity;
+    }
+
+    inline const SimInstruction& SimInstructionMemory::GetInsn(int address) const
+    {
+        return memory[address];
+    }
+
+    inline SimInstruction& SimInstructionMemory::GetInsn(int address)
+    {
+        return memory[address];
+    }
+
+    inline void SimInstructionMemory::SetInsn(int address, const SimInstruction& insn)
+    {
+        memory[address] = insn;
+    }
+
+    inline int SimInstructionMemory::GetPosition() const
+    {
+        return position;
+    }
+
+    inline void SimInstructionMemory::SetPosition(int pos)
+    {
+        this->position = pos;
+    }
+
+    bool SimInstructionMemory::PushInsn(const SimInstruction& insn)
+    {
+        if (position < capacity)
+        {
+            memory[position++] = insn;
+            return true;
+        }
+
+        return false;
     }
 }
 
@@ -3230,19 +3485,19 @@ namespace VMC::RAT {
 // class VMC::RAT::SimReservation::Entry
 namespace VMC::RAT {
     /*
-    const SimInstruction    insn;
-    bool                    src1rdy;
-    bool                    src2rdy;
+    const SimFetchedInstruction insn;
+    bool                        src1rdy;
+    bool                        src2rdy;
     */
 
-    SimReservation::Entry::Entry(const SimInstruction& insn)
+    SimReservation::Entry::Entry(const SimFetchedInstruction& insn)
         : insn      (insn)
         , src1rdy   (false)
         , src2rdy   (false)
         , dstrdy    (false)
     { }
 
-    SimReservation::Entry::Entry(const SimInstruction& insn, bool src1rdy, bool src2rdy, bool dstrdy)
+    SimReservation::Entry::Entry(const SimFetchedInstruction& insn, bool src1rdy, bool src2rdy, bool dstrdy)
         : insn      (insn)
         , src1rdy   (src1rdy)
         , src2rdy   (src2rdy)
@@ -3259,7 +3514,7 @@ namespace VMC::RAT {
     SimReservation::Entry::~Entry()
     { }
 
-    inline const SimInstruction& SimReservation::Entry::GetInsn() const
+    inline const SimFetchedInstruction& SimReservation::Entry::GetInsn() const
     {
         return insn;
     }
@@ -3286,17 +3541,17 @@ namespace VMC::RAT {
 
     inline int SimReservation::Entry::GetSrc1() const
     {
-        return insn.GetSrc1();
+        return insn.GetSrc1PRF();
     }
 
     inline int SimReservation::Entry::GetSrc2() const
     {
-        return insn.GetSrc2();
+        return insn.GetSrc2PRF();
     }
 
     inline int SimReservation::Entry::GetDst() const
     {
-        return insn.GetDst();
+        return insn.GetDstPRF();
     }
 
     inline void SimReservation::Entry::SetSrc1Ready(bool rdy)
@@ -3344,7 +3599,7 @@ namespace VMC::RAT {
         return entries;
     }
 
-    void SimReservation::PushInsn(const SimInstruction& insn)
+    void SimReservation::PushInsn(const SimFetchedInstruction& insn)
     {
         Entry entry = Entry(insn);
         /*
@@ -3371,7 +3626,7 @@ namespace VMC::RAT {
         return entries.empty();
     }
 
-    bool SimReservation::NextInsn(SimInstruction* insn)
+    bool SimReservation::NextInsn(SimFetchedInstruction* insn)
     {
         if (next != entries.end())
         {
@@ -3448,53 +3703,75 @@ namespace VMC::RAT {
 // class VMC::RAT::SimExecution::Entry
 namespace VMC::RAT {
     /*
-    const SimInstruction    insn;
-    uint64_t                src1val;
-    uint64_t                src2val;
-    int                     delay;
-    uint64_t                dstval;
+    SimFetchedInstruction       insn;
+    uint64_t                    src1val;
+    uint64_t                    src2val;
+    int                         delay;
+    bool                        dstrdy;
+    uint64_t                    dstval;
+
+    bool                        branch;
+    bool                        branch_rdy;
+    bool                        branch_taken;
+    int                         branch_target;
     */
 
     SimExecution::Entry::Entry()
-        : insn      ()
-        , src1val   (0)
-        , src2val   (0)
-        , delay     (0)
-        , dstrdy    (false)
-        , dstval    (0)
+        : insn          ()
+        , src1val       (0)
+        , src2val       (0)
+        , delay         (0)
+        , dstrdy        (false)
+        , dstval        (0)
+        , branch        (false)
+        , branch_rdy    (false)
+        , branch_taken  (false)
+        , branch_target (0)
     { }
 
-    SimExecution::Entry::Entry(const SimInstruction& insn)
-        : insn      (insn)
-        , src1val   (0)
-        , src2val   (0)
-        , delay     (insn.GetDelay())
-        , dstrdy    (false)
-        , dstval    (0)
+    SimExecution::Entry::Entry(const SimFetchedInstruction& insn)
+        : insn          (insn)
+        , src1val       (0)
+        , src2val       (0)
+        , delay         (insn.GetDelay())
+        , dstrdy        (false)
+        , dstval        (0)
+        , branch        (insn.IsBranch())
+        , branch_rdy    (false)
+        , branch_taken  (false)
+        , branch_target (0)
     { }
 
-    SimExecution::Entry::Entry(const SimInstruction& insn, uint64_t src1val, uint64_t src2val)
-        : insn      (insn)
-        , src1val   (src1val)
-        , src2val   (src2val)
-        , delay     (insn.GetDelay())
-        , dstrdy    (false)
-        , dstval    (0)
+    SimExecution::Entry::Entry(const SimFetchedInstruction& insn, uint64_t src1val, uint64_t src2val)
+        : insn          (insn)
+        , src1val       (src1val)
+        , src2val       (src2val)
+        , delay         (insn.GetDelay())
+        , dstrdy        (false)
+        , dstval        (0)
+        , branch        (insn.IsBranch())
+        , branch_rdy    (false)
+        , branch_taken  (false)
+        , branch_target (0)
     { }
 
     SimExecution::Entry::Entry(const Entry& obj)
-        : insn      (obj.insn)
-        , src1val   (obj.src1val)
-        , src2val   (obj.src2val)
-        , delay     (obj.delay)
-        , dstrdy    (obj.dstrdy)
-        , dstval    (obj.dstval)
+        : insn          (obj.insn)
+        , src1val       (obj.src1val)
+        , src2val       (obj.src2val)
+        , delay         (obj.delay)
+        , dstrdy        (obj.dstrdy)
+        , dstval        (obj.dstval)
+        , branch        (obj.branch)
+        , branch_rdy    (obj.branch_rdy)
+        , branch_taken  (obj.branch_taken)
+        , branch_target (obj.branch_target)
     { }
 
     SimExecution::Entry::~Entry()
     { }
 
-    inline const SimInstruction& SimExecution::Entry::GetInsn() const
+    inline const SimFetchedInstruction& SimExecution::Entry::GetInsn() const
     {
         return insn;
     }
@@ -3511,7 +3788,7 @@ namespace VMC::RAT {
 
     inline bool SimExecution::Entry::IsReady() const
     {
-        return dstrdy && !delay;
+        return dstrdy && (!branch || branch_rdy) && !delay;
     }
 
     inline bool SimExecution::Entry::IsDstReady() const
@@ -3522,6 +3799,26 @@ namespace VMC::RAT {
     inline uint64_t SimExecution::Entry::GetDstValue() const
     {
         return dstval;
+    }
+
+    inline bool SimExecution::Entry::IsBranch() const
+    {
+        return branch;
+    }
+
+    inline bool SimExecution::Entry::IsBranchReady() const
+    {
+        return branch_rdy;
+    }
+
+    inline bool SimExecution::Entry::IsBranchTaken() const
+    {
+        return branch_taken;
+    }
+
+    inline int SimExecution::Entry::GetBranchTarget() const
+    {
+        return branch_target;
     }
 
     inline void SimExecution::Entry::SetSrc1Value(uint64_t value)
@@ -3542,6 +3839,17 @@ namespace VMC::RAT {
     inline void SimExecution::Entry::SetDstValue(uint64_t value)
     {
         dstval = value;
+    }
+
+    inline void SimExecution::Entry::SetBranchReady(bool ready)
+    {
+        branch_rdy = ready;
+    }
+
+    inline void SimExecution::Entry::SetBranchTarget(bool taken, int target)
+    {
+        branch_taken  = taken;
+        branch_target = target;
     }
 
     void SimExecution::Entry::Eval()
@@ -3594,6 +3902,30 @@ namespace VMC::RAT {
 
                 case INSN_CODE_SUBI:
                     dstval = src1val - insn.GetImmediate();
+                    break;
+
+                case INSN_CODE_BEQ:
+                    branch_rdy    = true;
+                    branch_taken  = src1val == src2val;
+                    branch_target = insn.GetPC() + insn.GetImmediate();
+                    break;
+
+                case INSN_CODE_BNE:
+                    branch_rdy    = true;
+                    branch_taken  = src1val != src2val;
+                    branch_target = insn.GetPC() + insn.GetImmediate();
+                    break;
+
+                case INSN_CODE_BGE:
+                    branch_rdy    = true;
+                    branch_taken  = src1val >= src2val;
+                    branch_target = insn.GetPC() + insn.GetImmediate();
+                    break;
+
+                case INSN_CODE_BGT:
+                    branch_rdy    = true;
+                    branch_taken  = src1val > src2val;
+                    branch_target = insn.GetPC() + insn.GetImmediate();
                     break;
 
                 default:
@@ -3665,10 +3997,10 @@ namespace VMC::RAT {
         return entries.empty();
     }
 
-    void SimExecution::PushInsn(const SimInstruction& insn, Entry* entry)
+    void SimExecution::PushInsn(const SimFetchedInstruction& insn, Entry* entry)
     {
-        uint64_t src1val = ref ? (*refARF)[insn.GetSrc1()] : (*o3ARF)[insn.GetSrc1()];
-        uint64_t src2val = ref ? (*refARF)[insn.GetSrc2()] : (*o3ARF)[insn.GetSrc2()];
+        uint64_t src1val = ref ? (*refARF)[insn.GetSrc1PRF()] : (*o3ARF)[insn.GetSrc1PRF()];
+        uint64_t src2val = ref ? (*refARF)[insn.GetSrc2PRF()] : (*o3ARF)[insn.GetSrc2PRF()];
 
         Entry newEntry(insn, src1val, src2val);
 
@@ -3678,7 +4010,7 @@ namespace VMC::RAT {
         entries.push_back(newEntry);
     }
 
-    void SimExecution::PushInsnEx(const SimInstruction& insn, uint64_t src1val, uint64_t src2val, Entry* entry)
+    void SimExecution::PushInsnEx(const SimFetchedInstruction& insn, uint64_t src1val, uint64_t src2val, Entry* entry)
     {
         Entry newEntry(insn, src1val, src2val);
 
@@ -3740,9 +4072,9 @@ namespace VMC::RAT {
 // class VMC::RAT::SimReOrderBuffer::Entry
 namespace VMC::RAT {
     /*
-    SimInstruction  insn;
-    bool            rdy;
-    uint64_t        dstval;
+    SimFetchedInstruction   insn;
+    bool                    rdy;
+    uint64_t                dstval;
     */
 
     SimReOrderBuffer::Entry::Entry()
@@ -3751,7 +4083,7 @@ namespace VMC::RAT {
         , dstval    (0)
     { }
 
-    SimReOrderBuffer::Entry::Entry(const SimInstruction& insn)
+    SimReOrderBuffer::Entry::Entry(const SimFetchedInstruction& insn)
         : insn      (insn)
         , rdy       (false)
         , dstval    (0)
@@ -3766,7 +4098,7 @@ namespace VMC::RAT {
     SimReOrderBuffer::Entry::~Entry()
     { }
 
-    inline const SimInstruction& SimReOrderBuffer::Entry::GetInsn() const
+    inline const SimFetchedInstruction& SimReOrderBuffer::Entry::GetInsn() const
     {
         return insn;
     }
@@ -3847,12 +4179,12 @@ namespace VMC::RAT {
         return false;
     }
 
-    void SimReOrderBuffer::TouchInsn(const SimInstruction& insn)
+    void SimReOrderBuffer::TouchInsn(const SimFetchedInstruction& insn)
     {
         entries.push_back(Entry(insn));
     }
 
-    bool SimReOrderBuffer::WritebackInsn(const SimInstruction& insn, uint64_t value)
+    bool SimReOrderBuffer::WritebackInsn(const SimFetchedInstruction& insn, uint64_t value)
     {
         std::list<Entry>::iterator iter = entries.begin();
         while (iter != entries.end())
