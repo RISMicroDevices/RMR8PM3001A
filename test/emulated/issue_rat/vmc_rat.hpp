@@ -20,7 +20,6 @@
 using namespace MEMU::Core::Issue;
 
 namespace VMC::RAT {
-
     static constexpr int INSN_CODE_NOP      = 0;
 
     static constexpr int INSN_CODE_AND      = 1;
@@ -51,7 +50,9 @@ namespace VMC::RAT {
 
     static constexpr int INSN_CODE_BGT      = 14;
 
-    static constexpr int INSN_COUNT         = 11;
+    static constexpr int INSN_CODE_HALT     = 15; // TODO
+
+    static constexpr int INSN_COUNT         = 11; // TODO
 
     inline static bool IsBranchInsn(int insncode)
     {
@@ -123,6 +124,11 @@ namespace VMC::RAT {
     };
 
     //
+    class SimMachineStatus {
+        // reserved
+    };
+
+    //
     class SimRefARF
     {
     private:
@@ -175,6 +181,8 @@ namespace VMC::RAT {
         int         GetInsnCode() const;
         uint64_t    GetImmediate() const;
 
+        bool        IsBranch() const;
+
         void        SetDstARF(int dst);
         void        SetSrc1ARF(int src1);
         void        SetSrc2ARF(int src2);
@@ -185,6 +193,7 @@ namespace VMC::RAT {
     class SimFetchedInstruction : public SimInstruction
     {
     private:
+        int         FGR;
         int         pc;
         int         dstPRF;
         int         src1PRF;
@@ -193,19 +202,19 @@ namespace VMC::RAT {
     public:
         SimFetchedInstruction();
         SimFetchedInstruction(const SimInstruction& obj);
-        SimFetchedInstruction(const SimInstruction& obj, int pc);
-        SimFetchedInstruction(const SimInstruction& obj, int pc, int dstPRF, int src1PRF, int src2PRF);
+        SimFetchedInstruction(const SimInstruction& obj, int FGR, int pc);
+        SimFetchedInstruction(const SimInstruction& obj, int FGR, int pc, int dstPRF, int src1PRF, int src2PRF);
         SimFetchedInstruction(const SimFetchedInstruction& obj);
         ~SimFetchedInstruction();
 
         int         GetPC() const;
+        int         GetFGR() const;
         int         GetDstPRF() const;
         int         GetSrc1PRF() const;
         int         GetSrc2PRF() const;
 
-        bool        IsBranch() const;
-
         void        SetPC(int pc);
+        void        SetFGR(int FGR);
         void        SetDstPRF(int dst);
         void        SetSrc1PRF(int src1);
         void        SetSrc2PRF(int src2);
@@ -235,28 +244,7 @@ namespace VMC::RAT {
         void                    SetPosition(int pos);
         bool                    PushInsn(const SimInstruction& insn);
 
-    };
-
-    class SimFetch
-    {
-    private:
-        std::list<SimInstruction>   fetched;
-
-    public:
-        SimFetch();
-        ~SimFetch();
-
-        const std::list<SimInstruction>& Get() const;
-
-        int     GetCount() const;
-        bool    IsEmpty() const;
-
-        void    Clear();
-
-        void    PushInsn(const SimInstruction& insn);
-
-        bool    NextInsn(SimInstruction* insn = nullptr);
-        bool    PopInsn();
+        void                    Reset();
     };
 
 
@@ -271,6 +259,64 @@ namespace VMC::RAT {
     class SimScoreboard // Only support ARF0-conv mode
     {
     public:
+        class Entry {
+        private:
+            int     status;
+            int     FID;
+            bool    FGV;
+            int     FGR;
+
+        public:
+            Entry();
+            Entry(const Entry& obj);
+            ~Entry();
+
+            int     GetStatus() const;
+            int     GetFID() const;
+            bool    GetFGV() const;
+            int     GetFGR() const;
+
+            void    SetStatus(int status);
+            void    SetFID(int FID);
+            void    SetFGV(bool FGV);
+            void    SetFGR(int FGR);
+        };
+
+        class EntryModification {
+        private:
+            bool    modified;
+
+            bool    modified_status;
+            bool    modified_FID;
+            bool    modified_FGV;
+            bool    modified_FGR;
+
+            int     status;
+            int     FID;
+            bool    FGV;
+            int     FGR;
+
+        public:
+            EntryModification();
+            EntryModification(const EntryModification& obj);
+            ~EntryModification();
+
+            bool    IsModified() const;
+
+            bool    IsStatusModified() const;
+            bool    IsFIDModified() const;
+            bool    IsFGVModified() const;
+            bool    IsFGRModified() const;
+
+            void    SetStatus(int status);
+            void    SetFID(int FID);
+            void    SetFGV(bool FGV);
+            void    SetFGR(int FGR);
+
+            void    Reset();
+            void    Apply(Entry& dst) const;
+        };
+
         class Modification {
         private:
             int index;
@@ -527,8 +573,6 @@ namespace VMC::RAT {
 
         int                         O3FGR                       = 0;
 
-        SimFetch                    O3Fetch                     = SimFetch();
-
         SimScoreboard               O3Scoreboard                = SimScoreboard(EMULATED_PRF_SIZE);
 
         SimReservation              O3Reservation               = SimReservation(&O3Scoreboard);
@@ -544,8 +588,6 @@ namespace VMC::RAT {
         int                         RefPC                       = 0;
 
         int                         RefFGR                      = 0;
-
-        SimFetch                    RefFetch                    = SimFetch();
 
         SimScoreboard               RefScoreboard               = SimScoreboard(EMULATED_ARF_SIZE);
 
@@ -730,14 +772,11 @@ namespace VMC::RAT {
     //
     bool EvalRefFetch(SimHandle csim, bool info, int step)
     {
-        if (csim->RefFetch.IsEmpty())
+        if (!csim->InsnMemory.CheckBound(csim->RefPC))
         {
-            csim->RefStatus.SetFetchStatus(&STAGE_STATUS_IDLE);
-
-            if (info)
-                printf("[ %8d ] RefFetch: Fetch queue empty.\n", step);
-
-            return true;
+            printf("[ %8d ] RefFetch: PC 0x%08x out of memory bound.\n", step, csim->RefPC);
+            
+            return false;
         }
 
         if (!csim->RefReservation.IsEmpty())
@@ -751,18 +790,13 @@ namespace VMC::RAT {
         }
 
         //
-        SimInstruction insn;
-
-        if (!csim->RefFetch.NextInsn(&insn))
-        {
-            ShouldNotReachHere(" RAT::EvalRefFetch ILLEGAL_STATE #FetchFail");
-            return false;
-        }
+        const SimInstruction& insn = csim->InsnMemory.GetInsn(csim->RefPC);
 
         //
-        csim->RefReservation.PushInsn(SimFetchedInstruction(insn, csim->RefPC));
+        csim->RefReservation.PushInsn(SimFetchedInstruction(insn, csim->RefFGR, csim->RefPC));
 
-        csim->RefFetch.PopInsn();
+        if (insn.IsBranch())
+            csim->RefFGR++;
 
         csim->FetchHistory.push_back(insn);
 
@@ -950,7 +984,7 @@ namespace VMC::RAT {
             printf("[ %8d ] O3Fetch: Dst ARF renamed. Dst ARF #%d -> PRF #%d.\n", step, insn.GetDstARF(), dstprf);
 
         // Re-write/modify instruction after RAT
-        SimFetchedInstruction renamed_insn(insn, csim->O3PC, dstprf, src1prf, src2prf);
+        SimFetchedInstruction renamed_insn(insn, csim->O3FGR, csim->O3PC, dstprf, src1prf, src2prf);
 
         // Rename history
         csim->RenamedHistory.push_back(renamed_insn);
@@ -2117,8 +2151,7 @@ namespace VMC::RAT {
 
         SimInstruction insn(FID, delay, insncode, dstARF, srcARF1, srcARF2, imm);
 
-        csim->O3Fetch.PushInsn(insn);
-        csim->RefFetch.PushInsn(insn);
+        csim->InsnMemory.PushInsn(insn);
 
         return true;
     }
@@ -2173,8 +2206,7 @@ namespace VMC::RAT {
                 printf("[ %8d ] FID: %d, Delay: %d, Insncode: 0x%08x, DstARF: %d, SrcARF1: %d, SrcARF2: %d, Imm: %lu (0x%016lx)\n",
                     i, FID, delay, insncode, dstARF, srcARF1, srcARF2, imm, imm);
 
-            csim->O3Fetch.PushInsn(insn);
-            csim->RefFetch.PushInsn(insn);
+            csim->InsnMemory.PushInsn(insn);
         }
 
         return true;
@@ -2321,7 +2353,7 @@ namespace VMC::RAT {
     }
 
 
-    // rat0.diffsim.insn.eval.stepout [-SF|-WWDG|-T <count>]
+    // rat0.diffsim.insn.eval.stepout [-SF|-WWDG|-T <count>|-C <count>]
     bool _RAT0_DIFFSIM_INSN_EVAL_STEPOUT(void* handle, const std::string& cmd,
                                                        const std::string& paramline,
                                                        const std::vector<std::string>& params)
@@ -3031,6 +3063,11 @@ namespace VMC::RAT {
     SimInstruction::~SimInstruction()
     { }
 
+    inline bool SimInstruction::IsBranch() const
+    {
+        return IsBranchInsn(GetInsnCode());
+    }
+
     inline int SimInstruction::GetFID() const
     {
         return FID;
@@ -3097,6 +3134,7 @@ namespace VMC::RAT {
 namespace VMC::RAT {
     SimFetchedInstruction::SimFetchedInstruction()
         : SimInstruction    ()
+        , FGR               (-1)
         , pc                (-1)
         , dstPRF            (0)
         , src1PRF           (0)
@@ -3105,22 +3143,25 @@ namespace VMC::RAT {
 
     SimFetchedInstruction::SimFetchedInstruction(const SimInstruction& obj)
         : SimInstruction    (obj)
+        , FGR               (-1)
         , pc                (-1)
         , dstPRF            (obj.GetDstARF())
         , src1PRF           (obj.GetSrc1ARF())
         , src2PRF           (obj.GetSrc2ARF())
     { }
 
-    SimFetchedInstruction::SimFetchedInstruction(const SimInstruction& obj, int pc)
+    SimFetchedInstruction::SimFetchedInstruction(const SimInstruction& obj, int FGR, int pc)
         : SimInstruction    (obj)
+        , FGR               (FGR)
         , pc                (pc)
         , dstPRF            (obj.GetDstARF())
         , src1PRF           (obj.GetSrc1ARF())
         , src2PRF           (obj.GetSrc2ARF())
     { }
 
-    SimFetchedInstruction::SimFetchedInstruction(const SimInstruction& obj, int pc, int dstPRF, int src1PRF, int src2PRF)
+    SimFetchedInstruction::SimFetchedInstruction(const SimInstruction& obj, int FGR, int pc, int dstPRF, int src1PRF, int src2PRF)
         : SimInstruction    (obj)
+        , FGR               (FGR)
         , pc                (pc)
         , dstPRF            (dstPRF)
         , src1PRF           (src1PRF)
@@ -3129,6 +3170,7 @@ namespace VMC::RAT {
 
     SimFetchedInstruction::SimFetchedInstruction(const SimFetchedInstruction& obj)
         : SimInstruction    (obj)
+        , FGR               (obj.FGR)
         , pc                (obj.pc)
         , dstPRF            (obj.dstPRF)
         , src1PRF           (obj.src1PRF)
@@ -3137,6 +3179,11 @@ namespace VMC::RAT {
 
     SimFetchedInstruction::~SimFetchedInstruction()
     { }
+
+    inline int SimFetchedInstruction::GetFGR() const
+    {
+        return FGR;
+    }
 
     inline int SimFetchedInstruction::GetPC() const
     {
@@ -3158,9 +3205,9 @@ namespace VMC::RAT {
         return src2PRF;
     }
 
-    inline bool SimFetchedInstruction::IsBranch() const
+    inline void SimFetchedInstruction::SetFGR(int FGR)
     {
-        return IsBranchInsn(GetInsnCode());
+        this->FGR = FGR;
     }
 
     inline void SimFetchedInstruction::SetPC(int pc)
@@ -3270,66 +3317,185 @@ namespace VMC::RAT {
 
         return false;
     }
+
+    void SimInstructionMemory::Reset()
+    {
+        for (int i = 0; i < capacity; i++)
+            memory[i] = SimInstruction();
+    }
 }
 
 
-// class VMC::RAT::SimFetch
+// class VMC::RAT::SimScoreboard::Entry
 namespace VMC::RAT {
-    /*
-    std::list<SimInstruction>   fetched;
-    */
-
-    SimFetch::SimFetch()
-        : fetched(std::list<SimInstruction>())
+    SimScoreboard::Entry::Entry()
+        : status    (0)
+        , FID       (-1)
+        , FGV       (false)
+        , FGR       (-1)
     { }
 
-    SimFetch::~SimFetch()
+    SimScoreboard::Entry::Entry(const Entry& obj)
+        : status    (obj.status)
+        , FID       (obj.FID)
+        , FGV       (obj.FGV)
+        , FGR       (obj.FGR)
     { }
 
-    inline const std::list<SimInstruction>& SimFetch::Get() const
+    SimScoreboard::Entry::~Entry()
+    { }
+
+    inline int SimScoreboard::Entry::GetStatus() const
     {
-        return fetched;
+        return status;
     }
 
-    inline int SimFetch::GetCount() const
+    inline int SimScoreboard::Entry::GetFID() const
     {
-        return fetched.size();
+        return FID;
     }
 
-    inline bool SimFetch::IsEmpty() const
+    inline bool SimScoreboard::Entry::GetFGV() const
     {
-        return fetched.empty();
+        return FGV;
     }
 
-    inline void SimFetch::Clear()
+    inline int SimScoreboard::Entry::GetFGR() const
     {
-        fetched.clear();
+        return FGR;
     }
 
-    inline void SimFetch::PushInsn(const SimInstruction& insn)
+    inline void SimScoreboard::Entry::SetStatus(int status)
     {
-        fetched.push_back(insn);
+        this->status = status;
     }
 
-    inline bool SimFetch::NextInsn(SimInstruction* insn)
+    inline void SimScoreboard::Entry::SetFID(int FID)
     {
-        if (fetched.empty())
-            return false;
-
-        if (insn)
-            *insn = fetched.front();
-
-        return true;
+        this->FID = FID;
     }
 
-    inline bool SimFetch::PopInsn()
+    inline void SimScoreboard::Entry::SetFGV(bool FGV)
     {
-        if (fetched.empty())
-            return false;
+        this->FGV = FGV;
+    }
 
-        fetched.pop_front();
+    inline void SimScoreboard::Entry::SetFGR(int FGR)
+    {
+        this->FGR = FGR;
+    }
+}
 
-        return true;
+
+// class VMC::RAT::SimScoreboard::EntryModification
+namespace VMC::RAT {
+    SimScoreboard::EntryModification::EntryModification()
+        : modified          (false)
+        , modified_status   (false)
+        , modified_FID      (false)
+        , modified_FGV      (false)
+        , modified_FGR      (false)
+        , status            (0)
+        , FID               (0)
+        , FGV               (false)
+        , FGR               (0)
+    { }
+
+    SimScoreboard::EntryModification::EntryModification(const EntryModification& obj)
+        : modified          (obj.modified)
+        , modified_status   (obj.modified_status)
+        , modified_FID      (obj.modified_FID)
+        , modified_FGV      (obj.modified_FGV)
+        , modified_FGR      (obj.modified_FGR)
+        , status            (obj.status)
+        , FID               (obj.FID)
+        , FGV               (obj.FGV)
+        , FGR               (obj.FGR)
+    { }
+
+    SimScoreboard::EntryModification::~EntryModification()
+    { }
+
+    inline bool SimScoreboard::EntryModification::IsModified() const
+    {
+        return modified;
+    }
+
+    inline bool SimScoreboard::EntryModification::IsStatusModified() const
+    {
+        return modified_status;
+    }
+
+    inline bool SimScoreboard::EntryModification::IsFIDModified() const
+    {
+        return modified_FID;
+    }
+
+    inline bool SimScoreboard::EntryModification::IsFGVModified() const
+    {
+        return modified_FGV;
+    }
+
+    inline bool SimScoreboard::EntryModification::IsFGRModified() const
+    {
+        return modified_FGR;
+    }
+
+    inline void SimScoreboard::EntryModification::SetStatus(int status)
+    {
+        modified        = true;
+        modified_status = true;
+
+        this->status = status;
+    }
+
+    inline void SimScoreboard::EntryModification::SetFID(int FID)
+    {
+        modified     = true;
+        modified_FID = true;
+
+        this->FID = FID;
+    }
+
+    inline void SimScoreboard::EntryModification::SetFGV(bool FGV)
+    {
+        modified     = true;
+        modified_FGV = true;
+
+        this->FGV = FGV;
+    }
+
+    inline void SimScoreboard::EntryModification::SetFGR(int FGR)
+    {
+        modified     = true;
+        modified_FGR = true;
+
+        this->FGR = FGR;
+    }
+
+    void SimScoreboard::EntryModification::Reset()
+    {
+        modified        = false;
+
+        modified_status = false;
+        modified_FID    = false;
+        modified_FGV    = false;
+        modified_FGR    = false;
+    }
+
+    void SimScoreboard::EntryModification::Apply(Entry& dst) const
+    {
+        if (IsStatusModified())
+            dst.SetStatus(status);
+
+        if (IsFIDModified())
+            dst.SetFID(FID);
+
+        if (IsFGVModified())
+            dst.SetFGV(FGV);
+
+        if (IsFGRModified())
+            dst.SetFGR(FGR);
     }
 }
 
