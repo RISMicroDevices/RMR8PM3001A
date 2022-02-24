@@ -280,6 +280,8 @@ namespace VMC::RAT {
             void    SetFID(int FID);
             void    SetFGV(bool FGV);
             void    SetFGR(int FGR);
+
+            void    Clear();
         };
 
         class EntryModification {
@@ -317,49 +319,43 @@ namespace VMC::RAT {
             void    Apply(Entry& dst) const;
         };
 
-        class Modification {
-        private:
-            int index;
-            int status;
-            int FID;
-
-        public:
-            Modification();
-            Modification(int index, int status, int FID);
-            ~Modification();
-
-            void    SetIndex(int index);
-            void    SetStatus(int status);
-            void    SetFID(int FID);
-
-            int     GetIndex() const;
-            int     GetStatus() const;
-            int     GetFID() const;
-        };
-
     private:
-        const int               size;
+        const int           size;
 
-        std::list<Modification> modification;
+        Entry*              entries;
 
-        int*              const status;
-        int*              const FID;
+        EntryModification*  modification;
 
     public:
         SimScoreboard(int size);
         SimScoreboard(const SimScoreboard& obj);
         ~SimScoreboard();
 
-        void    Clear();
+        int             GetSize() const;
+        bool            CheckBound(int index) const;
 
-        int     GetFID(int index) const;
-        bool    IsBusy(int index) const;
-        int     GetStatus(int index) const;
-        void    SetStatus(int index, int status, int FID = -1);
+        const Entry&    GetEntry(int index) const;
+        Entry&          GetEntry(int index);
+        void            SetEntry(int index, const Entry& entry);
 
-        void    ResetInput();
+        int             GetFGR(int index) const;
+        bool            GetFGV(int index) const;
+        int             GetFID(int index) const;
+        bool            IsBusy(int index) const;
+        int             GetStatus(int index) const;
 
-        void    Eval();
+        void            SetFGR(int index, int FGR, bool FGV = true);
+        void            SetFGV(int index, bool FGV);
+        void            SetFID(int index, int FID);
+        void            SetStatus(int index, int status, int FGR = -1, int FID = -1);
+
+        void            ReleaseFGR(int FGR);
+        void            RestoreFGR(int FGR);
+
+        void            ResetInput();
+        void            Clear();
+
+        void            Eval();
     };
 
     class SimReservation // Only support ARF0-conv mode
@@ -405,7 +401,6 @@ namespace VMC::RAT {
         const std::list<Entry>& Get() const;
 
         const SimScoreboard*    GetScoreboardRef() const;
-        
 
         void                    PushInsn(const SimFetchedInstruction& insn);
 
@@ -3384,6 +3379,14 @@ namespace VMC::RAT {
     {
         this->FGR = FGR;
     }
+
+    void SimScoreboard::Entry::Clear()
+    {
+        status = 0;
+        FID = -1;
+        FGV = false;
+        FGR = -1;
+    }
 }
 
 
@@ -3500,150 +3503,136 @@ namespace VMC::RAT {
 }
 
 
-// class VMC::RAT::SimScoreboard::Modification
-namespace VMC::RAT {
-    /*
-    int index;
-    int status;
-    int FID;
-    */
-
-    SimScoreboard::Modification::Modification()
-        : index     (-1)
-        , status    (SCOREBOARD_STATUS_IN_ARF)
-        , FID       (-1)
-    { }
-
-    SimScoreboard::Modification::Modification(int index, int status, int FID)
-        : index     (index)
-        , status    (status)
-        , FID       (FID)
-    { }
-
-    SimScoreboard::Modification::~Modification()
-    { }
-
-    inline void SimScoreboard::Modification::SetIndex(int index)
-    {
-        this->index = index;
-    }
-
-    inline void SimScoreboard::Modification::SetStatus(int status)
-    {
-        this->status = status;
-    }
-
-    inline void SimScoreboard::Modification::SetFID(int FID)
-    {
-        this->FID = FID;
-    }
-
-    inline int SimScoreboard::Modification::GetIndex() const
-    {
-        return index;
-    }
-
-    inline int SimScoreboard::Modification::GetStatus() const
-    {
-        return status;
-    }
-
-    inline int SimScoreboard::Modification::GetFID() const
-    {
-        return FID;
-    }
-}
-
-
 // class VMC::RAT::SimScoreboard
 namespace VMC::RAT {
     /*
-    const int               size;
+    const int           size;
 
-    std::list<Modification> modification;
+    Entry*              entries;
 
-    int*              const status;
-    int*              const FID;
-    */
+    EntryModification*  modification;
+    */ 
 
     SimScoreboard::SimScoreboard(int size)
         : size          (size)
-        , modification  (std::list<Modification>())
-        , status        (new int[size]())
-        , FID           (new int[size])
+        , entries       (new Entry[size]())
+        , modification  (new EntryModification[size]())
     { }
 
     SimScoreboard::SimScoreboard(const SimScoreboard& obj)
         : size          (obj.size)
-        , modification  (obj.modification)
-        , status        (new int[obj.size]())
-        , FID           (new int[obj.size])
-    {
-        memcpy(status, obj.status, obj.size * sizeof(int));
-        memcpy(FID,    obj.FID,    obj.size * sizeof(int));
+        , entries       (new Entry[size])
+        , modification  (new EntryModification[size])
+    { 
+        for (int i = 0; i < size; i++)
+        {
+            new (&entries[i])      Entry(obj.entries[i]);
+            new (&modification[i]) EntryModification(obj.modification[i]);
+        }
     }
 
     SimScoreboard::~SimScoreboard()
+    { }
+
+    inline int SimScoreboard::GetSize() const
     {
-        delete status;
-        delete FID;
+        return size;
     }
 
-    inline void SimScoreboard::Clear()
+    inline bool SimScoreboard::CheckBound(int index) const
     {
-        memset(status, 0, size * sizeof(int));
-        modification.clear();
+        return index >= 0 && index < size;
     }
 
-    inline bool SimScoreboard::IsBusy(int index) const
+    inline const SimScoreboard::Entry& SimScoreboard::GetEntry(int index) const
     {
-        if (index == -1)
-            return false;
+        return entries[index];
+    }
 
-        return status[index] == SCOREBOARD_STATUS_BUSY;
+    inline SimScoreboard::Entry& SimScoreboard::GetEntry(int index)
+    {
+        return entries[index];
+    }
+
+    inline void SimScoreboard::SetEntry(int index, const Entry& entry)
+    {
+        entries[index] = entry;
+    }
+
+    inline int SimScoreboard::GetFGR(int index) const
+    {
+        return entries[index].GetFGR();
+    }
+
+    inline bool SimScoreboard::GetFGV(int index) const
+    {
+        return entries[index].GetFGV();
     }
 
     inline int SimScoreboard::GetFID(int index) const
     {
-        if (index == -1)
-            return -1;
+        return entries[index].GetFID();
+    }
 
-        return FID[index];
+    inline bool SimScoreboard::IsBusy(int index) const
+    {
+        return entries[index].GetStatus() == SCOREBOARD_STATUS_BUSY;
     }
 
     inline int SimScoreboard::GetStatus(int index) const
     {
-        if (index == -1)
-            return SCOREBOARD_STATUS_IN_ARF;
-
-        return status[index];
+        return entries[index].GetStatus();
     }
 
-    inline void SimScoreboard::SetStatus(int index, int status, int FID)
+    inline void SimScoreboard::SetFGR(int index, int FGR, bool FGV)
     {
-        if (index == -1)
-            return;
-
-        modification.push_back(Modification(index, status, FID));
+        modification[index].SetFGR(FGR);
+        modification[index].SetFGV(FGV);
     }
 
-    inline void SimScoreboard::ResetInput()
+    inline void SimScoreboard::SetFGV(int index, bool FGV)
     {
-        modification.clear();
+        modification[index].SetFGV(FGV);
+    }
+
+    inline void SimScoreboard::SetFID(int index, int FID)
+    {
+        modification[index].SetFID(FID);
+    }
+
+    void SimScoreboard::SetStatus(int index, int status, int FGR, int FID)
+    {
+        modification[index].SetStatus(status);
+
+        if (FGR != -1)
+        {
+            modification[index].SetFGR(FGR);
+            modification[index].SetFGV(true);
+        }
+
+        if (FID != -1)
+            modification[index].SetFID(FID);
+    }
+
+    // TODO
+
+    void SimScoreboard::ResetInput()
+    {
+        for (int i = 0; i < size; i++)
+            modification[i].Reset();
+    }
+
+    void SimScoreboard::Clear()
+    {
+        for (int i = 0; i < size; i++)
+            entries[i].Clear();
     }
 
     void SimScoreboard::Eval()
     {
-        std::list<Modification>::iterator iter = modification.begin();
-        for (; iter != modification.end(); iter++)
-        {
-            status[iter->GetIndex()] = iter->GetStatus();
-
-            if (iter->GetFID() != -1)
-                FID[iter->GetIndex()] = iter->GetFID();
-        }
-
-        ResetInput();
+        for (int i = 0; i < size; i++)
+            if (modification[i].IsModified())
+                modification[i].Apply(entries[i]);
     }
 }
 
