@@ -15,9 +15,16 @@
 
 #define EMULATED_RAT_SIZE                           EMULATED_PRF_SIZE
 
+#define EMULATED_RAT_GC_SIZE                        EMULATED_GC_COUNT                            
+
 using namespace std;
 
 namespace MEMU::Core::Issue {
+
+    class Scoreboard final : public MEMU::Emulated
+    {
+        // TODO
+    };
 
     class PhysicalRegisterFile final : public MEMU::Emulated
     {
@@ -215,12 +222,61 @@ namespace MEMU::Core::Issue {
             void    Apply(Entry& dst) const;
         };
 
+        class CheckpointEntry {
+        private:
+            bool    V;
+
+        public:
+            CheckpointEntry();
+            CheckpointEntry(const CheckpointEntry& obj);
+            ~CheckpointEntry();
+
+            bool    GetValid() const;
+            void    SetValid(bool V);
+
+            void    Allocate(const Entry& entry);
+            void    Restore(Entry& entry) const;
+        };
+
+        class Checkpoint {
+        private:
+            constexpr static int    gc_size      = EMULATED_RAT_GC_SIZE;
+
+            CheckpointEntry*    entries;
+
+        public:
+            Checkpoint();
+            Checkpoint(const Checkpoint& obj);
+            ~Checkpoint();
+
+            int                     GetSize() const;
+            bool                    CheckBound(int index) const;
+
+            const CheckpointEntry&  GetEntry(int index) const;
+            CheckpointEntry&        GetEntry(int index);
+            void                    SetEntry(int index, const CheckpointEntry& entry);
+
+            bool                    GetValid(int index) const;
+            void                    SetValid(int index, bool V);
+
+            void                    Allocate(const Entry* entries);
+            void                    Restore(Entry* entries) const;
+        };
+
     private:
         constexpr static int    rat_size     = EMULATED_RAT_SIZE;
 
-        Entry*                  entries     /*[rat_size]*/;
+        constexpr static int    gc_size      = EMULATED_RAT_GC_SIZE;
 
-        EntryModification*      modification    /*[rat_size]*/; 
+        Entry*                  entries      /*[rat_size]*/;
+
+        EntryModification*      modification /*[rat_size]*/; 
+
+        Checkpoint*             checkpoints   /*[gc_size]*/;
+
+        int                     checkpoint_allocate;
+        int                     checkpoint_restore;
+
 
     private:
         int                 GetNextEntry() const;
@@ -250,7 +306,10 @@ namespace MEMU::Core::Issue {
         bool                    TouchAndWriteback(int FID, int ARF, int* PRF = 0);
         bool                    TouchAndCommit(int FID, int ARF, int* PRF = 0);
 
-        void                    Restore(const ShadowRegisterAliasTable& sRAT);
+        void                    RestoreNRA(const ShadowRegisterAliasTable& sRAT);
+
+        void                    AllocateCheckpoint(int index);
+        void                    RestoreCheckpoint(int index);
 
         void                    ResetInput();
 
@@ -585,33 +644,162 @@ namespace MEMU::Core::Issue {
 }
 
 
+// class MEMU::Core::Issue::RegisterAliasTable::CheckpointEntry
+namespace MEMU::Core::Issue {
+    /*
+    bool    V;
+    */
+
+    RegisterAliasTable::CheckpointEntry::CheckpointEntry()
+        : V (false)
+    { }
+
+    RegisterAliasTable::CheckpointEntry::CheckpointEntry(const CheckpointEntry& obj)
+        : V (obj.V)
+    { }
+
+    RegisterAliasTable::CheckpointEntry::~CheckpointEntry()
+    { }
+
+    inline bool RegisterAliasTable::CheckpointEntry::GetValid() const
+    {
+        return V;
+    }
+
+    inline void RegisterAliasTable::CheckpointEntry::SetValid(bool V)
+    {
+        this->V = V;
+    }
+
+    inline void RegisterAliasTable::CheckpointEntry::Allocate(const Entry& entry)
+    {
+        V = entry.GetValid();
+    }
+
+    inline void RegisterAliasTable::CheckpointEntry::Restore(Entry& entry) const
+    {
+        entry.SetValid(V);
+    }
+}
+
+
+// class MEMU::Core::Issue::RegisterAliasTable::Checkpoint
+namespace MEMU::Core::Issue {
+    /*
+    constexpr static int    gc_size      = EMULATED_RAT_GC_SIZE;
+
+    CheckpointEntry*    entries;
+    */
+
+    RegisterAliasTable::Checkpoint::Checkpoint()
+        : entries   (new CheckpointEntry[gc_size]())
+    { }
+
+    RegisterAliasTable::Checkpoint::Checkpoint(const Checkpoint& obj)
+        : entries   (new CheckpointEntry[gc_size])
+    {
+        for (int i = 0; i < gc_size; i++)
+            new (&entries[i]) CheckpointEntry(obj.entries[i]);
+    }
+
+    RegisterAliasTable::Checkpoint::~Checkpoint()
+    {
+        delete[] entries;
+    }
+
+    inline int RegisterAliasTable::Checkpoint::GetSize() const
+    {
+        return gc_size;
+    }
+
+    inline bool RegisterAliasTable::Checkpoint::CheckBound(int index) const
+    {
+        return index >= 0 && index < gc_size;
+    }
+
+    inline const RegisterAliasTable::CheckpointEntry& RegisterAliasTable::Checkpoint::GetEntry(int index) const
+    {
+        return entries[index];
+    }
+
+    inline RegisterAliasTable::CheckpointEntry& RegisterAliasTable::Checkpoint::GetEntry(int index)
+    {
+        return entries[index];
+    }
+
+    inline void RegisterAliasTable::Checkpoint::SetEntry(int index, const CheckpointEntry& entry)
+    {
+        entries[index] = entry;
+    }
+
+    inline bool RegisterAliasTable::Checkpoint::GetValid(int index) const
+    {
+        return entries[index].GetValid();
+    }
+
+    inline void RegisterAliasTable::Checkpoint::SetValid(int index, bool V)
+    {
+        entries[index].SetValid(V);
+    }
+
+    void RegisterAliasTable::Checkpoint::Allocate(const Entry* entries)
+    {
+        for (int i = 0; i < gc_size; i++)
+            this->entries[i].Allocate(entries[i]);
+    }
+
+    void RegisterAliasTable::Checkpoint::Restore(Entry* entries) const
+    {
+        for (int i = 0; i < gc_size; i++)
+            this->entries[i].Restore(entries[i]);
+    }
+}
+
+
 // class MEMU::Core::Issue::RegisterAliasTable
 namespace MEMU::Core::Issue {
     /*
     constexpr static int    rat_size     = EMULATED_RAT_SIZE;
-    constexpr static int    rat_gc_count = EMULATED_RAT_GC_COUNT;
 
-    Entry*                  entries     // [rat_size];
+    constexpr static int    gc_size      = EMULATED_RAT_GC_SIZE;
 
-    EntryModification*      modified;   // [rat_size]
+    Entry*                  entries;      // [rat_size]
+
+    EntryModification*      modification; // [rat_size]
+
+    Checkpoint*             checkpoints;   // [gc_size]
+
+    int                     checkpoint_allocate;
+    int                     checkpoint_restore;
     */
 
     RegisterAliasTable::RegisterAliasTable()
-        : entries           (new Entry[rat_size]())
-        , modification      (new EntryModification[rat_size]())
+        : entries               (new Entry[rat_size]())
+        , modification          (new EntryModification[rat_size]())
+        , checkpoints           (new Checkpoint[gc_size]())
+        , checkpoint_allocate   (-1)
+        , checkpoint_restore    (-1)
     { 
         for (int i = 0; i < rat_size; i++)
             entries[i].SetPRF(i);
     }    
 
     RegisterAliasTable::RegisterAliasTable(const RegisterAliasTable& obj)
-        : entries           (new Entry[rat_size])
-        , modification      (new EntryModification[rat_size])
+        : entries               (new Entry[rat_size])
+        , modification          (new EntryModification[rat_size])
+        , checkpoints           (new Checkpoint[gc_size])
+        , checkpoint_allocate   (obj.checkpoint_allocate)
+        , checkpoint_restore    (obj.checkpoint_restore)
     {
         for (int i = 0; i < rat_size; i++)
         {
-            entries[i] = obj.entries[i];
-            modification[i] = obj.modification[i];
+            new (&entries[i])      Entry(obj.entries[i]);
+            new (&modification[i]) EntryModification(obj.modification[i]);
+        }
+
+        for (int i = 0; i < gc_size; i++)
+        {
+            new (&checkpoints[i]) Checkpoint(obj.checkpoints[i]);
         }
     }
     
@@ -807,23 +995,30 @@ namespace MEMU::Core::Issue {
         return Touch(false, FID, ARF, PRF);
     }
 
-    void RegisterAliasTable::Restore(const ShadowRegisterAliasTable& sRAT)
+    void RegisterAliasTable::RestoreNRA(const ShadowRegisterAliasTable& sRAT)
     {
         // HIGHEST PRIORITY write
         for (int i = 0; i < rat_size; i++)
-        {
-            const ShadowRegisterAliasTable::Entry& entry = sRAT.GetEntry(i);
+            modification[i].SetNRA(sRAT.GetEntry(i).GetNRA());
+    }
 
-            modification[i].SetARF(entry.GetARF());
-            modification[i].SetNRA(entry.GetNRA());
-            modification[i].SetValid(entry.GetValid());
-        }
+    void RegisterAliasTable::AllocateCheckpoint(int index)
+    {
+        checkpoint_allocate = index;
+    }
+
+    void RegisterAliasTable::RestoreCheckpoint(int index)
+    {
+        checkpoint_restore = index;
     }
 
     void RegisterAliasTable::ResetInput()
     {
         for (int i = 0; i < rat_size; i++)
             modification[i].Reset();
+
+        checkpoint_allocate = -1;
+        checkpoint_restore  = -1;
     }
 
     void RegisterAliasTable::Eval()
@@ -834,6 +1029,14 @@ namespace MEMU::Core::Issue {
             if (modification[i].IsModified())
                 modification[i].Apply(entries[i]);
         }
+
+        // Checkpoint allocate
+        if (checkpoint_allocate != -1)
+            checkpoints[checkpoint_allocate].Allocate(entries);
+
+        // Checkpoint restore
+        if (checkpoint_restore != -1)
+            checkpoints[checkpoint_restore].Restore(entries);
 
         //
         ResetInput();
