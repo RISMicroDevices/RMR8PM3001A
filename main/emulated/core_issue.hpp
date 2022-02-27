@@ -11,11 +11,15 @@
 #include "base.hpp"
 #include "core_global.hpp"
 
+
+#define EMULATED_SCOREBOARD_GC_COUNT                EMULATED_GC_COUNT
+
 #define EMULATED_PRF_SIZE                           64
 
 #define EMULATED_RAT_SIZE                           EMULATED_PRF_SIZE
 
-#define EMULATED_RAT_GC_SIZE                        EMULATED_GC_COUNT                            
+#define EMULATED_RAT_GC_COUNT                       EMULATED_GC_COUNT      
+
 
 using namespace std;
 
@@ -23,7 +27,153 @@ namespace MEMU::Core::Issue {
 
     class Scoreboard final : public MEMU::Emulated
     {
-        // TODO
+    public:
+        class Entry {
+        private:
+            bool    busy;
+            bool    forward;
+
+        public:
+            Entry();
+            Entry(const Entry& obj);
+            ~Entry();
+
+            bool    IsBusy() const;
+            bool    IsForward() const;
+
+            void    SetBusy(bool busy);
+            void    SetForward(bool forward);
+
+            void    Clear();
+        };
+
+        class EntryModification {
+        private:
+            bool    modified;
+
+            bool    modified_busy;
+            bool    modified_forward;
+            bool    modified_land;
+            bool    modified_takeoff;
+
+            bool    busy;
+            bool    forward;
+
+        public:
+            EntryModification();
+            EntryModification(const EntryModification& obj);
+            ~EntryModification();
+
+            bool    IsModified() const;
+
+            bool    IsBusyModified() const;
+            bool    IsForwardModified() const;
+            bool    IsLandModified() const;
+            bool    IsTakeOffModified() const;
+
+            void    SetBusy(bool busy);
+            void    SetForward(bool forward);
+            void    Land();
+            void    TakeOff();
+
+            void    Reset();
+
+            void    Apply(Entry& entry) const;
+        };
+
+        class CheckpointEntry {
+        private:
+            bool    busy;
+
+        public:
+            CheckpointEntry();
+            CheckpointEntry(const CheckpointEntry& obj);
+            ~CheckpointEntry();
+
+            bool    GetBusy() const;
+            void    SetBusy(bool busy);
+
+            void    Clear();
+
+            void    Allocate(const Entry& entry);
+            void    Restore(Entry& entry) const;
+        };
+
+        class Checkpoint {
+        private:
+            CheckpointEntry*    entries;
+        
+        public:
+            Checkpoint();
+            Checkpoint(const Checkpoint& obj);
+            ~Checkpoint();
+
+            int                     GetSize() const;
+            bool                    CheckBound(int index) const;
+
+            const CheckpointEntry&  GetEntry(int index) const;
+            CheckpointEntry&        GetEntry(int index);
+            void                    SetEntry(int index, const CheckpointEntry& entry);
+
+            void                    Land(int index);
+
+            void                    Clear();
+
+            void                    Allocate(const Entry* entries);
+            void                    Restore(Entry* entries) const;
+
+            void                    operator=(const Checkpoint& obj);
+        };
+
+    private:
+        constexpr static int    prf_size                = EMULATED_PRF_SIZE;
+
+        constexpr static int    gc_count                = EMULATED_SCOREBOARD_GC_COUNT;
+
+        Entry*              entries;        // [prf_size]
+
+        EntryModification*  modification;   // [prf_size]
+
+        Checkpoint*         checkpoints;    // [gc_count]
+
+        int                 checkpoint_allocate;
+
+        int                 checkpoint_restore;
+
+    public:
+        Scoreboard();
+        Scoreboard(const Scoreboard& obj);
+        ~Scoreboard();
+
+        int                 GetSize() const;
+        bool                CheckBound(int index) const;
+
+        const Entry&        GetEntry(int index) const;
+        Entry&              GetEntry(int index);
+        void                SetEntry(int index, const Entry& entry);
+
+        bool                IsBusy(int index) const;
+        bool                IsForward(int index) const;
+
+        void                Land(int index);
+        void                TakeOff(int index);
+        void                SetBusy(int index, bool busy);
+        void                SetForward(int index, bool forward);
+
+        int                 GetCheckpointCount() const;
+        bool                CheckCheckpointBound(int index) const;
+
+        const Checkpoint&   GetCheckpoint(int index) const;
+        Checkpoint&         GetCheckpoint(int index);
+        void                SetCheckpoint(int index, const Checkpoint& checkpoint);
+
+        void                AllocateCheckpoint(int index);
+        void                RestoreCheckpoint(int index);
+
+        void                ResetInput();
+        void                Clear();
+
+        virtual void        Eval() override;
     };
 
     class PhysicalRegisterFile final : public MEMU::Emulated
@@ -240,7 +390,7 @@ namespace MEMU::Core::Issue {
 
         class Checkpoint {
         private:
-            constexpr static int    gc_size      = EMULATED_RAT_GC_SIZE;
+            constexpr static int    gc_size      = EMULATED_PRF_SIZE;
 
             CheckpointEntry*    entries;
 
@@ -261,18 +411,20 @@ namespace MEMU::Core::Issue {
 
             void                    Allocate(const Entry* entries);
             void                    Restore(Entry* entries) const;
+
+            void                    operator=(const Checkpoint& obj);
         };
 
     private:
         constexpr static int    rat_size     = EMULATED_RAT_SIZE;
 
-        constexpr static int    gc_size      = EMULATED_RAT_GC_SIZE;
+        constexpr static int    gc_count     = EMULATED_RAT_GC_COUNT;
 
         Entry*                  entries      /*[rat_size]*/;
 
         EntryModification*      modification /*[rat_size]*/; 
 
-        Checkpoint*             checkpoints   /*[gc_size]*/;
+        Checkpoint*             checkpoints  /*[gc_count]*/;
 
         int                     checkpoint_allocate;
         int                     checkpoint_restore;
@@ -315,6 +467,464 @@ namespace MEMU::Core::Issue {
 
         virtual void            Eval() override;
     };
+}
+
+
+
+// class MEMU::Core::Issue::Scoreboard::Entry
+namespace MEMU::Core::Issue {
+    /*
+    bool    busy;
+    bool    forward;
+    */
+
+    Scoreboard::Entry::Entry()
+        : busy      (false)
+        , forward   (false)
+    { }
+
+    Scoreboard::Entry::Entry(const Entry& obj)
+        : busy      (obj.busy)
+        , forward   (obj.forward)
+    { }
+
+    Scoreboard::Entry::~Entry()
+    { }
+
+    inline bool Scoreboard::Entry::IsBusy() const
+    {
+        return busy;
+    }
+
+    inline bool Scoreboard::Entry::IsForward() const
+    {
+        return forward;
+    }
+
+    inline void Scoreboard::Entry::SetBusy(bool busy)
+    {
+        this->busy = busy;
+    }
+
+    inline void Scoreboard::Entry::SetForward(bool forward)
+    {
+        this->forward = forward;
+    }
+
+    inline void Scoreboard::Entry::Clear()
+    {
+        busy    = false;
+        forward = false;
+    }
+}
+
+
+// class MEMU::Core::Issue::Scoreboard::EntryModification
+namespace MEMU::Core::Issue {
+    /*
+    bool    modified;
+
+    bool    modified_busy;
+    bool    modified_forward
+    bool    modified_land;
+    bool    modified_takeoff;
+
+    bool    busy;
+    bool    forward;
+    */
+
+    Scoreboard::EntryModification::EntryModification()
+        : modified          (false)
+        , modified_busy     (false)
+        , modified_forward  (false)
+        , busy              (false)
+        , forward           (false)
+    { }
+
+    Scoreboard::EntryModification::EntryModification(const EntryModification& obj)
+        : modified          (obj.modified)
+        , modified_busy     (obj.modified_busy)
+        , modified_forward  (obj.modified_forward)
+        , busy              (obj.busy)
+        , forward           (obj.forward)
+    { }
+
+    Scoreboard::EntryModification::~EntryModification()
+    { }
+
+    inline bool Scoreboard::EntryModification::IsModified() const
+    {
+        return modified;
+    }
+
+    inline bool Scoreboard::EntryModification::IsBusyModified() const
+    {
+        return modified_busy;
+    }
+
+    inline bool Scoreboard::EntryModification::IsForwardModified() const
+    {
+        return modified_forward;
+    }
+
+    inline bool Scoreboard::EntryModification::IsLandModified() const
+    {
+        return modified_land;
+    }
+
+    inline bool Scoreboard::EntryModification::IsTakeOffModified() const
+    {
+        return modified_takeoff;
+    }
+
+    inline void Scoreboard::EntryModification::SetBusy(bool busy)
+    {
+        modified      = true;
+        modified_busy = true;
+
+        this->busy = busy;
+    }
+
+    inline void Scoreboard::EntryModification::SetForward(bool forward)
+    {
+        modified         = true;
+        modified_forward = true;
+
+        this->forward = forward;
+    }
+
+    inline void Scoreboard::EntryModification::Land()
+    {
+        modified_land = true;
+    }
+
+    inline void Scoreboard::EntryModification::TakeOff()
+    {
+        modified_takeoff = true;
+    }
+
+    inline void Scoreboard::EntryModification::Reset()
+    {
+        modified = false;
+
+        modified_busy    = false;
+        modified_forward = false;
+        modified_land    = false;
+        modified_takeoff = false;
+    }
+
+    void Scoreboard::EntryModification::Apply(Entry& entry) const
+    {
+        if (IsBusyModified())
+            entry.SetBusy(busy);
+
+        if (!IsForwardModified())
+            entry.SetForward(forward);
+    }
+}
+
+
+// class MEMU::Core::Issue::Scoreboard::CheckpointEntry
+namespace MEMU::Core::Issue {
+    /*
+    bool    busy;
+    */
+
+    Scoreboard::CheckpointEntry::CheckpointEntry()
+        : busy  (false)
+    { }
+
+    Scoreboard::CheckpointEntry::CheckpointEntry(const CheckpointEntry& obj)
+        : busy  (obj.busy)
+    { }
+
+    Scoreboard::CheckpointEntry::~CheckpointEntry()
+    { }
+
+    inline bool Scoreboard::CheckpointEntry::GetBusy() const
+    {
+        return busy;
+    }
+
+    inline void Scoreboard::CheckpointEntry::SetBusy(bool busy)
+    {
+        this->busy = busy;
+    }
+
+    inline void Scoreboard::CheckpointEntry::Clear()
+    {
+        busy = false;
+    }
+
+    inline void Scoreboard::CheckpointEntry::Allocate(const Entry& entry)
+    {
+        busy = entry.IsBusy();
+    }
+
+    inline void Scoreboard::CheckpointEntry::Restore(Entry& entry) const
+    {
+        entry.SetBusy(busy);
+    }
+}
+
+
+// class MEMU::Core::Issue::Scoreboard::Checkpoint
+namespace MEMU::Core::Issue {
+    /*
+    CheckpointEntry*    entries;
+    */
+
+    Scoreboard::Checkpoint::Checkpoint()
+        : entries   (new CheckpointEntry[prf_size]())
+    { }
+
+    Scoreboard::Checkpoint::Checkpoint(const Checkpoint& obj)
+        : entries   (new CheckpointEntry[prf_size])
+    { 
+        for (int i = 0; i < prf_size; i++)
+            entries[i] = obj.entries[i];
+    }
+
+    Scoreboard::Checkpoint::~Checkpoint()
+    {
+        delete[] entries;
+    }
+
+    inline int Scoreboard::Checkpoint::GetSize() const
+    {
+        return prf_size;
+    }
+
+    inline bool Scoreboard::Checkpoint::CheckBound(int index) const
+    {
+        return index >= 0 && index < GetSize();
+    }
+
+    inline const Scoreboard::CheckpointEntry& Scoreboard::Checkpoint::GetEntry(int index) const
+    {
+        return entries[index];
+    }
+
+    inline Scoreboard::CheckpointEntry& Scoreboard::Checkpoint::GetEntry(int index)
+    {
+        return entries[index];
+    }
+
+    inline void Scoreboard::Checkpoint::SetEntry(int index, const CheckpointEntry& entry)
+    {
+        entries[index] = entry;
+    }
+
+    inline void Scoreboard::Checkpoint::Land(int index)
+    {
+        entries[index].SetBusy(false);
+    }
+
+    void Scoreboard::Checkpoint::Clear()
+    {
+        for (int i = 0; i < GetSize(); i++)
+            entries[i].Clear();
+    }
+
+    void Scoreboard::Checkpoint::Allocate(const Entry* entries)
+    {
+        for (int i = 0; i < GetSize(); i++)
+            this->entries[i].Allocate(entries[i]);
+    }
+
+    void Scoreboard::Checkpoint::Restore(Entry* entries) const
+    {
+        for (int i = 0; i < GetSize(); i++)
+            this->entries[i].Restore(entries[i]);
+    }
+
+    void Scoreboard::Checkpoint::operator=(const Checkpoint& obj)
+    {
+        for (int i = 0; i < GetSize() && i < obj.GetSize(); i++)
+            this->entries[i] = obj.entries[i];
+    }
+}
+
+
+// class MEMU::Core::Issue::Scoreboard
+namespace MEMU::Core::Issue {
+    /*
+    constexpr static int    prf_size                = EMULATED_PRF_SIZE;
+
+    constexpr static int    gc_count                = EMULATED_SCOREBOARD_GC_COUNT;
+
+    Entry*              entries;
+
+    EntryModification*  modification;
+    */
+
+    Scoreboard::Scoreboard()
+        : entries               (new Entry[prf_size]())
+        , modification          (new EntryModification[prf_size]())
+        , checkpoints           (new Checkpoint[gc_count]())
+        , checkpoint_allocate   (-1)
+        , checkpoint_restore    (-1)
+    { }
+
+    Scoreboard::Scoreboard(const Scoreboard& obj)
+        : entries               (new Entry[prf_size])
+        , modification          (new EntryModification[prf_size])
+        , checkpoints           (new Checkpoint[gc_count])
+        , checkpoint_allocate   (-1)
+        , checkpoint_restore    (-1)
+    { 
+        for (int i = 0; i < prf_size; i++)
+        {
+            entries[i]      = obj.entries[i];
+            modification[i] = obj.modification[i];
+            checkpoints[i]  = obj.checkpoints[i];
+        }
+    }
+
+    Scoreboard::~Scoreboard()
+    { 
+        delete[] entries;
+        delete[] modification;
+        delete[] checkpoints;
+    }
+
+    inline int Scoreboard::GetSize() const
+    {
+        return prf_size;
+    }
+
+    inline bool Scoreboard::CheckBound(int index) const
+    {
+        return index >= 0 && index < GetSize();
+    }
+
+    inline const Scoreboard::Entry& Scoreboard::GetEntry(int index) const
+    {
+        return entries[index];
+    }
+
+    inline Scoreboard::Entry& Scoreboard::GetEntry(int index)
+    {
+        return entries[index];
+    }
+
+    inline void Scoreboard::SetEntry(int index, const Entry& entry)
+    {
+        entries[index] = entry;
+    }
+
+    inline bool Scoreboard::IsBusy(int index) const
+    {
+        return entries[index].IsBusy();
+    }
+
+    inline bool Scoreboard::IsForward(int index) const
+    {
+        return entries[index].IsForward();
+    }
+
+    inline void Scoreboard::Land(int index)
+    {
+        modification[index].SetBusy(false);
+        modification[index].Land();
+    }
+
+    inline void Scoreboard::TakeOff(int index)
+    {
+        modification[index].SetBusy(true);
+        modification[index].TakeOff();
+    }
+
+    inline void Scoreboard::SetBusy(int index, bool busy)
+    {
+        modification[index].SetBusy(busy);
+    }
+
+    inline void Scoreboard::SetForward(int index, bool forward)
+    {
+        modification[index].SetForward(forward);
+    }
+
+    inline int Scoreboard::GetCheckpointCount() const
+    {
+        return gc_count;
+    }
+
+    inline bool Scoreboard::CheckCheckpointBound(int index) const
+    {
+        return index >= 0 && index < GetCheckpointCount();
+    }
+
+    inline const Scoreboard::Checkpoint& Scoreboard::GetCheckpoint(int index) const
+    {
+        return checkpoints[index];
+    }
+
+    inline Scoreboard::Checkpoint& Scoreboard::GetCheckpoint(int index)
+    {
+        return checkpoints[index];
+    }
+
+    inline void Scoreboard::SetCheckpoint(int index, const Checkpoint& checkpoint)
+    {
+        checkpoints[index] = checkpoint;
+    }
+
+    void Scoreboard::AllocateCheckpoint(int index)
+    {
+        checkpoint_allocate = index;
+    }
+
+    void Scoreboard::RestoreCheckpoint(int index)
+    {
+        checkpoint_restore = index;
+    }
+
+    void Scoreboard::ResetInput()
+    {
+        for (int i = 0; i < GetSize(); i++)
+            modification[i].Reset();
+
+        checkpoint_allocate = -1;
+        checkpoint_restore  = -1;
+    }
+
+    void Scoreboard::Clear()
+    {
+        for (int i = 0; i < GetSize(); i++)
+            entries[i].Clear();
+    }
+
+    void Scoreboard::Eval()
+    {
+        // checkpoint allocate
+        if (checkpoint_allocate != -1)
+            checkpoints[checkpoint_allocate].Allocate(entries);
+
+        for (int i = 0; i < GetSize(); i++)
+        {
+            // Clear forward flag at every clock cycle
+            // *NOTE: Data in forwarding network only holds for a cycle
+            entries[i].SetForward(false);
+
+            //
+            if (modification[i].IsModified())
+            {
+                modification[i].Apply(entries[i]);
+
+                // Checkpoint write-through on PRF land
+                if (modification[i].IsLandModified())
+                    for (int j = 0; j < GetCheckpointCount(); j++)
+                        checkpoints[j].Land(i);
+            }
+        }
+
+        // checkpoint restore
+        if (checkpoint_restore != -1)
+            checkpoints[checkpoint_restore].Restore(entries);
+
+        ResetInput();
+    }
 }
 
 
@@ -686,7 +1296,7 @@ namespace MEMU::Core::Issue {
 // class MEMU::Core::Issue::RegisterAliasTable::Checkpoint
 namespace MEMU::Core::Issue {
     /*
-    constexpr static int    gc_size      = EMULATED_RAT_GC_SIZE;
+    constexpr static int    gc_size;
 
     CheckpointEntry*    entries;
     */
@@ -699,7 +1309,7 @@ namespace MEMU::Core::Issue {
         : entries   (new CheckpointEntry[gc_size])
     {
         for (int i = 0; i < gc_size; i++)
-            new (&entries[i]) CheckpointEntry(obj.entries[i]);
+            entries[i] = obj.entries[i];
     }
 
     RegisterAliasTable::Checkpoint::~Checkpoint()
@@ -714,7 +1324,7 @@ namespace MEMU::Core::Issue {
 
     inline bool RegisterAliasTable::Checkpoint::CheckBound(int index) const
     {
-        return index >= 0 && index < gc_size;
+        return index >= 0 && index < GetSize();
     }
 
     inline const RegisterAliasTable::CheckpointEntry& RegisterAliasTable::Checkpoint::GetEntry(int index) const
@@ -744,14 +1354,20 @@ namespace MEMU::Core::Issue {
 
     void RegisterAliasTable::Checkpoint::Allocate(const Entry* entries)
     {
-        for (int i = 0; i < gc_size; i++)
+        for (int i = 0; i < GetSize(); i++)
             this->entries[i].Allocate(entries[i]);
     }
 
     void RegisterAliasTable::Checkpoint::Restore(Entry* entries) const
     {
-        for (int i = 0; i < gc_size; i++)
+        for (int i = 0; i < GetSize(); i++)
             this->entries[i].Restore(entries[i]);
+    }
+
+    void RegisterAliasTable::Checkpoint::operator=(const Checkpoint& obj)
+    {
+        for (int i = 0; i < GetSize() && i < obj.GetSize(); i++)
+            this->entries[i] = obj.entries[i];
     }
 }
 
@@ -776,7 +1392,7 @@ namespace MEMU::Core::Issue {
     RegisterAliasTable::RegisterAliasTable()
         : entries               (new Entry[rat_size]())
         , modification          (new EntryModification[rat_size]())
-        , checkpoints           (new Checkpoint[gc_size]())
+        , checkpoints           (new Checkpoint[gc_count]())
         , checkpoint_allocate   (-1)
         , checkpoint_restore    (-1)
     { 
@@ -787,19 +1403,19 @@ namespace MEMU::Core::Issue {
     RegisterAliasTable::RegisterAliasTable(const RegisterAliasTable& obj)
         : entries               (new Entry[rat_size])
         , modification          (new EntryModification[rat_size])
-        , checkpoints           (new Checkpoint[gc_size])
+        , checkpoints           (new Checkpoint[gc_count])
         , checkpoint_allocate   (obj.checkpoint_allocate)
         , checkpoint_restore    (obj.checkpoint_restore)
     {
         for (int i = 0; i < rat_size; i++)
         {
-            new (&entries[i])      Entry(obj.entries[i]);
-            new (&modification[i]) EntryModification(obj.modification[i]);
+            entries[i]      = obj.entries[i];
+            modification[i] = obj.modification[i];
         }
 
-        for (int i = 0; i < gc_size; i++)
+        for (int i = 0; i < gc_count; i++)
         {
-            new (&checkpoints[i]) Checkpoint(obj.checkpoints[i]);
+            checkpoints[i] = obj.checkpoints[i];
         }
     }
     
@@ -830,7 +1446,7 @@ namespace MEMU::Core::Issue {
             return -1;
 
         // PRF Query CAM
-        for (int i = 0; i < rat_size; i++)
+        for (int i = 0; i < GetSize(); i++)
             if (entries[i].GetValid() && (entries[i].GetARF() == arf))
                 return entries[i].GetPRF();
 
@@ -839,7 +1455,7 @@ namespace MEMU::Core::Issue {
 
     void RegisterAliasTable::Clear()
     {
-        for (int i = 0; i < rat_size; i++)
+        for (int i = 0; i < GetSize(); i++)
         {
             entries[i].Clear();
             entries[i].SetPRF(i);
@@ -848,7 +1464,7 @@ namespace MEMU::Core::Issue {
 
     bool RegisterAliasTable::IsFull() const
     {
-        for (int i = 0; i < rat_size; i++)
+        for (int i = 0; i < GetSize(); i++)
             if (!entries[i].GetNRA())
                 return false;
 
@@ -858,7 +1474,7 @@ namespace MEMU::Core::Issue {
     int RegisterAliasTable::GetNextEntry() const
     {
         // Selection tree.
-        for (int i = 0; i < rat_size; i++)
+        for (int i = 0; i < GetSize(); i++)
             if (!entries[i].GetNRA())
                 return i;
 
@@ -875,7 +1491,7 @@ namespace MEMU::Core::Issue {
 
         // Invalidate all other same-ARF entries.
         // Should be implemented with a CAM in actual circuit.
-        for (int i = 0; i < rat_size; i++)
+        for (int i = 0; i < GetSize(); i++)
             if (entries[i].GetValid() && entries[i].GetARF() == ARF)
             {
                 modification[i].SetValid(false);
@@ -902,7 +1518,7 @@ namespace MEMU::Core::Issue {
             modification[PRF].SetFV(false);
 
         // Release: Set NRA of all non-FV same-ARF entries to false
-        for (int i = 0; i < rat_size; i++)
+        for (int i = 0; i < GetSize(); i++)
             if (!entries[i].GetFV() && entries[i].GetARF() == ARF)
             {
                 // Reset of NRA bit MUST HAVE the LOWEST priority
@@ -927,7 +1543,7 @@ namespace MEMU::Core::Issue {
 
         bool invalidated = false;
 
-        for (int i = 0; i < rat_size; i++)
+        for (int i = 0; i < GetSize(); i++)
             if (entries[i].GetARF() == ARF)
             {
                 if (!invalidated && entries[i].GetValid())
@@ -998,7 +1614,7 @@ namespace MEMU::Core::Issue {
     void RegisterAliasTable::RestoreNRA(const ShadowRegisterAliasTable& sRAT)
     {
         // HIGHEST PRIORITY write
-        for (int i = 0; i < rat_size; i++)
+        for (int i = 0; i < GetSize(); i++)
             modification[i].SetNRA(sRAT.GetEntry(i).GetNRA());
     }
 
@@ -1014,7 +1630,7 @@ namespace MEMU::Core::Issue {
 
     void RegisterAliasTable::ResetInput()
     {
-        for (int i = 0; i < rat_size; i++)
+        for (int i = 0; i < GetSize(); i++)
             modification[i].Reset();
 
         checkpoint_allocate = -1;
@@ -1023,16 +1639,16 @@ namespace MEMU::Core::Issue {
 
     void RegisterAliasTable::Eval()
     {
+        // Checkpoint allocate
+        if (checkpoint_allocate != -1)
+            checkpoints[checkpoint_allocate].Allocate(entries);
+
         // Write entries
-        for (int i = 0; i < rat_size; i++)
+        for (int i = 0; i < GetSize(); i++)
         {
             if (modification[i].IsModified())
                 modification[i].Apply(entries[i]);
         }
-
-        // Checkpoint allocate
-        if (checkpoint_allocate != -1)
-            checkpoints[checkpoint_allocate].Allocate(entries);
 
         // Checkpoint restore
         if (checkpoint_restore != -1)
@@ -1298,7 +1914,7 @@ namespace MEMU::Core::Issue {
             return -1;
 
         // Query in CAM
-        for (int i = 0; i < rat_size; i++)
+        for (int i = 0; i < GetSize(); i++)
             if (entries[i].GetValid() && entries[i].GetARF() == arf)
                 return entries[i].GetPRF();
 
@@ -1307,7 +1923,7 @@ namespace MEMU::Core::Issue {
 
     void ShadowRegisterAliasTable::Clear()
     {
-        for (int i = 0; i < rat_size; i++)
+        for (int i = 0; i < GetSize(); i++)
         {
             entries[i].Clear();
             entries[i].SetPRF(i);
@@ -1326,7 +1942,7 @@ namespace MEMU::Core::Issue {
         modification[PRF].SetNRA(true);
 
         // De-assert all other same-ARF NRAs
-        for (int i = 0; i < rat_size; i++)
+        for (int i = 0; i < GetSize(); i++)
             if (entries[i].GetARF() == ARF)
             {
                 if (!modification[i].IsNRAModified())
@@ -1336,14 +1952,14 @@ namespace MEMU::Core::Issue {
 
     void ShadowRegisterAliasTable::ResetInput()
     {
-        for (int i = 0; i < rat_size; i++)
+        for (int i = 0; i < GetSize(); i++)
             modification[i].Reset();
     }
 
     void ShadowRegisterAliasTable::Eval()
     {
         //
-        for (int i = 0; i < rat_size; i++)
+        for (int i = 0; i < GetSize(); i++)
         {
             if (modification[i].IsModified())
                 modification[i].Apply(entries[i]);
