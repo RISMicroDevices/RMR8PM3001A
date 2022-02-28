@@ -297,10 +297,7 @@ namespace MEMU::Core::Issue {
     public:
         class Entry {
         private:
-            int     FID;   // Instruction Fetch ID
-            bool    FV;    // Instruction On-flight Valid
             bool    NRA;   // Not reallocate-able Flag
-
             int     PRF;   // PRF (Physical Register File) address
             int     ARF;   // ARF (Architectural Register File) mapping address
             bool    V;     // Mapping entry Valid
@@ -312,15 +309,11 @@ namespace MEMU::Core::Issue {
 
             void        Clear();
 
-            int         GetFID() const;
-            bool        GetFV() const; //
             bool        GetNRA() const;
             int         GetPRF() const;
             int         GetARF() const;
             bool        GetValid() const;
 
-            void        SetFID(int val);
-            void        SetFV(bool val); //
             void        SetNRA(bool val);
             void        SetPRF(int val);
             void        SetARF(int val);
@@ -336,16 +329,11 @@ namespace MEMU::Core::Issue {
         private:
             bool    modified;
 
-            bool    modified_FID;
-            bool    modified_FV;
             bool    modified_NRA;
             bool    modified_ARF;
             bool    modified_V;
 
-            int     FID;
-            bool    FV;
             bool    NRA;
-
             int     ARF;
             bool    V;
 
@@ -356,14 +344,10 @@ namespace MEMU::Core::Issue {
 
             bool    IsModified() const;
 
-            bool    IsFIDModified() const;
-            bool    IsFVModified() const;
             bool    IsNRAModified() const;
             bool    IsARFModified() const;
             bool    IsValidModified() const;
 
-            void    SetFID(int FID);
-            void    SetFV(bool FV);
             void    SetNRA(bool NRA);
             void    SetARF(int ARF);
             void    SetValid(bool V);
@@ -426,6 +410,8 @@ namespace MEMU::Core::Issue {
 
         Checkpoint*             checkpoints  /*[gc_count]*/;
 
+        const Scoreboard*       scoreboard;
+
         int                     checkpoint_allocate;
         int                     checkpoint_restore;
 
@@ -438,14 +424,18 @@ namespace MEMU::Core::Issue {
         bool                Touch(bool FV, int FID, int ARF, int* PRF);
 
     public:
-        RegisterAliasTable();
+        RegisterAliasTable(const Scoreboard* scoreboard);
         RegisterAliasTable(const RegisterAliasTable& obj);
         ~RegisterAliasTable();
 
         constexpr int           GetSize() const;
 
         const Entry&            GetEntry(int index) const;
+        Entry&                  GetEntry(int index);
         void                    SetEntry(int index, const Entry& entry);
+
+        const Scoreboard*       GetScoreboard() const;
+        void                    SetScoreboard(const Scoreboard* scoreboard);
 
         int                     GetAliasPRF(int arf) const;
 
@@ -458,7 +448,7 @@ namespace MEMU::Core::Issue {
         bool                    TouchAndWriteback(int FID, int ARF, int* PRF = 0);
         bool                    TouchAndCommit(int FID, int ARF, int* PRF = 0);
 
-        void                    RestoreNRA(const ShadowRegisterAliasTable& sRAT);
+        void                    SyncNRA(const ShadowRegisterAliasTable& sRAT);
 
         void                    AllocateCheckpoint(int index);
         void                    RestoreCheckpoint(int index);
@@ -981,28 +971,21 @@ namespace MEMU::Core::Issue {
 // class MEMU::Core::Issue::RegisterAliasTable::Entry
 namespace MEMU::Core::Issue {
     /*
-    int     FID;
-    bool    FV;
     bool    NRA;
-
     int     PRF;
     int     ARF;
     bool    V;
     */
 
     RegisterAliasTable::Entry::Entry()
-        : FID   (-1)
-        , FV    (false)
-        , NRA   (false)
+        : NRA   (false)
         , PRF   (0)
         , ARF   (0)
         , V     (false)
     { }
 
     RegisterAliasTable::Entry::Entry(const RegisterAliasTable::Entry& obj)
-        : FID   (obj.FID)
-        , FV    (obj.FV)
-        , NRA   (obj.NRA)
+        : NRA   (obj.NRA)
         , PRF   (obj.PRF)
         , ARF   (obj.ARF)
         , V     (obj.V)
@@ -1013,22 +996,10 @@ namespace MEMU::Core::Issue {
 
     void RegisterAliasTable::Entry::Clear()
     {
-        FID = -1;
-        FV  = false;
         NRA = false;
         PRF = 0;
         ARF = 0;
         V   = false;
-    }
-
-    inline int RegisterAliasTable::Entry::GetFID() const
-    {
-        return FID;
-    }
-
-    inline bool RegisterAliasTable::Entry::GetFV() const
-    {
-        return FV;
     }
 
     inline bool RegisterAliasTable::Entry::GetNRA() const
@@ -1049,16 +1020,6 @@ namespace MEMU::Core::Issue {
     inline bool RegisterAliasTable::Entry::GetValid() const
     {
         return V;
-    }
-
-    inline void RegisterAliasTable::Entry::SetFID(int val)
-    {
-        FID = val;
-    }
-
-    inline void RegisterAliasTable::Entry::SetFV(bool val)
-    {
-        FV = val;
     }
 
     inline void RegisterAliasTable::Entry::SetNRA(bool val)
@@ -1093,8 +1054,6 @@ namespace MEMU::Core::Issue {
 
     void RegisterAliasTable::Entry::operator=(const RegisterAliasTable::Entry& obj)
     {
-        FID = obj.FID;
-        FV = obj.FV;
         NRA = obj.NRA;
         PRF = obj.PRF;
         ARF = obj.ARF;
@@ -1108,29 +1067,20 @@ namespace MEMU::Core::Issue {
     /*
     bool    modified;
 
-    bool    modified_FID;
-    bool    modified_FV;
     bool    modified_NRA;
     bool    modified_PRF;
     bool    modified_V;
 
-    int     FID;
-    bool    FV;
     bool    NRA;
-
     int     PRF;
     bool    V;
     */
 
     RegisterAliasTable::EntryModification::EntryModification()
         : modified      (false)
-        , modified_FID  (false)
-        , modified_FV   (false)
         , modified_NRA  (false)
         , modified_ARF  (false)
         , modified_V    (false)
-        , FID           (0)
-        , FV            (false)
         , NRA           (false)
         , ARF           (0)
         , V             (false)
@@ -1138,13 +1088,9 @@ namespace MEMU::Core::Issue {
 
     RegisterAliasTable::EntryModification::EntryModification(const EntryModification& obj)
         : modified      (obj.modified)
-        , modified_FID  (obj.modified_FID)
-        , modified_FV   (obj.modified_FV)
         , modified_NRA  (obj.modified_NRA)
         , modified_ARF  (obj.modified_ARF)
         , modified_V    (obj.modified_V)
-        , FID           (obj.FID)
-        , FV            (obj.FV)
         , NRA           (obj.NRA)
         , ARF           (obj.ARF)
         , V             (obj.V)
@@ -1156,16 +1102,6 @@ namespace MEMU::Core::Issue {
     inline bool RegisterAliasTable::EntryModification::IsModified() const
     {
         return modified;
-    }
-
-    inline bool RegisterAliasTable::EntryModification::IsFIDModified() const
-    {
-        return modified_FID;
-    }
-
-    inline bool RegisterAliasTable::EntryModification::IsFVModified() const
-    {
-        return modified_FV;
     }
 
     inline bool RegisterAliasTable::EntryModification::IsNRAModified() const
@@ -1181,22 +1117,6 @@ namespace MEMU::Core::Issue {
     inline bool RegisterAliasTable::EntryModification::IsValidModified() const
     {
         return modified_V;
-    }
-
-    inline void RegisterAliasTable::EntryModification::SetFID(int FID)
-    {
-        modified     = true;
-        modified_FID = true;
-
-        this->FID = FID;
-    }
-
-    inline void RegisterAliasTable::EntryModification::SetFV(bool FV)
-    {
-        modified    = true;
-        modified_FV = true;
-
-        this->FV = FV;
     }
 
     inline void RegisterAliasTable::EntryModification::SetNRA(bool NRA)
@@ -1227,8 +1147,6 @@ namespace MEMU::Core::Issue {
     {
         modified     = false;
 
-        modified_FID = false;
-        modified_FV  = false;
         modified_NRA = false;
         modified_ARF = false;
         modified_V   = false;
@@ -1236,12 +1154,6 @@ namespace MEMU::Core::Issue {
 
     void RegisterAliasTable::EntryModification::Apply(Entry& dst) const
     {
-        if (modified_FID)
-            dst.SetFID(FID);
-
-        if (modified_FV)
-            dst.SetFV(FV);
-
         if (modified_NRA)
             dst.SetNRA(NRA);
 
@@ -1385,14 +1297,17 @@ namespace MEMU::Core::Issue {
 
     Checkpoint*             checkpoints;   // [gc_size]
 
+    const Scoreboard*       scoreboard;
+
     int                     checkpoint_allocate;
     int                     checkpoint_restore;
     */
 
-    RegisterAliasTable::RegisterAliasTable()
+    RegisterAliasTable::RegisterAliasTable(const Scoreboard* scoreboard)
         : entries               (new Entry[rat_size]())
         , modification          (new EntryModification[rat_size]())
         , checkpoints           (new Checkpoint[gc_count]())
+        , scoreboard            (scoreboard)
         , checkpoint_allocate   (-1)
         , checkpoint_restore    (-1)
     { 
@@ -1404,6 +1319,7 @@ namespace MEMU::Core::Issue {
         : entries               (new Entry[rat_size])
         , modification          (new EntryModification[rat_size])
         , checkpoints           (new Checkpoint[gc_count])
+        , scoreboard            (obj.scoreboard)
         , checkpoint_allocate   (obj.checkpoint_allocate)
         , checkpoint_restore    (obj.checkpoint_restore)
     {
@@ -1423,6 +1339,7 @@ namespace MEMU::Core::Issue {
     {
         delete[] entries;
         delete[] modification;
+        delete[] checkpoints;
     }
 
     constexpr int RegisterAliasTable::GetSize() const
@@ -1430,14 +1347,29 @@ namespace MEMU::Core::Issue {
         return rat_size;
     }
 
-    const RegisterAliasTable::Entry& RegisterAliasTable::GetEntry(int index) const
+    inline const RegisterAliasTable::Entry& RegisterAliasTable::GetEntry(int index) const
     {
         return entries[index];
     }
 
-    void RegisterAliasTable::SetEntry(int index, const Entry& entry)
+    inline RegisterAliasTable::Entry& RegisterAliasTable::GetEntry(int index)
+    {
+        return entries[index];
+    }
+
+    inline void RegisterAliasTable::SetEntry(int index, const Entry& entry)
     {
         entries[index] = entry;
+    }
+
+    inline const Scoreboard* RegisterAliasTable::GetScoreboard() const
+    {
+        return scoreboard;
+    }
+
+    inline void RegisterAliasTable::SetScoreboard(const Scoreboard* scoreboard)
+    {
+        this->scoreboard = scoreboard;
     }
 
     int RegisterAliasTable::GetAliasPRF(int arf) const
@@ -1512,14 +1444,9 @@ namespace MEMU::Core::Issue {
         // query CAM circuit.
         int ARF = entries[PRF].GetARF();
         
-        // Land: Set FV to false
-        // Reset of FV bit MUST HAVE the LOWEST 
-        if (!modification[PRF].IsFVModified())
-            modification[PRF].SetFV(false);
-
         // Release: Set NRA of all non-FV same-ARF entries to false
         for (int i = 0; i < GetSize(); i++)
-            if (!entries[i].GetFV() && entries[i].GetARF() == ARF)
+            if (!scoreboard->IsBusy(i) && entries[i].GetARF() == ARF)
             {
                 // Reset of NRA bit MUST HAVE the LOWEST priority
                 if (modification[i].IsNRAModified())
@@ -1573,9 +1500,7 @@ namespace MEMU::Core::Issue {
         else
             InvalidateAndRelease(ARF);
 
-        // Pre-touch means instruction on flight
-        modification[index].SetFID  (FID);
-        modification[index].SetFV   (FV);
+        //
         modification[index].SetNRA  (true);
         modification[index].SetARF  (ARF);
         modification[index].SetValid(true);
@@ -1611,7 +1536,7 @@ namespace MEMU::Core::Issue {
         return Touch(false, FID, ARF, PRF);
     }
 
-    void RegisterAliasTable::RestoreNRA(const ShadowRegisterAliasTable& sRAT)
+    void RegisterAliasTable::SyncNRA(const ShadowRegisterAliasTable& sRAT)
     {
         // HIGHEST PRIORITY write
         for (int i = 0; i < GetSize(); i++)
