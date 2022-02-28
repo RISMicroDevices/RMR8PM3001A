@@ -14,7 +14,7 @@
 
 #include "vmc.hpp"
 
-#include "core_issue.hpp"
+#include "core_dispatch.hpp"
 
 
 using namespace MEMU::Core::Issue;
@@ -248,13 +248,11 @@ namespace VMC::RAT {
     };
 
 
-    static constexpr int SCOREBOARD_STATUS_BUSY     = -1;
+    static constexpr int SCOREBOARD_STATUS_BUSY             = -1;
 
-    static constexpr int SCOREBOARD_STATUS_IN_ARF   = 0;
+    static constexpr int SCOREBOARD_STATUS_IN_ARF           = 0;
 
-    static constexpr int SCOREBOARD_STATUS_IN_ROB   = 1;
-
-    static constexpr int SCOREBOARD_STATUS_FORWARD  = 2; // unused
+    static constexpr int SCOREBOARD_STATUS_FORWARD          = 2; // unused
 
     class SimScoreboard // Only support ARF0-conv mode
     {
@@ -358,6 +356,7 @@ namespace VMC::RAT {
         void            Eval();
     };
 
+    template<class TScoreboard>
     class SimReservation // Only support ARF0-conv mode
     {
     public:
@@ -389,18 +388,18 @@ namespace VMC::RAT {
         };
 
     private:
-        const SimScoreboard*    const scoreboard;
+        const TScoreboard*      const scoreboard;
         std::list<Entry>              entries;
         std::list<Entry>::iterator    next;
 
     public:
-        SimReservation(const SimScoreboard* scoreboard);
-        SimReservation(const SimReservation& obj);
+        SimReservation(const TScoreboard* scoreboard);
+        SimReservation(const SimReservation<TScoreboard>& obj);
         ~SimReservation();
 
         const std::list<Entry>& Get() const;
 
-        const SimScoreboard*    GetScoreboardRef() const;
+        const TScoreboard*      GetScoreboard() const;
 
         void                    PushInsn(const SimFetchedInstruction& insn);
 
@@ -560,7 +559,9 @@ namespace VMC::RAT {
 
         SimInstructionMemory        InsnMemory                  = SimInstructionMemory(SIM_INSN_MEMORY_CAPACITY);
 
-        RegisterAliasTable          O3RAT                       = RegisterAliasTable();
+        Scoreboard                  O3Scoreboard                = Scoreboard();
+
+        RegisterAliasTable          O3RAT                       = RegisterAliasTable(&O3Scoreboard);
 
         PhysicalRegisterFile        O3PRF                       = PhysicalRegisterFile();
 
@@ -570,7 +571,7 @@ namespace VMC::RAT {
 
         SimScoreboard               O3Scoreboard                = SimScoreboard(EMULATED_PRF_SIZE);
 
-        SimReservation              O3Reservation               = SimReservation(&O3Scoreboard);
+        SimReservation<Scoreboard>  O3Reservation               = SimReservation(&O3Scoreboard);
 
         SimExecution                O3Execution                 = SimExecution(&O3PRF);
 
@@ -582,11 +583,12 @@ namespace VMC::RAT {
 
         int                         RefPC                       = 0;
 
-        int                         RefFGR                      = 0;
+        bool                        RefFetchStall               = false;
 
         SimScoreboard               RefScoreboard               = SimScoreboard(EMULATED_ARF_SIZE);
 
-        SimReservation              RefReservation              = SimReservation(&RefScoreboard);
+        SimReservation<SimScoreboard>
+                                    RefReservation              = SimReservation(&RefScoreboard);
 
         SimExecution                RefExecution                = SimExecution(RefARF);
 
@@ -767,6 +769,16 @@ namespace VMC::RAT {
     //
     bool EvalRefFetch(SimHandle csim, bool info, int step)
     {
+        if (csim->RefFetchStall)
+        {
+            csim->RefStatus.SetFetchStatus(&STAGE_STATUS_WAIT);
+
+            if (info)
+                printf("[ %8d ] RefFetch: Fetch stall.\n", step);
+
+            return true;
+        }
+
         if (!csim->InsnMemory.CheckBound(csim->RefPC))
         {
             printf("[ %8d ] RefFetch: PC 0x%08x out of memory bound.\n", step, csim->RefPC);
@@ -788,11 +800,15 @@ namespace VMC::RAT {
         const SimInstruction& insn = csim->InsnMemory.GetInsn(csim->RefPC);
 
         //
-        csim->RefReservation.PushInsn(SimFetchedInstruction(insn, csim->RefFGR, csim->RefPC));
+        csim->RefReservation.PushInsn(SimFetchedInstruction(insn, 0, csim->RefPC));
+
+        // PC operation
+        csim->RefPC++;
 
         if (insn.IsBranch())
-            csim->RefFGR++;
+            csim->RefFetchStall = true;
 
+        //
         csim->FetchHistory.push_back(insn);
 
         csim->RefFetchCount++;
@@ -875,7 +891,7 @@ namespace VMC::RAT {
             return true;
         }
 
-        const SimInstruction& insn = entry.GetInsn();
+        const SimFetchedInstruction& insn = entry.GetInsn();
 
         //
         SetRefARF(csim, insn.GetDstARF(), entry.GetDstValue());
@@ -885,6 +901,9 @@ namespace VMC::RAT {
             ShouldNotReachHere(" RAT::EvalRefWriteback ILLEGAL_STATE #ExecutionPopFail");
             return false;
         }
+
+        if (entry.IsBranch())
+            csim->RefFetchStall = false;
 
         csim->RefScoreboard.SetStatus(insn.GetDstARF(), SCOREBOARD_STATUS_IN_ARF);
 
@@ -3256,10 +3275,7 @@ namespace VMC::RAT {
         // memcpy(memory, obj.memory, sizeof(SimInstruction) * min(new_capacity, obj.capacity));
 
         for (int i = 0; i < obj.capacity && i < new_capacity; i++)
-            new (&memory[i]) SimInstruction(obj.memory[i]);
-
-        for (int i = obj.capacity; i < new_capacity; i++)
-            new (&memory[i]) SimInstruction();
+            memory[i] = obj.memory[i];
     }
 
     SimInstructionMemory::~SimInstructionMemory()
@@ -3614,7 +3630,26 @@ namespace VMC::RAT {
             modification[index].SetFID(FID);
     }
 
-    // TODO
+    void SimScoreboard::ReleaseFGR(int FGR)
+    {
+        for (int i = 0; i < size; i++)
+        {
+            if (entries[i].GetFGV() && entries[i].GetFGR() == FGR)
+                modification[i].SetFGV(false);
+        }
+    }
+
+    void SimScoreboard::RestoreFGR(int FGR)
+    {
+        for (int i = 0; i < size; i++)
+        {
+            if (entries[i].GetFGV() && entries[i].GetFGR() == FGR)
+            {
+                modification[i].SetFGV(false);
+                modification[i].SetStatus(SCOREBOARD_STATUS_IN_ARF);
+            }
+        }
+    }
 
     void SimScoreboard::ResetInput()
     {
@@ -3645,81 +3680,96 @@ namespace VMC::RAT {
     bool                        src2rdy;
     */
 
-    SimReservation::Entry::Entry(const SimFetchedInstruction& insn)
+    template<class TScoreboard>
+    SimReservation<TScoreboard>::Entry::Entry(const SimFetchedInstruction& insn)
         : insn      (insn)
         , src1rdy   (false)
         , src2rdy   (false)
         , dstrdy    (false)
     { }
 
-    SimReservation::Entry::Entry(const SimFetchedInstruction& insn, bool src1rdy, bool src2rdy, bool dstrdy)
+    template<class TScoreboard>
+    SimReservation<TScoreboard>::Entry::Entry(const SimFetchedInstruction& insn, bool src1rdy, bool src2rdy, bool dstrdy)
         : insn      (insn)
         , src1rdy   (src1rdy)
         , src2rdy   (src2rdy)
         , dstrdy    (dstrdy)
     { }
 
-    SimReservation::Entry::Entry(const Entry& obj)
+    template<class TScoreboard>
+    SimReservation<TScoreboard>::Entry::Entry(const Entry& obj)
         : insn      (obj.insn)
         , src1rdy   (obj.src1rdy)
         , src2rdy   (obj.src2rdy)
         , dstrdy    (obj.dstrdy)
     { }
 
-    SimReservation::Entry::~Entry()
+    template<class TScoreboard>
+    SimReservation<TScoreboard>::Entry::~Entry()
     { }
 
-    inline const SimFetchedInstruction& SimReservation::Entry::GetInsn() const
+    template<class TScoreboard>
+    inline const SimFetchedInstruction& SimReservation<TScoreboard>::Entry::GetInsn() const
     {
         return insn;
     }
 
-    inline bool SimReservation::Entry::IsSrc1Ready() const
+    template<class TScoreboard>
+    inline bool SimReservation<TScoreboard>::Entry::IsSrc1Ready() const
     {
         return src1rdy;
     }
 
-    inline bool SimReservation::Entry::IsSrc2Ready() const
+    template<class TScoreboard>
+    inline bool SimReservation<TScoreboard>::Entry::IsSrc2Ready() const
     {
         return src2rdy;
     }
 
-    inline bool SimReservation::Entry::IsDstReady() const
+    template<class TScoreboard>
+    inline bool SimReservation<TScoreboard>::Entry::IsDstReady() const
     {
         return dstrdy;
     }
 
-    inline bool SimReservation::Entry::IsReady() const
+    template<class TScoreboard>
+    inline bool SimReservation<TScoreboard>::Entry::IsReady() const
     {
         return src1rdy && src2rdy && dstrdy;
     }
 
-    inline int SimReservation::Entry::GetSrc1() const
+    template<class TScoreboard>
+    inline int SimReservation<TScoreboard>::Entry::GetSrc1() const
     {
         return insn.GetSrc1PRF();
     }
 
-    inline int SimReservation::Entry::GetSrc2() const
+    template<class TScoreboard>
+    inline int SimReservation<TScoreboard>::Entry::GetSrc2() const
     {
         return insn.GetSrc2PRF();
     }
 
-    inline int SimReservation::Entry::GetDst() const
+    template<class TScoreboard>
+    inline int SimReservation<TScoreboard>::Entry::GetDst() const
     {
         return insn.GetDstPRF();
     }
 
-    inline void SimReservation::Entry::SetSrc1Ready(bool rdy)
+    template<class TScoreboard>
+    inline void SimReservation<TScoreboard>::Entry::SetSrc1Ready(bool rdy)
     {
         src1rdy = rdy;
     }
 
-    inline void SimReservation::Entry::SetSrc2Ready(bool rdy)
+    template<class TScoreboard>
+    inline void SimReservation<TScoreboard>::Entry::SetSrc2Ready(bool rdy)
     {
         src2rdy = rdy;
     }
 
-    inline void SimReservation::Entry::SetDstReady(bool rdy)
+    template<class TScoreboard>
+    inline void SimReservation<TScoreboard>::Entry::SetDstReady(bool rdy)
     {
         dstrdy = rdy;
     }
@@ -3729,32 +3779,37 @@ namespace VMC::RAT {
 // class VMC::RAT::SimReservation
 namespace VMC::RAT {
     /*
-    const SimScoreboard*    scoreboard;
+    const TScoreboard*      scoreboard;
     list<Entry>             entries;
     list<Entry>::iterator   next;
     */
 
-    SimReservation::SimReservation(const SimScoreboard* scoreboard)
+    template<class TScoreboard>
+    SimReservation<TScoreboard>::SimReservation(const TScoreboard* scoreboard)
         : scoreboard(scoreboard)
         , entries   (list<Entry>())
         , next      (entries.end())
     { }
 
-    SimReservation::SimReservation(const SimReservation& obj)
+    template<class TScoreboard>
+    SimReservation<TScoreboard>::SimReservation(const SimReservation& obj)
         : scoreboard(obj.scoreboard)
         , entries   (obj.entries)
         , next      (entries.end())
     { }
 
-    SimReservation::~SimReservation()
+    template<class TScoreboard>
+    SimReservation<TScoreboard>::~SimReservation()
     { }
 
-    inline const std::list<SimReservation::Entry>& SimReservation::Get() const
+    template<class TScoreboard>
+    inline const std::list<SimReservation<TScoreboard>::Entry>& SimReservation<TScoreboard>::Get() const
     {
         return entries;
     }
 
-    void SimReservation::PushInsn(const SimFetchedInstruction& insn)
+    template<class TScoreboard>
+    void SimReservation<TScoreboard>::PushInsn(const SimFetchedInstruction& insn)
     {
         Entry entry = Entry(insn);
         /*
@@ -3766,22 +3821,26 @@ namespace VMC::RAT {
         entries.push_back(entry);
     }
 
-    inline const SimScoreboard* SimReservation::GetScoreboardRef() const
+    template<class TScoreboard>
+    inline const TScoreboard* SimReservation<TScoreboard>::GetScoreboard() const
     {
         return scoreboard;
     }
-
-    inline int SimReservation::GetCount() const
+    
+    template<class TScoreboard>
+    inline int SimReservation<TScoreboard>::GetCount() const
     {
         return entries.size();
     }
 
-    inline bool SimReservation::IsEmpty() const
+    template<class TScoreboard>
+    inline bool SimReservation<TScoreboard>::IsEmpty() const
     {
         return entries.empty();
     }
 
-    bool SimReservation::NextInsn(SimFetchedInstruction* insn)
+    template<class TScoreboard>
+    bool SimReservation<TScoreboard>::NextInsn(SimFetchedInstruction* insn)
     {
         if (next != entries.end())
         {
@@ -3810,7 +3869,8 @@ namespace VMC::RAT {
         return false;
     }
 
-    bool SimReservation::PopInsn()
+    template<class TScoreboard>
+    bool SimReservation<TScoreboard>::PopInsn()
     {
         if (next == entries.end() && !NextInsn())
             return false;
@@ -3821,12 +3881,14 @@ namespace VMC::RAT {
         return true;
     }
     
-    inline void SimReservation::Clear()
+    template<class TScoreboard>
+    inline void SimReservation<TScoreboard>::Clear()
     {
         entries.clear();
     }
 
-    void SimReservation::Eval()
+    template<class TScoreboard>
+    void SimReservation<TScoreboard>::Eval()
     {
         std::list<Entry>::iterator iter = entries.begin();
         while (iter != entries.end())
