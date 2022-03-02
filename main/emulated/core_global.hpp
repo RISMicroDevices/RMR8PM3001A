@@ -15,6 +15,66 @@
 using namespace std;
 
 namespace MEMU::Core {
+
+    template<typename TPayload>
+    class CompressingMemory : public MEMU::Emulated
+    {
+    private:
+        class Modification {
+        private:
+            bool        modified;
+
+            bool        modified_payload;
+            bool        modified_valid;
+
+            TPayload    payload;
+            bool        valid;
+
+        public:
+            Modification();
+            Modification(const Modification& obj);
+            ~Modification();
+
+            bool    IsModified() const;
+
+            bool    IsPayloadModified() const;
+            bool    IsValidModified() const;
+
+            void    SetPayload(TPayload payload);
+            void    SetValid(bool valid = true);
+
+            void    Reset();
+        };
+
+    private:
+        const int       size;
+
+        TPayload*       memory;
+        bool*           valid;
+
+    public:
+        CompressingMemory(int size);
+        CompressingMemory(const CompressingMemory<TPayload>& obj);
+        ~CompressingMemory();
+
+        int                 GetSize() const;
+        bool                CheckBound(int address) const;
+
+        int                 NextTopAddress() const;
+
+        const TPayload&     GetPayload(int address) const;
+        bool                GetValid(int address) const;
+
+        void                SetPayload(int address, const TPayload& payload);
+        void                SetValid(int address, bool valid = true);
+
+        void                ResetInput();
+
+        virtual void        Eval() override;
+
+        void                operator=(const CompressingMemory<TPayload>& obj) = delete;
+    };
+
     class GlobalCheckpointTable : public MEMU::Emulated
     {
     private:
