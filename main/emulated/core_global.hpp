@@ -16,7 +16,7 @@ using namespace std;
 
 namespace MEMU::Core {
 
-    template<typename TPayload>
+    template<class TPayload>
     class CompressingMemory : public MEMU::Emulated
     {
     private:
@@ -40,7 +40,7 @@ namespace MEMU::Core {
             bool    IsPayloadModified() const;
             bool    IsValidModified() const;
 
-            void    SetPayload(TPayload payload);
+            void    SetPayload(const TPayload& payload);
             void    SetValid(bool valid = true);
 
             void    Reset();
@@ -103,7 +103,94 @@ namespace MEMU::Core {
 }
 
 
-// MEMU::Core::GlobalCheckpointTable
+// class MEMU::Core::CompressingMemory::Modification
+namespace MEMU::Core {
+    /*
+    bool        modified;
+
+    bool        modified_payload;
+    bool        modified_valid;
+
+    TPayload    payload;
+    bool        valid;
+    */
+
+    template<class TPayload>
+    CompressingMemory<TPayload>::Modification::Modification()
+        : modified          (false)
+        , modified_payload  (false)
+        , modified_valid    (false)
+        , payload           ()
+        , valid             (false)
+    { }
+
+    template<class TPayload>
+    CompressingMemory<TPayload>::Modification::Modification(const Modification& obj)
+        : modified          (obj.modified)
+        , modified_payload  (obj.modified_payload)
+        , modified_valid    (obj.modified_valid)
+        , payload           (obj.payload)
+        , valid             (obj.valid)
+    { }
+
+    template<class TPayload>
+    CompressingMemory<TPayload>::Modification::~Modification()
+    { }
+
+    template<class TPayload>
+    inline bool CompressingMemory<TPayload>::Modification::IsModified() const
+    {
+        return modified;
+    }
+
+    template<class TPayload>
+    inline bool CompressingMemory<TPayload>::Modification::IsPayloadModified() const
+    {
+        return modified_payload;
+    }
+
+    template<class TPayload>
+    inline bool CompressingMemory<TPayload>::Modification::IsValidModified() const
+    {
+        return modified_valid;
+    }
+
+    template<class TPayload>
+    inline void CompressingMemory<TPayload>::Modification::SetPayload(const TPayload& payload)
+    {
+        modified         = true;
+        modified_payload = true;
+
+        this->payload = payload;
+    }
+
+    template<class TPayload>
+    inline void CompressingMemory<TPayload>::Modification::SetValid(bool valid)
+    {
+        modified       = true;
+        modified_valid = true;
+
+        this->valid = valid;
+    }
+
+    template<class TPayload>
+    void CompressingMemory<TPayload>::Modification::Reset()
+    {
+        modified = false;
+
+        modified_payload = false;
+        modified_valid   = false;
+    }
+}
+
+
+// class MEMU::Core::CompressingMemory
+namespace MEMU::Core {
+
+}
+
+
+// class MEMU::Core::GlobalCheckpointTable
 namespace MEMU::Core {
     /*
     bitset<EMULATED_GC_COUNT>   gc_valid;
