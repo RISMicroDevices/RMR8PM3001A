@@ -52,6 +52,8 @@ namespace MEMU::Core {
         TPayload*       memory;
         bool*           valid;
 
+        Modification*   modification;
+
     public:
         CompressingMemory(int size);
         CompressingMemory(const CompressingMemory<TPayload>& obj);
@@ -186,7 +188,120 @@ namespace MEMU::Core {
 
 // class MEMU::Core::CompressingMemory
 namespace MEMU::Core {
+    /*
+    const int       size;
 
+    TPayload*       memory;
+    bool*           valid;
+
+    Modification*   modification;
+    */
+
+    template<class TPayload>
+    CompressingMemory<TPayload>::CompressingMemory(int size)
+        : size          (size)
+        , memory        (new TPayload[size]())
+        , valid         (new bool[size]())
+        , modification  (new Modification[size]())
+    { }
+
+    template<class TPayload>
+    CompressingMemory<TPayload>::CompressingMemory(const CompressingMemory<TPayload>& obj)
+        : size          (obj.size)
+        , memory        (new TPayload[size]())
+        , valid         (new bool[size]())
+        , modification  (new Modification[size]())
+    {
+        for (int i = 0; i < size; i++)
+        {
+            memory[i]       = obj.memory[i];
+            valid[i]        = obj.valid[i];
+            modification[i] = obj.modification[i];
+        }
+    }
+
+    template<class TPayload>
+    CompressingMemory<TPayload>::~CompressingMemory()
+    {
+        delete[] memory;
+        delete[] valid;
+    }
+
+    template<class TPayload>
+    inline int CompressingMemory<TPayload>::GetSize() const
+    {
+        return size;
+    }
+
+    template<class TPayload>
+    inline bool CompressingMemory<TPayload>::CheckBound(int address) const
+    {
+        return address >= 0 && address < GetSize();
+    }
+
+    template<class TPayload>
+    int CompressingMemory<TPayload>::NextTopAddress() const
+    {
+        int addr = -1;
+
+        for (int i = 0; i < GetSize(); i++)
+        {
+            if (valid[i])
+                break;
+
+            addr = i;
+        }
+
+        return addr;
+    }
+
+    template<class TPayload>
+    inline const TPayload& CompressingMemory<TPayload>::GetPayload(int address) const
+    {
+        return memory[address];
+    }
+
+    template<class TPayload>
+    inline bool CompressingMemory<TPayload>::GetValid(int address) const
+    {
+        return valid[address];
+    }
+
+    template<class TPayload>
+    inline void CompressingMemory<TPayload>::SetPayload(int address, const TPayload& payload)
+    {
+        modification[address].SetPayload(payload);
+    }
+
+    template<class TPayload>
+    inline void CompressingMemory<TPayload>::SetValid(int address, bool valid)
+    {
+        modification[address].SetValid(valid);
+    }
+
+    template<class TPayload>
+    void CompressingMemory<TPayload>::ResetInput()
+    {
+        for (int i = 0; i < GetSize(); i++)
+            modification[i].Reset();
+    }
+
+    template<class TPayload>
+    void CompressingMemory<TPayload>::Eval()
+    {
+        // TODO
+    }
+
+    template<class TPayload>
+    void CompressingMemory<TPayload>::operator=(const CompressingMemory<TPayload>& obj)
+    {
+        for (int i = 0; i < GetSize() && i < obj.GetSize(); i++)
+        {
+            memory[i]       = obj.memory[i];
+            valid[i]        = obj.valid[i];
+            modification[i] = obj.modification[i];
+        }
+    }
 }
 
 
