@@ -346,7 +346,7 @@ namespace MEMU::Core {
 
         for (int i = 0; i < GetSize(); i++)
         {
-            if (entires[i].GetValid())
+            if (entries[i].GetValid())
                 break;
 
             addr = i;
@@ -404,7 +404,7 @@ namespace MEMU::Core {
         for (int i = GetSize() - 1; i >= 0; i--)
         {
             //
-            comp_carrier[i] = comp_carrier[i + 1] || !valid[i];
+            comp_carrier[i] = comp_carrier[i + 1] || !entries[i].GetValid();
 
             //
             bool comp_unit = comp_carrier[i + 1];
@@ -431,16 +431,6 @@ namespace MEMU::Core {
         ResetInput();
 
         delete[] comp_carrier;
-    }
-
-    template<class TPayload>
-    void CompressingMemory<TPayload>::operator=(const CompressingMemory<TPayload>& obj)
-    {
-        for (int i = 0; i < GetSize() && i < obj.GetSize(); i++)
-        {
-            entries[i]      = obj.entries[i];
-            modification[i] = obj.modification[i];
-        }
     }
 }
 
