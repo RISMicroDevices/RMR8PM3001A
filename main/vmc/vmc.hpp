@@ -638,20 +638,20 @@ namespace VMC::Basic {
     //
     void SetupCommands(VMCHandle handle)
     {
-        RegisterCommand(handle, VMC::CommandHandler { std::string("#")      , &Nop     });
-        RegisterCommand(handle, VMC::CommandHandler { std::string("nop")    , &Nop     });
-        RegisterCommand(handle, VMC::CommandHandler { std::string("rem")    , &Nop     });
-        RegisterCommand(handle, VMC::CommandHandler { std::string("version"), &Version });
-        RegisterCommand(handle, VMC::CommandHandler { std::string("exit")   , &Exit });
-        RegisterCommand(handle, VMC::CommandHandler { std::string("exec")   , &Exec });
-        RegisterCommand(handle, VMC::CommandHandler { std::string("echo")   , &Echo }); 
-        RegisterCommand(handle, VMC::CommandHandler { std::string("setbool"), &SetBool });
-        RegisterCommand(handle, VMC::CommandHandler { std::string("movbool"), &MovBool });
-        RegisterCommand(handle, VMC::CommandHandler { std::string("delbool"), &DelBool });
-        RegisterCommand(handle, VMC::CommandHandler { std::string("setivar"), &SetIVar });
-        RegisterCommand(handle, VMC::CommandHandler { std::string("movivar"), &MovIVar });
-        RegisterCommand(handle, VMC::CommandHandler { std::string("delivar"), &DelIVar });
-        RegisterCommand(handle, VMC::CommandHandler { std::string("srand"),   &Srand });
+        VMC_COMMAND(handle, "#"      , Nop);
+        VMC_COMMAND(handle, "nop"    , Nop);
+        VMC_COMMAND(handle, "rem"    , Nop);
+        VMC_COMMAND(handle, "version", Version);
+        VMC_COMMAND(handle, "exit"   , Exit);
+        VMC_COMMAND(handle, "exec"   , Exec);
+        VMC_COMMAND(handle, "echo"   , Echo); 
+        VMC_COMMAND(handle, "setbool", SetBool);
+        VMC_COMMAND(handle, "movbool", MovBool);
+        VMC_COMMAND(handle, "delbool", DelBool);
+        VMC_COMMAND(handle, "setivar", SetIVar);
+        VMC_COMMAND(handle, "movivar", MovIVar);
+        VMC_COMMAND(handle, "delivar", DelIVar);
+        VMC_COMMAND(handle, "srand"  , Srand);
     }
     
 }
