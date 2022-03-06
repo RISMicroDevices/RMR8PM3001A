@@ -4,15 +4,23 @@
 //
 //
 
-#include "bitset"
+#include <bitset>
 
 #include "base.hpp"
 
-#define EMULATED_GC_COUNT               8
 
-#define EMULATED_ARF_SIZE               32
+#define EMULATED_GC_COUNT                           8
+#define EMULATED_ARF_SIZE                           32
+#define EMULATED_PRF_SIZE                           96
+
+#define EMULATED_SCOREBOARD_GC_COUNT                EMULATED_GC_COUNT
+
+#define EMULATED_RAT_SIZE                           EMULATED_PRF_SIZE
+#define EMULATED_RAT_GC_COUNT                       EMULATED_GC_COUNT 
+
 
 using namespace std;
+
 
 namespace MEMU::Core {
 
@@ -20,7 +28,27 @@ namespace MEMU::Core {
     class CompressingMemory : public MEMU::Emulated
     {
     private:
-        class Modification {
+        class Entry {
+        private:
+            TPayload    payload;
+            bool        valid;
+
+        public:
+            Entry();
+            Entry(const Entry& obj);
+            ~Entry();
+
+            const TPayload&     GetPayload() const;
+            TPayload&           GetPayload();
+            bool                GetValid() const;
+
+            void                SetPayload(const TPayload& payload);
+            void                SetValid(bool valid);
+
+            void                Clear();
+        };
+
+        class EntryModification {
         private:
             bool        modified;
 
@@ -31,9 +59,9 @@ namespace MEMU::Core {
             bool        valid;
 
         public:
-            Modification();
-            Modification(const Modification& obj);
-            ~Modification();
+            EntryModification();
+            EntryModification(const EntryModification& obj);
+            ~EntryModification();
 
             bool    IsModified() const;
 
@@ -44,15 +72,16 @@ namespace MEMU::Core {
             void    SetValid(bool valid = true);
 
             void    Reset();
+
+            void    Apply(Entry& entry) const;
         };
 
     private:
-        const int       size;
+        const int           size;
 
-        TPayload*       memory;
-        bool*           valid;
+        Entry*              entries;
 
-        Modification*   modification;
+        EntryModification*  modification;
 
     public:
         CompressingMemory(int size);
@@ -71,6 +100,7 @@ namespace MEMU::Core {
         void                SetValid(int address, bool valid = true);
 
         void                ResetInput();
+        void                Clear();
 
         virtual void        Eval() override;
 
@@ -105,7 +135,70 @@ namespace MEMU::Core {
 }
 
 
-// class MEMU::Core::CompressingMemory::Modification
+
+// class MEMU::Core::CompressingMemory::Entry
+namespace MEMU::Core {
+    /*
+    TPayload    payload;
+    bool        valid;
+    */
+
+    template<class TPayload>
+    CompressingMemory<TPayload>::Entry::Entry()
+        : payload   ()
+        , valid     (false)
+    { }
+
+    template<class TPayload>
+    CompressingMemory<TPayload>::Entry::Entry(const Entry& obj)
+        : payload   (obj.payload)
+        , valid     (obj.valid)
+    { }
+
+    template<class TPayload>
+    CompressingMemory<TPayload>::Entry::~Entry()
+    { }
+
+    template<class TPayload>
+    inline const TPayload& CompressingMemory<TPayload>::Entry::GetPayload() const
+    {
+        return payload;
+    }
+
+    template<class TPayload>
+    inline TPayload& CompressingMemory<TPayload>::Entry::GetPayload()
+    {
+        return payload;
+    }
+
+    template<class TPayload>
+    inline bool CompressingMemory<TPayload>::Entry::GetValid() const
+    {
+        return valid;
+    }
+
+    template<class TPayload>
+    inline void CompressingMemory<TPayload>::Entry::SetPayload(const TPayload& payload)
+    {
+        this->payload = payload;
+    }
+
+    template<class TPayload>
+    inline void CompressingMemory<TPayload>::Entry::SetValid(bool valid)
+    {
+        this->valid = valid;
+    }
+
+    template<class TPayload>
+    inline void CompressingMemory<TPayload>::Entry::Clear()
+    {
+        payload = TPayload();
+        valid   = false;
+    }
+}
+
+
+// class MEMU::Core::CompressingMemory::EntryModification
 namespace MEMU::Core {
     /*
     bool        modified;
@@ -118,7 +211,7 @@ namespace MEMU::Core {
     */
 
     template<class TPayload>
-    CompressingMemory<TPayload>::Modification::Modification()
+    CompressingMemory<TPayload>::EntryModification::EntryModification()
         : modified          (false)
         , modified_payload  (false)
         , modified_valid    (false)
@@ -127,7 +220,7 @@ namespace MEMU::Core {
     { }
 
     template<class TPayload>
-    CompressingMemory<TPayload>::Modification::Modification(const Modification& obj)
+    CompressingMemory<TPayload>::EntryModification::EntryModification(const EntryModification& obj)
         : modified          (obj.modified)
         , modified_payload  (obj.modified_payload)
         , modified_valid    (obj.modified_valid)
@@ -136,29 +229,29 @@ namespace MEMU::Core {
     { }
 
     template<class TPayload>
-    CompressingMemory<TPayload>::Modification::~Modification()
+    CompressingMemory<TPayload>::EntryModification::~EntryModification()
     { }
 
     template<class TPayload>
-    inline bool CompressingMemory<TPayload>::Modification::IsModified() const
+    inline bool CompressingMemory<TPayload>::EntryModification::IsModified() const
     {
         return modified;
     }
 
     template<class TPayload>
-    inline bool CompressingMemory<TPayload>::Modification::IsPayloadModified() const
+    inline bool CompressingMemory<TPayload>::EntryModification::IsPayloadModified() const
     {
         return modified_payload;
     }
 
     template<class TPayload>
-    inline bool CompressingMemory<TPayload>::Modification::IsValidModified() const
+    inline bool CompressingMemory<TPayload>::EntryModification::IsValidModified() const
     {
         return modified_valid;
     }
 
     template<class TPayload>
-    inline void CompressingMemory<TPayload>::Modification::SetPayload(const TPayload& payload)
+    inline void CompressingMemory<TPayload>::EntryModification::SetPayload(const TPayload& payload)
     {
         modified         = true;
         modified_payload = true;
@@ -167,7 +260,7 @@ namespace MEMU::Core {
     }
 
     template<class TPayload>
-    inline void CompressingMemory<TPayload>::Modification::SetValid(bool valid)
+    inline void CompressingMemory<TPayload>::EntryModification::SetValid(bool valid)
     {
         modified       = true;
         modified_valid = true;
@@ -176,12 +269,22 @@ namespace MEMU::Core {
     }
 
     template<class TPayload>
-    void CompressingMemory<TPayload>::Modification::Reset()
+    inline void CompressingMemory<TPayload>::EntryModification::Reset()
     {
         modified = false;
 
         modified_payload = false;
         modified_valid   = false;
+    }
+
+    template<class TPayload>
+    inline void CompressingMemory<TPayload>::EntryModification::Apply(Entry& entry) const
+    {
+        if (IsPayloadModified())
+            entry.SetPayload(payload);
+
+        if (!IsValidModified())
+            entry.SetValid(valid);
     }
 }
 
@@ -194,28 +297,25 @@ namespace MEMU::Core {
     TPayload*       memory;
     bool*           valid;
 
-    Modification*   modification;
+    EntryModification*   modification;
     */
 
     template<class TPayload>
     CompressingMemory<TPayload>::CompressingMemory(int size)
         : size          (size)
-        , memory        (new TPayload[size]())
-        , valid         (new bool[size]())
-        , modification  (new Modification[size]())
+        , entries       (new Entry[size]())
+        , modification  (new EntryModification[size]())
     { }
 
     template<class TPayload>
     CompressingMemory<TPayload>::CompressingMemory(const CompressingMemory<TPayload>& obj)
         : size          (obj.size)
-        , memory        (new TPayload[size]())
-        , valid         (new bool[size]())
-        , modification  (new Modification[size]())
+        , entries       (new Entry[size]())
+        , modification  (new EntryModification[size]())
     {
         for (int i = 0; i < size; i++)
         {
-            memory[i]       = obj.memory[i];
-            valid[i]        = obj.valid[i];
+            entries[i]      = obj.entries[i];
             modification[i] = obj.modification[i];
         }
     }
@@ -223,8 +323,8 @@ namespace MEMU::Core {
     template<class TPayload>
     CompressingMemory<TPayload>::~CompressingMemory()
     {
-        delete[] memory;
-        delete[] valid;
+        delete[] entries;
+        delete[] modification;
     }
 
     template<class TPayload>
@@ -246,7 +346,7 @@ namespace MEMU::Core {
 
         for (int i = 0; i < GetSize(); i++)
         {
-            if (valid[i])
+            if (entires[i].GetValid())
                 break;
 
             addr = i;
@@ -258,13 +358,13 @@ namespace MEMU::Core {
     template<class TPayload>
     inline const TPayload& CompressingMemory<TPayload>::GetPayload(int address) const
     {
-        return memory[address];
+        return entries[address].GetPayload();
     }
 
     template<class TPayload>
     inline bool CompressingMemory<TPayload>::GetValid(int address) const
     {
-        return valid[address];
+        return entries[address].GetValid();
     }
 
     template<class TPayload>
@@ -287,9 +387,50 @@ namespace MEMU::Core {
     }
 
     template<class TPayload>
+    void CompressingMemory<TPayload>::Clear()
+    {
+        for (int i = 0; i < GetSize(); i++)
+            entries[i].Clear();
+    }
+
+    template<class TPayload>
     void CompressingMemory<TPayload>::Eval()
     {
-        // TODO
+        bool* comp_carrier = new bool[GetSize() + 1]();
+
+        comp_carrier[GetSize()] = false;
+
+        //
+        for (int i = GetSize() - 1; i >= 0; i--)
+        {
+            //
+            comp_carrier[i] = comp_carrier[i + 1] || !valid[i];
+
+            //
+            bool comp_unit = comp_carrier[i + 1];
+
+            if (comp_unit)
+            {
+                // NOTICE: Overlap would occur asserting 'valid' of non-valid entries 
+                //         between valid entries.
+                //         The overlap behaviour is UNDEFINED.
+                //         
+
+                if (modification[i].IsModified())
+                    modification[i].Apply(entries[i + 1]);
+                else
+                    entries[i + 1] = entries[i];
+
+                entries[i].SetValid(false);
+            }
+            else if (modification[i].IsModified())
+                modification[i].Apply(entries[i]);
+        }
+
+        //
+        ResetInput();
+
+        delete[] comp_carrier;
     }
 
     template<class TPayload>
@@ -297,8 +438,7 @@ namespace MEMU::Core {
     {
         for (int i = 0; i < GetSize() && i < obj.GetSize(); i++)
         {
-            memory[i]       = obj.memory[i];
-            valid[i]        = obj.valid[i];
+            entries[i]      = obj.entries[i];
             modification[i] = obj.modification[i];
         }
     }
