@@ -31,8 +31,8 @@ bool Help(void* handle, const std::string& cmd,
 
 inline void InitBasicCommands(VMC::VMCHandle handle)
 {
-    handle->handlers.push_back(VMC::CommandHandler { std::string("?")      , &Help });
-    handle->handlers.push_back(VMC::CommandHandler { std::string("help")   , &Help });
+    VMC_COMMAND(handle, "?"   , Help);
+    VMC_COMMAND(handle, "help", Help);
 
     VMC::Basic::SetupCommands(handle);
 }
