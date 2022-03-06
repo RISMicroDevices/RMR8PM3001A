@@ -20,6 +20,10 @@ namespace VMC {
 #define VMC_VAR_DEFAULT_LAST_RETURN_BOOL                        false
 #define VMC_VAR_DEFAULT_LAST_RETURN_INT                         (uint64_t)0
 
+
+#define VMC_COMMAND(handle, name, func) \
+    VMC::RegisterCommand(handle, VMC::CommandHandler { std::string(name), &func })
+
 #define ECHO_COUT_VMC_VERSION \
     std::cout << "RISMD VMC (Verification Module Console) v0.1" << std::endl; \
     std::cout << "- Build time: " __DATE__ << " " << __TIME__   << std::endl; \
