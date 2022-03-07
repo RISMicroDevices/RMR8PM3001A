@@ -283,7 +283,7 @@ namespace MEMU::Core {
         if (IsPayloadModified())
             entry.SetPayload(payload);
 
-        if (!IsValidModified())
+        if (IsValidModified())
             entry.SetValid(valid);
     }
 }
@@ -398,8 +398,6 @@ namespace MEMU::Core {
     {
         bool* comp_carrier = new bool[GetSize() + 1]();
 
-        comp_carrier[GetSize()] = false;
-
         //
         for (int i = GetSize() - 1; i >= 0; i--)
         {
@@ -416,10 +414,11 @@ namespace MEMU::Core {
                 //         The overlap behaviour is UNDEFINED.
                 //         
 
+                if (entries[i].GetValid())
+                    entries[i + 1] = entries[i];
+
                 if (modification[i].IsModified())
                     modification[i].Apply(entries[i + 1]);
-                else
-                    entries[i + 1] = entries[i];
 
                 entries[i].SetValid(false);
             }
