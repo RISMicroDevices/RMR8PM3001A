@@ -15,9 +15,9 @@ namespace MEMU::Core::Issue {
     class PhysicalRegisterFile final : public MEMU::Emulated
     {
     private:
-        uint64_t    prfs[EMULATED_PRF_SIZE] = { 0 };
+        arch_t      prfs[EMULATED_PRF_SIZE] = { 0 };
         int         writing_index;
-        uint64_t    writing_value;
+        arch_t      writing_value;
 
     public:
         PhysicalRegisterFile();
@@ -28,8 +28,8 @@ namespace MEMU::Core::Issue {
 
         bool            CheckBound(int index) const;
 
-        uint64_t        Get(int index) const;
-        void            Set(int index, uint64_t value);
+        arch_t          Get(int index) const;
+        void            Set(int index, arch_t value);
 
         virtual void    Eval() override;
     };
@@ -69,12 +69,12 @@ namespace MEMU::Core::Issue {
         return (index >= 0) && (index < EMULATED_PRF_SIZE);
     }
 
-    inline uint64_t PhysicalRegisterFile::Get(int index) const
+    inline arch_t PhysicalRegisterFile::Get(int index) const
     {
         return prfs[index];
     }
 
-    inline void PhysicalRegisterFile::Set(int index, uint64_t value)
+    inline void PhysicalRegisterFile::Set(int index, arch_t value)
     {
         writing_index = index;
         writing_value = value;
