@@ -20,9 +20,51 @@ namespace VMC {
 #define VMC_VAR_DEFAULT_LAST_RETURN_BOOL                        false
 #define VMC_VAR_DEFAULT_LAST_RETURN_INT                         (uint64_t)0
 
-
+//
 #define VMC_COMMAND(handle, name, func) \
     VMC::RegisterCommand(handle, VMC::CommandHandler { std::string(name), &func })
+
+
+#define VMC_PARAM_COUNT_ASSERT(assertion, command_name) \
+    if (!(assertion)) \
+    { \
+        std::cout << "Too much or too less parameter(s) for \'" << command_name << "\'." << std::endl; \
+        return false; \
+    }
+
+#define VMC_PARAM_COUNT_EQUALS(input_count, expected_count, command_name) \
+    VMC_PARAM_COUNT_ASSERT(input_count == expected_count, command_name)
+
+#define VMC_PARAM_COUNT_MORE_THAN(input_count, expected_count, command_name) \
+    VMC_PARAM_COUNT_ASSERT(input_count > expected_count, command_name)
+
+#define VMC_PARAM_COUNT_LESS_THAN(input_count, expected_count, command_name) \
+    VMC_PARAM_COUNT_ASSERT(input_count < expected_count, command_name);
+
+#define VMC_PARAM_COUNT_ZERO(input_count, command_name) \
+    VMC_PARAM_COUNT_ASSERT(input_count == 0, command_name)
+
+#define VMC_PARAM_COUNT_NONZERO(input_count, command_name) \
+    VMC_PARAM_COUNT_ASSERT(input_count != 0, command_name)
+
+
+#define VMC_PARAMLIST_COUNT_EQUALS(params, expected_count, command_name) \
+    VMC_PARAM_COUNT_EQUALS(params.size(), expected_count, command_name)
+
+#define VMC_PARAMLIST_COUNT_MORE_THAN(params, expected_count, command_name) \
+    VMC_PARAM_COUNT_MORE_THAN(params.size(), expected_count, command_name)
+
+#define VMC_PARAMLIST_COUNT_LESS_THAN(params, expected_count, command_name) \
+    VMC_PARAM_COUNT_LESS_THAN(params.size(), expected_count, command_name)
+
+#define VMC_PARAMLIST_COUNT_ZERO(params, command_name) \
+    VMC_PARAM_COUNT_ZERO(params.size(), command_name)
+
+#define VMC_PARAMLIST_COUNT_NONZERO(params, command_name) \
+    VMC_PARAM_COUNT_NONZERO(params.size(), command_name)
+
+//
+
 
 #define ECHO_COUT_VMC_VERSION \
     std::cout << "RISMD VMC (Verification Module Console) v0.1" << std::endl; \
