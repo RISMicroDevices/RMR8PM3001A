@@ -4,6 +4,7 @@
 //
 //
 
+#include <stdexcept>
 #include <list>
 
 #include "base.hpp"
@@ -40,6 +41,32 @@ namespace MEMU::Common {
             void                Apply(TPayload* memory) const;
         };
 
+        class Iterator {
+        private:
+            FIFO<TPayload>*     owner;
+
+            int                 rptr;
+            bool                rptrb;
+
+            void                CheckBound() const;
+
+        public:
+            Iterator();
+            Iterator(FIFO<TPayload>* owner, int rptr, bool rptrb);
+            Iterator(const Iterator& obj);
+            ~Iterator();
+
+            operator            bool() const;
+            const TPayload&     operator*() const;
+            TPayload&           operator*();
+            Iterator&           operator++();     // prefix
+            Iterator            operator++(int);  // suffix
+            bool                operator==(const Iterator& obj) const;
+            bool                operator!=(const Iterator& obj) const;
+
+            void                operator=(const Iterator& obj);
+        };
+
     private:
         const int           size;
 
@@ -66,6 +93,9 @@ namespace MEMU::Common {
 
         bool                IsEmpty() const;
         bool                IsFull() const;
+
+        Iterator            Begin();
+        Iterator            End();
 
         int                 GetReadPointer() const;
         bool                GetReadPointerB() const;
@@ -172,6 +202,131 @@ namespace MEMU::Common {
 }
 
 
+// class MEMU::Common::FIFO::Iterator
+namespace MEMU::Common {
+    /*
+    FIFO<TPayload>*     owner;
+
+    int                 rptr;
+    bool                rptrb;
+    */
+
+    template<class TPayload>
+    FIFO<TPayload>::Iterator::Iterator()
+        : owner (nullptr)
+        , rptr  (0)
+        , rptrb (false)
+    { }
+
+    template<class TPayload>
+    FIFO<TPayload>::Iterator::Iterator(FIFO<TPayload>* owner, int rptr, bool rptrb)
+        : owner (owner)
+        , rptr  (rptr)
+        , rptrb (rptrb)
+    { }
+
+    template<class TPayload>
+    FIFO<TPayload>::Iterator::Iterator(const Iterator& obj)
+        : owner (obj.owner)
+        , rptr  (obj.rptr)
+        , rptrb (obj.rptrb)
+    { }
+
+    template<class TPayload>
+    FIFO<TPayload>::Iterator::~Iterator()
+    { }
+
+    template<class TPayload>
+    inline void FIFO<TPayload>::Iterator::CheckBound() const
+    {
+        if (!((bool)*this))
+            throw std::out_of_range("iterator out of range or not initialized");
+    }
+
+    template<class TPayload>
+    FIFO<TPayload>::Iterator::operator bool() const
+    {
+        return owner 
+            && (rptr != owner->GetWritePointer() || rptrb != owner->GetWritePointerB());
+    }
+
+    template<class TPayload>
+    const TPayload& FIFO<TPayload>::Iterator::operator*() const
+    {
+        CheckBound();
+
+        return owner.GetPayload(rptr);
+    }
+
+    template<class TPayload>
+    TPayload& FIFO<TPayload>::Iterator::operator*()
+    {
+        CheckBound();
+
+        return owner->GetPayload(rptr);
+    }
+
+    template<class TPayload>
+    typename FIFO<TPayload>::Iterator& FIFO<TPayload>::Iterator::operator++()
+    {
+        CheckBound();
+
+        if (++rptr == owner->GetSize())
+        {
+            rptr  = 0;
+            rptrb = !rptrb;
+        }
+
+        return *this;
+    }
+
+    template<class TPayload>
+    typename FIFO<TPayload>::Iterator FIFO<TPayload>::Iterator::operator++(int)
+    {
+        CheckBound();
+
+        Iterator iter(owner, rptr, rptrb);
+
+        if (++rptr == owner->GetSize())
+        {
+            rptr  = 0;
+            rptrb = !rptrb;
+        }
+
+        return iter;
+    }
+
+    template<class TPayload>
+    bool FIFO<TPayload>::Iterator::operator==(const Iterator& obj) const
+    {
+        if (owner != obj.owner)
+            return false;
+
+        if (rptr != obj.rptr)
+            return false;
+
+        if (rptrb != obj.rptrb)
+            return false;
+
+        return true;
+    }
+
+    template<class TPayload>
+    bool FIFO<TPayload>::Iterator::operator!=(const Iterator& obj) const
+    {
+        return !(this->operator==(obj));
+    }
+
+    template<class TPayload>
+    void FIFO<TPayload>::Iterator::operator=(const Iterator& obj)
+    {
+        owner = obj.owner;
+        rptr  = obj.rptr;
+        rptrb = obj.rptrb;
+    }
+}
+
+
 // class MEMU::Common::FIFO
 namespace MEMU::Common {
     /*
@@ -253,6 +408,18 @@ namespace MEMU::Common {
     inline bool FIFO<TPayload>::IsFull() const
     {
         return wptr == rptr && wptrb != rptrb;
+    }
+
+    template<class TPayload>
+    inline typename FIFO<TPayload>::Iterator FIFO<TPayload>::Begin()
+    {
+        return Iterator(this, rptr, rptrb);
+    }
+
+    template<class TPayload>
+    inline typename FIFO<TPayload>::Iterator FIFO<TPayload>::End()
+    {
+        return Iterator(this, wptr, wptrb);
     }
 
     template<class TPayload>
