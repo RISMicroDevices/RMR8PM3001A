@@ -101,6 +101,7 @@ namespace MEMU::Core {
 
 
 
+    //
     class GlobalCheckpointTableEntry {
     private:
         fgr_t   FGR;
@@ -109,6 +110,7 @@ namespace MEMU::Core {
 
     public:
         GlobalCheckpointTableEntry();
+        GlobalCheckpointTableEntry(fgr_t FGR, bool V, int GCA);
         GlobalCheckpointTableEntry(const GlobalCheckpointTableEntry& obj);
         ~GlobalCheckpointTableEntry();
 
@@ -123,11 +125,20 @@ namespace MEMU::Core {
         void    Clear();
     };
 
+    //
     class GlobalCheckpointWALK
+        : public MEMU::Common::FIFO<fgr_t>
     {
-        // TODO
+    private:
+        static constexpr int    size = EMULATED_GC_COUNT;
+
+    public:
+        GlobalCheckpointWALK();
+        GlobalCheckpointWALK(const GlobalCheckpointWALK& obj);
+        ~GlobalCheckpointWALK();
     };
 
+    //
     class GlobalCheckpointTable 
         : public MEMU::Common::FIFO<GlobalCheckpointTableEntry>
     {
@@ -139,7 +150,10 @@ namespace MEMU::Core {
         GlobalCheckpointTable(const GlobalCheckpointTable& obj);
         ~GlobalCheckpointTable();
 
-        
+        bool            PushFGR(fgr_t FGR, int GCA);
+        bool            PopFGR();
+
+        bool            RestoreFGR(fgr_t FGR, int* GCA, GlobalCheckpointWALK* WALK = nullptr);
     };
 }
 
@@ -443,4 +457,165 @@ namespace MEMU::Core {
 }
 
 
-//
+
+// class MEMU::Core::GlobalCheckpointTableEntry
+namespace MEMU::Core {
+    /*
+    fgr_t   FGR;
+    bool    V;
+    int     GCA;
+    */
+
+    GlobalCheckpointTableEntry::GlobalCheckpointTableEntry()
+        : FGR   (0)
+        , V     (false)
+        , GCA   (0)
+    { }
+
+    GlobalCheckpointTableEntry::GlobalCheckpointTableEntry(fgr_t FGR, bool V, int GCA)
+        : FGR   (FGR)
+        , V     (V)
+        , GCA   (GCA)
+    { }
+
+    GlobalCheckpointTableEntry::GlobalCheckpointTableEntry(const GlobalCheckpointTableEntry& obj)
+        : FGR   (obj.FGR)
+        , V     (obj.V)
+        , GCA   (obj.GCA)
+    { }
+
+    GlobalCheckpointTableEntry::~GlobalCheckpointTableEntry()
+    { }
+
+    inline fgr_t GlobalCheckpointTableEntry::GetFGR() const
+    {
+        return FGR;
+    }
+
+    inline bool GlobalCheckpointTableEntry::GetValid() const
+    {
+        return V;
+    }
+
+    inline int GlobalCheckpointTableEntry::GetGCA() const
+    {
+        return GCA;
+    }
+
+    inline void GlobalCheckpointTableEntry::SetFGR(fgr_t FGR)
+    {
+        this->FGR = FGR;
+    }
+
+    inline void GlobalCheckpointTableEntry::SetValid(bool V)
+    {
+        this->V = V;
+    }
+
+    inline void GlobalCheckpointTableEntry::SetGCA(int GCA)
+    {
+        this->GCA = GCA;
+    }
+
+    inline void GlobalCheckpointTableEntry::Clear()
+    {
+        this->FGR = 0;
+        this->V   = false;
+        this->GCA = 0;
+    }
+}
+
+
+// class MEMU::Core::GlobalCheckpointWALK
+namespace MEMU::Core {
+    GlobalCheckpointWALK::GlobalCheckpointWALK()
+        : FIFO  (size)
+    { }
+
+    GlobalCheckpointWALK::GlobalCheckpointWALK(const GlobalCheckpointWALK& obj)
+        : FIFO  (obj)
+    { }
+
+    GlobalCheckpointWALK::~GlobalCheckpointWALK()
+    { }
+}
+
+
+// class MEMU::Core::GlobalCheckpointTable
+namespace MEMU::Core {
+    GlobalCheckpointTable::GlobalCheckpointTable()
+        : FIFO      (size)
+    { }
+
+    GlobalCheckpointTable::GlobalCheckpointTable(const GlobalCheckpointTable& obj)
+        : FIFO      (obj)
+    { }
+
+    GlobalCheckpointTable::~GlobalCheckpointTable()
+    { }
+
+    inline bool GlobalCheckpointTable::PushFGR(fgr_t FGR, int GCA)
+    {
+        return PushPayload(GlobalCheckpointTableEntry(FGR, true, GCA));
+    }
+
+    inline bool GlobalCheckpointTable::PopFGR()
+    {
+        return PopPayload();
+    }
+
+    bool GlobalCheckpointTable::RestoreFGR(fgr_t FGR, int* GCA, GlobalCheckpointWALK* WALK)
+    {
+        // CAM Query of FGR entry
+        int restore = -1;
+        for (int i = 0; i < GetSize(); i++)
+        {
+            const GlobalCheckpointTableEntry& entry = GetPayload(i);
+
+            if (entry.GetValid() && entry.GetFGR() == FGR)
+            {
+                *GCA = entry.GetGCA();
+                restore = i;
+
+                break;
+            }
+        }
+
+        if (restore == -1)
+            return false;
+
+        int restore_ptr = restore + 1;
+
+        // Manipulate V bits (left-handed pseudo-loop combinational)
+        int j = restore_ptr;
+        do 
+        {
+            GlobalCheckpointTableEntry entry = GetPayload(j);
+
+            if (!entry.GetValid())
+                break;
+
+            entry.SetValid(false);
+
+            SetPayload(j, entry);
+
+            if (--j < 0)
+                j = size;
+        } 
+        while (j != restore_ptr);
+
+        // Write into WALK FIFO
+        for (int i = 0; i < GetSize(); i++)
+            WALK->SetPayload(i, GetPayload(i).GetFGR());
+
+        // Manipulate Wptr&Rptr of WALK FIFO
+        WALK->SetReadPointer(GetReadPointer());
+        WALK->SetReadPointerB(GetReadPointerB());
+
+        WALK->SetWritePointer(restore_ptr);
+        WALK->SetWritePointerB(restore_ptr > GetWritePointer() ? !GetWritePointerB() : GetWritePointerB());
+
+        return true;
+    }
+}
+
