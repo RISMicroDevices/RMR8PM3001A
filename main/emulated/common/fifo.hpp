@@ -82,6 +82,11 @@ namespace MEMU::Common {
         int                 delta_rptr;
         int                 delta_wptr;
 
+        int                 set_rptr;
+        int                 set_rptrb;
+        int                 set_wptr;
+        int                 set_wptrb;
+
     public:
         FIFO(int size);
         FIFO(const FIFO<TPayload>& obj);
@@ -343,6 +348,11 @@ namespace MEMU::Common {
 
     int                 delta_rptr;
     int                 delta_wptr;
+
+    int                 set_rptr;
+    int                 set_rptrb;
+    int                 set_wptr;
+    int                 set_wptrb;
     */
 
     template<class TPayload>
@@ -356,6 +366,10 @@ namespace MEMU::Common {
         , wptrb         (false)
         , delta_rptr    (0)
         , delta_wptr    (0)
+        , set_rptr      (-1)
+        , set_rptrb     (-1)
+        , set_wptr      (-1)
+        , set_wptrb     (-1)
     { }
 
     template<class TPayload>
@@ -369,6 +383,10 @@ namespace MEMU::Common {
         , wptrb         (obj.wptrb)
         , delta_rptr    (obj.delta_rptr)
         , delta_wptr    (obj.delta_wptr)
+        , set_rptr      (obj.set_rptr)
+        , set_rptrb     (obj.set_rptrb)
+        , set_wptr      (obj.set_wptr)
+        , set_wptrb     (obj.set_wptrb)
     {
         for (int i = 0; i < size; i++)
             memory[i] = obj.memory[i];
@@ -449,25 +467,25 @@ namespace MEMU::Common {
     template<class TPayload>
     inline void FIFO<TPayload>::SetReadPointer(int rptr)
     {
-        this->rptr = rptr;
+        set_rptr = rptr;
     }
 
     template<class TPayload>
     inline void FIFO<TPayload>::SetReadPointerB(bool rptrb)
     {
-        this->rptrb = rptrb;
+        set_rptrb = rptrb;
     }
 
     template<class TPayload>
     inline void FIFO<TPayload>::SetWritePointer(int wptr)
     {
-        this->wptr = wptr;
+        set_wptr = wptr;
     }
 
     template<class TPayload>
     inline void FIFO<TPayload>::SetWritePointerB(bool wptrb)
     {
-        this->wptrb = wptrb;
+        set_wptrb = wptrb;
     }
 
     template<class TPayload>
@@ -489,7 +507,7 @@ namespace MEMU::Common {
     }
 
     template<class TPayload>
-    inline bool FIFO<TPayload>::PeekPayload(TPayload* dst) const
+    bool FIFO<TPayload>::PeekPayload(TPayload* dst) const
     {
         if (IsEmpty())
             return false;
@@ -500,7 +518,7 @@ namespace MEMU::Common {
     }
 
     template<class TPayload>
-    inline bool FIFO<TPayload>::PopPayload()
+    bool FIFO<TPayload>::PopPayload()
     {
         if (delta_rptr < GetCount())
         {
@@ -513,7 +531,7 @@ namespace MEMU::Common {
     }
 
     template<class TPayload>
-    inline bool FIFO<TPayload>::PushPayload(const TPayload& payload)
+    bool FIFO<TPayload>::PushPayload(const TPayload& payload)
     {
         if (delta_wptr < GetRemainingSize())
         {
@@ -532,6 +550,11 @@ namespace MEMU::Common {
     {
         delta_rptr = 0;
         delta_wptr = 0;
+
+        set_rptr  = -1;
+        set_rptrb = -1;
+        set_wptr  = -1;
+        set_wptrb = -1;
 
         modification.clear();
     }
@@ -554,7 +577,13 @@ namespace MEMU::Common {
             iter->Apply(memory);
 
         //
-        rptr += delta_rptr;
+        if (set_rptr != -1)
+            rptr = set_rptr;
+        else
+            rptr += delta_rptr;
+
+        if (set_rptrb != -1)
+            rptrb = set_rptrb;
 
         if (rptr >= size)
         {
@@ -563,7 +592,13 @@ namespace MEMU::Common {
         }
 
         //
-        wptr += delta_wptr;
+        if (set_wptr != -1)
+            wptr = set_wptr;
+        else
+            wptr += delta_wptr;
+
+        if (set_wptrb != -1)
+            wptrb = set_wptrb;
 
         if (wptr >= size)
         {
