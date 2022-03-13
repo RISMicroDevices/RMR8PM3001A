@@ -56,6 +56,36 @@
 #define RV32I_FUNCT3_FENCE                      0b000
 
 
+// Function-7
+#define RV32I_FUNCT7_MASK                       0xFE000000
+#define RV32I_FUNCT7_OFFSET                     25
+
+#define RV32I_FUNCT7_SLLI                       0b0000000
+#define RV32I_FUNCT7_SRLI                       0b0000000
+#define RV32I_FUNCT7_SRAI                       0b0100000
+
+#define RV32I_FUNCT7_ADD                        0b0000000
+#define RV32I_FUNCT7_SUB                        0b0100000
+
+#define RV32I_FUNCT7_SLL                        0b0000000
+#define RV32I_FUNCT7_SLT                        0b0000000
+#define RV32I_FUNCT7_SLTU                       0b0000000
+#define RV32I_FUNCT7_XOR                        0b0000000
+#define RV32I_FUNCT7_OR                         0b0000000
+#define RV32I_FUNCT7_AND                        0b0000000
+
+#define RV32I_FUNCT7_SRL                        0b0000000
+#define RV32I_FUNCT7_SRA                        0b0100000
+
+
+// Function-12
+#define RV32I_FUNCT12_MASK                      0xFFF00000
+#define RV32I_FUNCT12_OFFSET                    20
+
+#define RV32I_FUNCT12_ECALL                     0b000000000000
+#define RV32I_FUNCT12_EBREAK                    0b000000000001
+
+
 //
 #ifndef __INCLUDE_RV64I
 

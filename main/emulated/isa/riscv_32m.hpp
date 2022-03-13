@@ -23,6 +23,21 @@
 #define RV32M_FUNCT3_REMU                       0b111
 
 
+// Function-7
+#define RV32M_FUNCT7_MASK                       0xFE000000
+#define RV32M_FUNCT7_OFFSET                     25
+
+#define RV32M_FUNCT7_MUL                        0b0000001
+#define RV32M_FUNCT7_MULH                       0b0000001
+#define RV32M_FUNCT7_MULHSU                     0b0000001
+#define RV32M_FUNCT7_MULHU                      0b0000001
+
+#define RV32M_FUNCT7_DIV                        0b0000001
+#define RV32M_FUNCT7_DIVU                       0b0000001
+#define RV32M_FUNCT7_REM                        0b0000001
+#define RV32M_FUNCT7_REMU                       0b0000001
+
+
 //
 #ifndef __INCLUDE_RV64M
 

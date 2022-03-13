@@ -32,4 +32,29 @@
 #define RV64I_FUNCT3_SRLW__SRAW                 0b101
 
 
-//
+// Function-6
+#define RV64I_FUNCT6_MASK                       0xFC000000
+#define RV64I_FUNCT6_OFFSET                     26
+
+#define RV64I_FUNCT6_SLLI                       0b000000
+#define RV64I_FUNCT6_SRLI                       0b000000
+#define RV64I_FUNCT6_SRAI                       0b010000
+
+
+// Function-7
+#define RV64I_FUNCT7_MASK                       0xFE000000
+#define RV64I_FUNCT7_OFFSET                     25
+
+#define RV64I_FUNCT7_SLLIW                      0b0000000
+#define RV64I_FUNCT7_SRLIW                      0b0000000
+#define RV64I_FUNCT7_SRAIW                      0b0100000
+
+#define RV64I_FUNCT7_ADDW                       0b0000000
+#define RV64I_FUNCT7_SUBW                       0b0100000
+
+#define RV64I_FUNCT7_SLLW                       0b0000000
+#define RV64I_FUNCT7_SRLW                       0b0000000
+#define RV64I_FUNCT7_SRAW                       0b0100000
+
+
+

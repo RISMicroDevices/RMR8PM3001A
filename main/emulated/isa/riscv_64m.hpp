@@ -23,3 +23,15 @@
 #define RV64M_FUNCT3_REMW                       0b110
 #define RV64M_FUNCT3_REMUW                      0b111
 
+
+// Function-7
+#define RV64M_FUNCT7_MASK                       0xFE000000
+#define RV64M_FUNCT7_OFFSET                     25
+
+#define RV64M_FUNCT7_MULW                       0b0000001
+#define RV64M_FUNCT7_DIVW                       0b0000001
+#define RV64M_FUNCT7_DIVUW                      0b0000001
+#define RV64M_FUNCT7_REMW                       0b0000001
+#define RV64M_FUNCT7_REMUW                      0b0000001
+
+
