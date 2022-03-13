@@ -19,7 +19,7 @@
 
 using namespace MEMU::Core::Issue;
 
-namespace VMC::RAT {
+namespace VMC::Core {
     static constexpr int INSN_CODE_NOP      = 0;
 
     static constexpr int INSN_CODE_AND      = 1;
@@ -569,6 +569,10 @@ namespace VMC::RAT {
 
         int                         O3FGR                       = 0;
 
+        bool                        O3FetchStall                = false;
+
+        bool                        O3IssueStall                = false;
+
         SimScoreboard               O3Scoreboard                = SimScoreboard(EMULATED_PRF_SIZE);
 
         SimReservation<Scoreboard>  O3Reservation               = SimReservation(&O3Scoreboard);
@@ -629,7 +633,7 @@ namespace VMC::RAT {
 
 
 // Global components
-namespace VMC::RAT {
+namespace VMC::Core {
 
     static SimHandle CURRENT_HANDLE = nullptr;
 
@@ -854,7 +858,7 @@ namespace VMC::RAT {
 
         if (!csim->RefReservation.PopInsn())
         {
-            ShouldNotReachHere(" RAT::EvalRefIssue ILLEGAL_STATE #ReservationPopFail");
+            ShouldNotReachHere(" Core::EvalRefIssue ILLEGAL_STATE #ReservationPopFail");
             return false;
         }
 
@@ -898,7 +902,7 @@ namespace VMC::RAT {
 
         if (!csim->RefExecution.PopInsn())
         {
-            ShouldNotReachHere(" RAT::EvalRefWriteback ILLEGAL_STATE #ExecutionPopFail");
+            ShouldNotReachHere(" Core::EvalRefWriteback ILLEGAL_STATE #ExecutionPopFail");
             return false;
         }
 
@@ -952,24 +956,25 @@ namespace VMC::RAT {
 
     bool EvalO3Fetch(SimHandle csim, bool info, int step)
     {
-        if (csim->O3Fetch.IsEmpty())
+        if (csim->O3FetchStall)
         {
-            csim->O3Status.SetFetchStatus(&STAGE_STATUS_IDLE);
+            csim->O3Status.SetFetchStatus(&STAGE_STATUS_WAIT);
 
             if (info)
-                printf("[ %8d ] O3Fetch: Fetch queue empty.\n", step);
+                printf("[ %8d ] O3Fetch: Fetch stall.\n", step);
 
             return true;
         }
 
-        //
-        SimInstruction insn;
-
-        if (!csim->O3Fetch.NextInsn(&insn))
+        if (!csim->InsnMemory.CheckBound(csim->O3PC))
         {
-            ShouldNotReachHere(" RAT::EvalO3Fetch ILLEGAL_STATE #FetchFail");
+            printf("[ %8d ] O3Fetch: PC 0x%08x out of memory bound.\n", step, csim->O3PC);
+
             return false;
         }
+
+        //
+        SimInstruction& insn = csim->InsnMemory.GetInsn(csim->O3PC);
 
         // Get src PRFs
         int src1prf = csim->O3RAT.GetAliasPRF(insn.GetSrc1ARF());
@@ -981,7 +986,7 @@ namespace VMC::RAT {
             printf("[ %8d ] O3Fetch: ARF converted. Src2 ARF #%d -> PRF #%d.\n", step, insn.GetSrc2ARF(), src2prf);
         }
 
-        // Try to allocate RAT entry
+        // Try to allocate Core entry
         int dstprf = -1;
         
         if (!csim->O3RAT.Touch(insn.GetFID(), insn.GetDstARF(), &dstprf))
@@ -989,7 +994,7 @@ namespace VMC::RAT {
             csim->O3Status.SetFetchStatus(&STAGE_STATUS_WAIT);
 
             if (info)
-                printf("[ %8d ] O3Fetch: Wait on FID #%d. RAT not available.\n", info, insn.GetFID());
+                printf("[ %8d ] O3Fetch: Wait on FID #%d. Core not available.\n", info, insn.GetFID());
 
             return true;
         }
@@ -997,8 +1002,12 @@ namespace VMC::RAT {
         if (info)
             printf("[ %8d ] O3Fetch: Dst ARF renamed. Dst ARF #%d -> PRF #%d.\n", step, insn.GetDstARF(), dstprf);
 
-        // Re-write/modify instruction after RAT
+        // Re-write/modify instruction after Core
         SimFetchedInstruction renamed_insn(insn, csim->O3FGR, csim->O3PC, dstprf, src1prf, src2prf);
+
+        // FGR increment (Current design: Post-branch)
+        if (insn.IsBranch())
+            csim->O3FGR++;
 
         // Rename history
         csim->RenamedHistory.push_back(renamed_insn);
@@ -1008,8 +1017,6 @@ namespace VMC::RAT {
         csim->O3ROB.TouchInsn(renamed_insn);
 
         csim->O3Scoreboard.SetStatus(dstprf, SCOREBOARD_STATUS_BUSY, renamed_insn.GetFID());
-
-        csim->O3Fetch.PopInsn();
 
         csim->O3FetchCount++;
 
@@ -1085,7 +1092,7 @@ namespace VMC::RAT {
             case SCOREBOARD_STATUS_IN_ROB:
                 if (!csim->O3ROB.GetDstValue(csim->O3Scoreboard.GetFID(insn.GetSrc1PRF()), &src1val))
                 {
-                    ShouldNotReachHere(" RAT::EvalO3Issue ILLEGAL_STATE #ROBForwardFailure(src1)");
+                    ShouldNotReachHere(" Core::EvalO3Issue ILLEGAL_STATE #ROBForwardFailure(src1)");
                     return false;
                 }
 
@@ -1095,7 +1102,7 @@ namespace VMC::RAT {
                 break;
 
             default:
-                ShouldNotReachHere(" RAT::EvalO3Issue ILLEGAL_STATUE #ScoreboardStatus(src1)");
+                ShouldNotReachHere(" Core::EvalO3Issue ILLEGAL_STATUE #ScoreboardStatus(src1)");
                 return false;
         }
 
@@ -1112,7 +1119,7 @@ namespace VMC::RAT {
             case SCOREBOARD_STATUS_IN_ROB:
                 if (!csim->O3ROB.GetDstValue(csim->O3Scoreboard.GetFID(insn.GetSrc2PRF()), &src2val))
                 {
-                    ShouldNotReachHere(" RAT::EvalO3Issue ILLEGAL_STATE #ROBForwardFailure(src2)");
+                    ShouldNotReachHere(" Core::EvalO3Issue ILLEGAL_STATE #ROBForwardFailure(src2)");
                     return false;
                 }
 
@@ -1122,7 +1129,7 @@ namespace VMC::RAT {
                 break;
 
             default:
-                ShouldNotReachHere(" RAT::EvalO3Issue ILLEGAL_STATUE #ScoreboardStatus(src2)");
+                ShouldNotReachHere(" Core::EvalO3Issue ILLEGAL_STATUE #ScoreboardStatus(src2)");
                 return false;
         }
 
@@ -1130,7 +1137,7 @@ namespace VMC::RAT {
 
         if (!csim->O3Reservation.PopInsn())
         {
-            ShouldNotReachHere(" RAT::EvalO3Issue ILLEGAL_STATE #ReservationPopFail");
+            ShouldNotReachHere(" Core::EvalO3Issue ILLEGAL_STATE #ReservationPopFail");
             return false;
         }
 
@@ -1172,7 +1179,7 @@ namespace VMC::RAT {
         //
         if (!csim->O3ROB.WritebackInsn(insn, entry.GetDstValue()))
         {
-            ShouldNotReachHere(" RAT::EvalO3Writeback ILLEGAL_STATE #ROBWritebackFail");
+            ShouldNotReachHere(" Core::EvalO3Writeback ILLEGAL_STATE #ROBWritebackFail");
             return false;
         }
 
@@ -1180,7 +1187,7 @@ namespace VMC::RAT {
 
         if (!csim->O3Execution.PopInsn())
         {
-            ShouldNotReachHere(" RAT::EvalO3Writeback ILLEGAL_STATE #ExecutionPopFail");
+            ShouldNotReachHere(" Core::EvalO3Writeback ILLEGAL_STATE #ExecutionPopFail");
             return false;
         }
 
@@ -1238,7 +1245,7 @@ namespace VMC::RAT {
         // assert
         if (insn.GetDstPRF() >= 0 && csim->O3RAT.GetEntry(insn.GetDstPRF()).GetFID() != insn.GetFID())
         {
-            printf("[ \033[1;31mASSERT\033[0m   ] O3Commit: RAT commit FID not identical.\n");
+            printf("[ \033[1;31mASSERT\033[0m   ] O3Commit: Core commit FID not identical.\n");
             return false;
         }
 
@@ -1247,7 +1254,7 @@ namespace VMC::RAT {
 
         if (!csim->O3ROB.PopInsn())
         {
-            ShouldNotReachHere(" RAT::EvalO3Commit ILLEGAL_STATE #ROBPopFail");
+            ShouldNotReachHere(" Core::EvalO3Commit ILLEGAL_STATE #ROBPopFail");
             return false;
         }
 
@@ -1339,8 +1346,8 @@ namespace VMC::RAT {
 }
 
 
-// VMC RAT commands
-namespace VMC::RAT {
+// VMC Core commands
+namespace VMC::Core {
 
 #define ECHO_COUT_VMC_RAT_HELP \
     std::cout << "RAT0 simulation command usages:" << std::endl; \
@@ -1351,9 +1358,9 @@ namespace VMC::RAT {
     std::cout << "- rat0.rand.reg.index [(uint)max_value|@DEFAULT]" << std::endl; \
     std::cout << "                                    Get/set the maximum value of random register index" << std::endl; \
     std::cout << "- rat0.prf.ls [-V|+V|-NRA|+NRA|-FV|+FV|-Z|+Z] " << std::endl; \
-    std::cout << "                                    List all RAT entries and related PRF (with optional filter)" << std::endl; \
+    std::cout << "                                    List all Core entries and related PRF (with optional filter)" << std::endl; \
     std::cout << "- rat0.arf.ls.ref [-Z]              List all reference ARF register values (with optional filter)" << std::endl; \
-    std::cout << "- rat0.arf.ls [-Z|-U]               List all values of ARF register mapped by RAT (with optional filter)" << std::endl; \
+    std::cout << "- rat0.arf.ls [-Z|-U]               List all values of ARF register mapped by Core (with optional filter)" << std::endl; \
     std::cout << "- rat0.arf.set <index> <value> [-S|-NEQ] " << std::endl; \
     std::cout << "                                    Set specified ARF register value" << std::endl; \
     std::cout << "- rat0.arf.set.randomval <index> [-S|-NEQ]" << std::endl; \
@@ -1367,9 +1374,9 @@ namespace VMC::RAT {
     std::cout << "                                    Push a specified instruction" << std::endl; \
     std::cout << "- rat0.diffsim.insn.push.random <count>" << std::endl; \
     std::cout << "                                    Push specified count of random instructions" << std::endl; \
-    std::cout << "- rat0.diffsim.insn.eval.step       Differential evaluate RAT by one step" << std::endl; \
+    std::cout << "- rat0.diffsim.insn.eval.step       Differential evaluate Core by one step" << std::endl; \
     std::cout << "- rat0.diffsim.insn.eval.stepout [-SF|-WWDG|-T <count>]" << std::endl; \
-    std::cout << "                                    Differential evaluate RAT with all instructions or specified steps" << std::endl; \
+    std::cout << "                                    Differential evaluate Core with all instructions or specified steps" << std::endl; \
     std::cout << "- rat0.diffsim.insn.dump [-R|-range <startFID> <endFID>]" << std::endl; \
     std::cout << "                                    Dump history instructions." << std::endl; \
     std::cout << "- rat0.diffsim.insn.dumpfile <filename> [-R|-range <startFID> <endFID>]" << std::endl; \
@@ -1381,8 +1388,8 @@ namespace VMC::RAT {
 
     // rat0.infobystep [true|false]
     bool _RAT0_INFOBYSTEP(void* handle, const std::string& cmd,
-                                         const std::string& paramline,
-                                         const std::vector<std::string>& params)
+                                        const std::string& paramline,
+                                        const std::vector<std::string>& params)
     {
         if (params.size() > 1)
         {
@@ -1652,7 +1659,7 @@ namespace VMC::RAT {
         if (!SetO3ARFAndEval(csim, index, value, &prf))
         {
             if (vmc->bWarnOnFalse)
-                std::cout << "Failed to allocate entry in RAT for ARF #" << index << "." << std::endl;
+                std::cout << "Failed to allocate entry in Core for ARF #" << index << "." << std::endl;
             
             return false;
         }
@@ -2011,7 +2018,7 @@ namespace VMC::RAT {
 
             if (!SetO3ARFAndEval(csim, index, value, &prf))
             {
-                printf("[%8d] \033[1;31mFailed to allocate RAT entry for ARF #%d.\033[0m\n",
+                printf("[%8d] \033[1;31mFailed to allocate Core entry for ARF #%d.\033[0m\n",
                     i, index);
                 break;
             }
@@ -2820,8 +2827,8 @@ namespace VMC::RAT {
 }
 
 
-// class VMC::RAT::SimStageStatus
-namespace VMC::RAT {
+// class VMC::Core::SimStageStatus
+namespace VMC::Core {
     /*
     const std::string str;
     */
@@ -2844,8 +2851,8 @@ namespace VMC::RAT {
 };
 
 
-// class VMC::RAT::SimRefPipeStatus
-namespace VMC::RAT {
+// class VMC::Core::SimRefPipeStatus
+namespace VMC::Core {
     /*
     const SimStageStatus*   fetchStatus;
     const SimStageStatus*   reservationStatus;
@@ -2893,8 +2900,8 @@ namespace VMC::RAT {
 };
 
 
-// class VMC::RAT::SimO3PipeStatus
-namespace VMC::RAT {
+// class VMC::Core::SimO3PipeStatus
+namespace VMC::Core {
     /*
     const SimStageStatus*   fetchStatus;
     const SimStageStatus*   reservationStatus;
@@ -2954,8 +2961,8 @@ namespace VMC::RAT {
 };
 
 
-// class VMC::RAT::SimRefARF
-namespace VMC::RAT {
+// class VMC::Core::SimRefARF
+namespace VMC::Core {
     /*
     uint64_t*   refARF;
     */
@@ -2978,8 +2985,8 @@ namespace VMC::RAT {
 }
 
 
-// class VMC::RAT::SimO3ARF
-namespace VMC::RAT {
+// class VMC::Core::SimO3ARF
+namespace VMC::Core {
     /*
     PhysicalRegisterFile*   PRF;
     */
@@ -3002,8 +3009,8 @@ namespace VMC::RAT {
 }
 
 
-// class VMC::RAT::SimInstruction
-namespace VMC::RAT {
+// class VMC::Core::SimInstruction
+namespace VMC::Core {
     /*
     int         FID;
     int         clkDelay;
@@ -3144,8 +3151,8 @@ namespace VMC::RAT {
 }
 
 
-// class VMC::RAT::SimFetchedInstruction
-namespace VMC::RAT {
+// class VMC::Core::SimFetchedInstruction
+namespace VMC::Core {
     SimFetchedInstruction::SimFetchedInstruction()
         : SimInstruction    ()
         , FGR               (-1)
@@ -3246,8 +3253,8 @@ namespace VMC::RAT {
 }
 
 
-// class VMC::RAT::SimInstructionMemory
-namespace VMC::RAT {
+// class VMC::Core::SimInstructionMemory
+namespace VMC::Core {
     SimInstructionMemory::SimInstructionMemory(int capacity)
         : capacity  (capacity)
         , memory    (new SimInstruction[capacity]())
@@ -3337,8 +3344,8 @@ namespace VMC::RAT {
 }
 
 
-// class VMC::RAT::SimScoreboard::Entry
-namespace VMC::RAT {
+// class VMC::Core::SimScoreboard::Entry
+namespace VMC::Core {
     SimScoreboard::Entry::Entry()
         : status    (0)
         , FID       (-1)
@@ -3406,8 +3413,8 @@ namespace VMC::RAT {
 }
 
 
-// class VMC::RAT::SimScoreboard::EntryModification
-namespace VMC::RAT {
+// class VMC::Core::SimScoreboard::EntryModification
+namespace VMC::Core {
     SimScoreboard::EntryModification::EntryModification()
         : modified          (false)
         , modified_status   (false)
@@ -3519,8 +3526,8 @@ namespace VMC::RAT {
 }
 
 
-// class VMC::RAT::SimScoreboard
-namespace VMC::RAT {
+// class VMC::Core::SimScoreboard
+namespace VMC::Core {
     /*
     const int           size;
 
@@ -3672,8 +3679,8 @@ namespace VMC::RAT {
 }
 
 
-// class VMC::RAT::SimReservation::Entry
-namespace VMC::RAT {
+// class VMC::Core::SimReservation::Entry
+namespace VMC::Core {
     /*
     const SimFetchedInstruction insn;
     bool                        src1rdy;
@@ -3776,8 +3783,8 @@ namespace VMC::RAT {
 }
 
 
-// class VMC::RAT::SimReservation
-namespace VMC::RAT {
+// class VMC::Core::SimReservation
+namespace VMC::Core {
     /*
     const TScoreboard*      scoreboard;
     list<Entry>             entries;
@@ -3917,8 +3924,8 @@ namespace VMC::RAT {
 }
 
 
-// class VMC::RAT::SimExecution::Entry
-namespace VMC::RAT {
+// class VMC::Core::SimExecution::Entry
+namespace VMC::Core {
     /*
     SimFetchedInstruction       insn;
     uint64_t                    src1val;
@@ -4157,8 +4164,8 @@ namespace VMC::RAT {
 }
 
 
-// class VMC::RAT::SimExecution
-namespace VMC::RAT {
+// class VMC::Core::SimExecution
+namespace VMC::Core {
     /*
     bool                    const ref;
     SimRefARF*              const refARF;
@@ -4286,8 +4293,8 @@ namespace VMC::RAT {
 }
 
 
-// class VMC::RAT::SimReOrderBuffer::Entry
-namespace VMC::RAT {
+// class VMC::Core::SimReOrderBuffer::Entry
+namespace VMC::Core {
     /*
     SimFetchedInstruction   insn;
     bool                    rdy;
@@ -4347,8 +4354,8 @@ namespace VMC::RAT {
 }
 
 
-// class VMC::RAT::SimReOrderBuffer
-namespace VMC::RAT {
+// class VMC::Core::SimReOrderBuffer
+namespace VMC::Core {
     /*
     std::list<Entry>            entries;
     std::list<Entry>::iterator  next;

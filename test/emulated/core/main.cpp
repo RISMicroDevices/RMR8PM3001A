@@ -9,7 +9,7 @@
 #include <cstdlib>
 
 #include "vmc.hpp"
-#include "vmc_rat.hpp"
+#include "vmc_core.hpp"
 
 
 VMC::VMCEntity con;
@@ -40,7 +40,7 @@ int main()
     InitBasicCommands(&con);
     
     VMC::Setup(&con);
-    VMC::RAT::Setup(&con);
+    VMC::Core::Setup(&con);
 
     ECHO_COUT_VMC_VERSION
     std::cout << std::endl;
