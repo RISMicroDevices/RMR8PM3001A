@@ -5,6 +5,9 @@
 //
 //
 
+// Basis
+#define RV_ARCH_REG_COUNT                   32
+
 // Opcode
 #define RV_OPCODE_MASK                      0x0000007F
 #define RV_OPCODE_OFFSET                    0
