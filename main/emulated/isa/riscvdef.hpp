@@ -8,6 +8,30 @@
 // Basis
 #define RV_ARCH_REG_COUNT                   32
 
+// Operand
+#define RV_OPERAND_RD_MASK                  0x00000F80
+#define RV_OPERAND_RD_OFFSET                7
+
+#define RV_OPERAND_RS1_MASK                 0x000F8000
+#define RV_OPERAND_RS1_OFFSET               15
+
+#define RV_OPERAND_RS2_MASK                 0x01F00000
+#define RV_OPERAND_RS2_OFFSET               20
+
+#define RV_OPERAND_SHAMT5_MASK              0x01F00000
+#define RV_OPERAND_SHAMT5_OFFSET            20
+
+#define RV_OPERAND_SHAMT6_MASK              0x03F00000
+#define RV_OPERAND_SHAMT6_OFFSET            20
+
+#define RV_OPERAND_CSR_MASK                 0xFFF00000
+#define RV_OPERAND_CSR_OFFSET               20
+
+#define RV_OPERAND_CSR_UIMM_MASK            0x000F8000
+#define RV_OPERAND_CSR_UIMM_OFFSET          15
+
+
+
 // Opcode
 #define RV_OPCODE_MASK                      0x0000007F
 #define RV_OPCODE_OFFSET                    0

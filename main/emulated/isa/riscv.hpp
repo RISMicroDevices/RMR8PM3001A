@@ -7,8 +7,14 @@
 
 #include <cstdint>
 #include <stdexcept>
+#include <string>
+#include <list>
 
 #include "riscvdef.hpp"
+
+
+#define GET_OPERAND(insn, mask, offset) \
+    ((insn & mask) >> offset)
 
 
 namespace Jasse {
@@ -18,11 +24,20 @@ namespace Jasse {
     // Type definition of Architectural Register Value of XLEN=64
     typedef     uint64_t        arch64_t;
 
+    // Type definition of Immediate Value of XLEN=32/64
+    typedef union {
+        arch64_t    imm64 = 0;
+        arch32_t    imm32;
+    } imm_t;
+
     // Type definition of PC Register Value of XLEN=32/64
     typedef union {
         arch64_t    pc64 = 0;
         arch32_t    pc32;
     } pc_t;
+
+    // Type definition of Raw Instruction
+    typedef     uint32_t        insnraw_t;
 
 
 
@@ -59,7 +74,8 @@ namespace Jasse {
 
     // X-Len Enumeration
     typedef enum {
-        XLEN32 = 0, XLEN64
+        XLEN32 = 0,
+        XLEN64
     } XLen;
 
     // RISC-V Architectural State Container
@@ -97,7 +113,132 @@ namespace Jasse {
 
         // TODO
     };
+
+
+    // Enumeration of RISC-V special operands
+    typedef enum {
+        SHAMT5 = 0,
+        SHAMT6,
+        CSR,
+        CSR_UIMM
+    } RVSpecialOperand;
+
+    // RISC-V Decoded Instruction Textualizer
+    typedef std::string (*RVInstructionTextualizer)(const RVInstruction&);
+
+    // RISC-V Decoded Instruction Executor
+    typedef void        (*RVInstructionExecutor)(const RVInstruction&, RVArchitectural&);
+
+    // RISC-V Decoded Instruction
+    class RVInstruction {
+    private:
+        insnraw_t                   insn;
+
+        imm_t                       imm;
+        int                         rd;
+        int                         rs1;
+        int                         rs2;
+        
+        RVInstructionTextualizer*   textualizer;
+        RVInstructionExecutor*      executor;
+
+    public:
+        RVInstruction(
+            insnraw_t insn,
+            imm_t imm,
+            int rd, 
+            int rs1, 
+            int rs2, 
+            RVInstructionTextualizer* textualizer,
+            RVInstructionExecutor* executor);
+
+        RVInstruction();
+        RVInstruction(const RVInstruction& obj);
+        ~RVInstruction();
+
+        insnraw_t                   GetRaw() const;
+        imm_t                       GetImmediate() const;
+        int                         GetRD() const;
+        int                         GetRS1() const;
+        int                         GetRS2() const;
+        int                         GetOperand(RVSpecialOperand operand) const;
+
+        RVInstructionTextualizer*   GetTextualizer() const;
+        RVInstructionExecutor*      GetExecutor() const;
+
+        void                        SetRaw(insnraw_t insn);
+        void                        SetImmediate(imm_t imm);
+        void                        SetRD(int rd);
+        void                        SetRS1(int rs1);
+        void                        SetRS2(int rs2);
+
+        void                        SetTextualizer(RVInstructionTextualizer* textualizer);
+        void                        SetExecutor(RVInstructionExecutor* executor);
+
+        void                        Execute(RVArchitectural& arch) const;
+        std::string                 ToString() const;
+    };
+
+
+    // RISC-V Instruction Decoder
+    class RVDecoder {
+    private:
+        const std::string   name;
+        const std::string   name_canonical;
+
+    public:
+        RVDecoder(std::string name, std::string name_canonical);
+        ~RVDecoder();
+
+        const std::string&  GetName() const;
+        const std::string&  GetCanonicalName() const;
+
+        virtual bool        Decode(insnraw_t insnraw, RVInstruction& insn) const = 0;
+
+        void    operator=(const RVDecoder& obj) = delete;
+    };
+
+    // RISC-V Instruction Decoder Collection
+    typedef std::list<const RVDecoder*>::const_iterator     RVDecoderIterator;
+
+    //
+    class RVDecoderCollection {
+    private:
+        std::list<const RVDecoder*>     decoders;
+
+    public:
+        RVDecoderCollection();
+        RVDecoderCollection(const RVDecoderCollection& obj);
+        ~RVDecoderCollection();
+
+        int                 GetSize() const;
+        void                Clear();
+
+        RVDecoderIterator   Begin() const;
+        RVDecoderIterator   End() const;
+
+        bool                Has(const std::string& name) const;
+        bool                Has(const char* name) const;
+        bool                HasCanonical(const std::string& name_canonical) const;
+        bool                HasCanonical(const char* name) const;
+
+        bool                Add(const RVDecoder* decoder);
+
+        bool                Remove(const std::string& name);
+        bool                Remove(const char* name);
+        bool                RemoveCanonical(const std::string& name_canonical);
+        bool                RemoveCanonical(const char* name_canonical);
+
+        bool                Decode(insnraw_t insnraw, RVInstruction& insn) const;
+    };
+
+
+    // RISC-V Instance
+    class RVInstance {
+
+    };
 }
+
 
 
 
@@ -289,3 +430,315 @@ namespace Jasse {
         return *_GR64;
     }
 }
+
+
+// Implementation of: class RVInstruction
+namespace Jasse {
+    /*
+    insnraw_t                   insn;
+
+    imm_t                       imm;
+    int                         rd;
+    int                         rs1;
+    int                         rs2;
+        
+    RVInstructionTextualizer*   textualizer;
+    RVInstructionExecutor*      executor;
+    */
+
+    RVInstruction::RVInstruction(
+        insnraw_t                   insn,
+        imm_t                       imm,
+        int                         rd,
+        int                         rs1,
+        int                         rs2,
+        RVInstructionTextualizer*   textualizer,
+        RVInstructionExecutor*      executor)
+        : insn          (insn)
+        , imm           (imm)
+        , rd            (rd)
+        , rs1           (rs1)
+        , rs2           (rs2)
+        , textualizer   (textualizer)
+        , executor      (executor)
+    { }
+
+    RVInstruction::RVInstruction()
+        : insn          (0)
+        , imm           ({ 0 })
+        , rd            (0)
+        , rs1           (0)
+        , rs2           (0)
+        , textualizer   (nullptr)
+        , executor      (nullptr)
+    { }
+
+    RVInstruction::RVInstruction(const RVInstruction& obj)
+        : insn          (obj.insn)
+        , imm           (obj.imm)
+        , rd            (obj.rd)
+        , rs1           (obj.rs1)
+        , rs2           (obj.rs2)
+        , textualizer   (obj.textualizer)
+        , executor      (obj.executor)
+    { }
+
+    RVInstruction::~RVInstruction()
+    { }
+
+    inline insnraw_t RVInstruction::GetRaw() const
+    {
+        return insn;
+    }
+
+    inline imm_t RVInstruction::GetImmediate() const
+    {
+        return imm;
+    }
+
+    inline int RVInstruction::GetRD() const
+    {
+        return rd;
+    }
+
+    inline int RVInstruction::GetRS1() const 
+    {
+        return rs1;
+    }
+
+    inline int RVInstruction::GetRS2() const
+    {
+        return rs2;
+    }
+
+    inline int RVInstruction::GetOperand(RVSpecialOperand operand) const
+    {
+        switch (operand)
+        {
+            case SHAMT5:
+                return GET_OPERAND(insn, RV_OPERAND_SHAMT5_MASK, RV_OPERAND_SHAMT5_OFFSET);
+
+            case SHAMT6:
+                return GET_OPERAND(insn, RV_OPERAND_SHAMT6_MASK, RV_OPERAND_SHAMT6_OFFSET);
+
+            case CSR:
+                return GET_OPERAND(insn, RV_OPERAND_CSR_MASK, RV_OPERAND_CSR_OFFSET);
+
+            case CSR_UIMM:
+                return GET_OPERAND(insn, RV_OPERAND_CSR_UIMM_MASK, RV_OPERAND_CSR_UIMM_OFFSET);
+
+            default:
+                return 0;
+        }
+    }
+
+    inline RVInstructionTextualizer* RVInstruction::GetTextualizer() const
+    {
+        return textualizer;
+    }
+
+    inline RVInstructionExecutor* RVInstruction::GetExecutor() const
+    {
+        return executor;
+    }
+
+    inline void RVInstruction::SetRaw(insnraw_t insn)
+    {
+        this->insn = insn;
+    }
+
+    inline void RVInstruction::SetImmediate(imm_t imm)
+    {
+        this->imm = imm;
+    }
+
+    inline void RVInstruction::SetRD(int rd)
+    {
+        this->rd = rd;
+    }
+
+    inline void RVInstruction::SetRS1(int rs1)
+    {
+        this->rs1 = rs1;
+    }
+
+    inline void RVInstruction::SetRS2(int rs2)
+    {
+        this->rs2 = rs2;
+    }
+
+    inline void RVInstruction::SetTextualizer(RVInstructionTextualizer* textualizer)
+    {
+        this->textualizer = textualizer;
+    }
+
+    inline void RVInstruction::SetExecutor(RVInstructionExecutor* executor)
+    {
+        this->executor = executor;
+    }
+
+    inline void RVInstruction::Execute(RVArchitectural& arch) const
+    {
+        (*executor)(*this, arch);
+    }
+
+    inline std::string RVInstruction::ToString() const
+    {
+        return (*textualizer)(*this);
+    }
+}
+
+
+// Implementation of: class RVDecoder
+namespace Jasse {
+    /*
+    const std::string   name;
+    const std::string   name_canonical;
+    */
+
+    RVDecoder::RVDecoder(std::string name, std::string name_canonical)
+        : name              (name)
+        , name_canonical    (name_canonical)
+    { }
+
+    RVDecoder::~RVDecoder()
+    { }
+
+    inline const std::string& RVDecoder::GetName() const
+    {
+        return name;
+    }
+
+    inline const std::string& RVDecoder::GetCanonicalName() const
+    {
+        return name_canonical;
+    }
+}
+
+// Implementation of: class RVDecoderCollection
+namespace Jasse {
+    /*
+    std::list<const RVDecoder*>     decoders;
+    */
+
+    RVDecoderCollection::RVDecoderCollection()
+        : decoders  (std::list<const RVDecoder*>())
+    { }
+
+    RVDecoderCollection::RVDecoderCollection(const RVDecoderCollection& obj)
+        : decoders  (obj.decoders)
+    { }
+
+    RVDecoderCollection::~RVDecoderCollection()
+    { }
+
+    inline int RVDecoderCollection::GetSize() const
+    {
+        return decoders.size();
+    }
+
+    inline void RVDecoderCollection::Clear()
+    {
+        decoders.clear();
+    }
+
+    inline RVDecoderIterator RVDecoderCollection::Begin() const
+    {
+        return decoders.begin();
+    }
+
+    inline RVDecoderIterator RVDecoderCollection::End() const
+    {
+        return decoders.end();
+    }
+
+    inline bool RVDecoderCollection::Has(const std::string& name) const
+    {
+        return Has(name.c_str());
+    }
+
+    bool RVDecoderCollection::Has(const char* name) const
+    {
+        std::list<const RVDecoder*>::const_iterator iter = decoders.begin();
+        for (; iter != decoders.end(); iter++)
+            if ((*iter)->GetName().compare(name) == 0)
+                return true;
+
+        return false;
+    }
+
+    inline bool RVDecoderCollection::HasCanonical(const std::string& name_canonical) const
+    {
+        return Has(name_canonical.c_str());
+    }
+
+    bool RVDecoderCollection::HasCanonical(const char* name_canonical) const
+    {
+        std::list<const RVDecoder*>::const_iterator iter = decoders.begin();
+        for (; iter != decoders.end(); iter++)
+            if ((*iter)->GetCanonicalName().compare(name_canonical) == 0)
+                return true;
+
+        return false;
+    }
+
+    bool RVDecoderCollection::Add(const RVDecoder* decoder)
+    {
+        std::list<const RVDecoder*>::const_iterator iter = decoders.begin();
+        for (; iter != decoders.end(); iter++)
+            if ((*iter)->GetName().compare(decoder->GetName()) == 0
+                || (*iter)->GetCanonicalName().compare(decoder->GetCanonicalName()) == 0)
+                return false;
+
+        decoders.push_back(decoder);
+
+        return true;
+    }
+
+    inline bool RVDecoderCollection::Remove(const std::string& name)
+    {
+        return Remove(name.c_str());
+    }
+
+    bool RVDecoderCollection::Remove(const char* name)
+    {
+        std::list<const RVDecoder*>::const_iterator iter = decoders.begin();
+        for (; iter != decoders.end(); iter++)
+            if ((*iter)->GetName().compare(name) == 0)
+            {
+                decoders.erase(iter);
+                return true;
+            }
+        
+        return false;
+    }
+
+    inline bool RVDecoderCollection::RemoveCanonical(const std::string& name_canonical)
+    {
+        return RemoveCanonical(name_canonical.c_str());
+    }
+
+    bool RVDecoderCollection::RemoveCanonical(const char* name_canonical)
+    {
+        std::list<const RVDecoder*>::const_iterator iter = decoders.begin();
+        for (; iter != decoders.end(); iter++)
+            if ((*iter)->GetCanonicalName().compare(name_canonical) == 0)
+            {
+                decoders.erase(iter);
+                return true;
+            }
+
+        return false;
+    }
+
+    bool RVDecoderCollection::Decode(insnraw_t insnraw, RVInstruction& insn) const
+    {
+        std::list<const RVDecoder*>::const_iterator iter = decoders.begin();
+        for (; iter != decoders.end(); iter++)
+            if ((*iter)->Decode(insnraw, insn))
+                return true;
+
+        return false;
+    }
+}
+
