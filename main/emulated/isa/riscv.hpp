@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <stdexcept>
 #include <string>
+#include <iomanip>
+#include <sstream>
 #include <list>
 
 #include "riscvdef.hpp"
@@ -15,6 +17,9 @@
 
 #define GET_OPERAND(insn, mask, offset) \
     ((insn & mask) >> offset)
+
+#define GET_STD_OPERAND(insn, name) \
+    ((insn & name##_MASK) >> name##_OFFSET)
 
 #define IMM64_SIGNEXT32(imm) \
     (imm.imm64 = (arch64_t)((int32_t)imm.imm32), imm);
@@ -141,19 +146,22 @@ namespace Jasse {
         int                         rd;
         int                         rs1;
         int                         rs2;
+
+        std::string                 name;
         
-        RVInstructionTextualizer*   textualizer;
-        RVInstructionExecutor*      executor;
+        RVInstructionTextualizer    textualizer;
+        RVInstructionExecutor       executor;
 
     public:
         RVInstruction(
-            insnraw_t insn,
-            imm_t imm,
-            int rd, 
-            int rs1, 
-            int rs2, 
-            RVInstructionTextualizer* textualizer,
-            RVInstructionExecutor* executor);
+            insnraw_t                   insn,
+            imm_t                       imm,
+            int                         rd, 
+            int                         rs1, 
+            int                         rs2, 
+            std::string                 name,
+            RVInstructionTextualizer    textualizer,
+            RVInstructionExecutor       executor);
 
         RVInstruction();
         RVInstruction(const RVInstruction& obj);
@@ -166,8 +174,10 @@ namespace Jasse {
         int                         GetRS2() const;
         int                         GetOperand(RVSpecialOperand operand) const;
 
-        RVInstructionTextualizer*   GetTextualizer() const;
-        RVInstructionExecutor*      GetExecutor() const;
+        const std::string&          GetName() const;
+
+        RVInstructionTextualizer    GetTextualizer() const;
+        RVInstructionExecutor       GetExecutor() const;
 
         void                        SetRaw(insnraw_t insn);
         void                        SetImmediate(imm_t imm);
@@ -175,8 +185,10 @@ namespace Jasse {
         void                        SetRS1(int rs1);
         void                        SetRS2(int rs2);
 
-        void                        SetTextualizer(RVInstructionTextualizer* textualizer);
-        void                        SetExecutor(RVInstructionExecutor* executor);
+        void                        SetName(const std::string& name);
+
+        void                        SetTextualizer(RVInstructionTextualizer textualizer);
+        void                        SetExecutor(RVInstructionExecutor executor);
 
         void                        Execute(RVArchitectural& arch) const;
         std::string                 ToString() const;
@@ -251,6 +263,15 @@ namespace Jasse {
     imm_t DecodeRV64ImmediateTypeU(insnraw_t insnraw);
     imm_t DecodeRV32ImmediateTypeJ(insnraw_t insnraw);
     imm_t DecodeRV64ImmediateTypeJ(insnraw_t insnraw);
+
+
+    // RISC-V Instruction Normal Textualizer
+    std::string TextualizeRVTypeR(const RVInstruction& insn);
+    std::string TextualizeRVTypeI(const RVInstruction& insn);
+    std::string TextualizeRVTypeS(const RVInstruction& insn);
+    std::string TextualizeRVTypeB(const RVInstruction& insn);
+    std::string TextualizeRVTypeU(const RVInstruction& insn);
+    std::string TextualizeRVTypeJ(const RVInstruction& insn);
 
 
     // RISC-V Instance
@@ -461,9 +482,11 @@ namespace Jasse {
     int                         rd;
     int                         rs1;
     int                         rs2;
+
+    std::string                 name;
         
-    RVInstructionTextualizer*   textualizer;
-    RVInstructionExecutor*      executor;
+    RVInstructionTextualizer    textualizer;
+    RVInstructionExecutor       executor;
     */
 
     RVInstruction::RVInstruction(
@@ -472,13 +495,15 @@ namespace Jasse {
         int                         rd,
         int                         rs1,
         int                         rs2,
-        RVInstructionTextualizer*   textualizer,
-        RVInstructionExecutor*      executor)
+        std::string                 name,
+        RVInstructionTextualizer    textualizer,
+        RVInstructionExecutor       executor)
         : insn          (insn)
         , imm           (imm)
         , rd            (rd)
         , rs1           (rs1)
         , rs2           (rs2)
+        , name          (name)
         , textualizer   (textualizer)
         , executor      (executor)
     { }
@@ -489,6 +514,7 @@ namespace Jasse {
         , rd            (0)
         , rs1           (0)
         , rs2           (0)
+        , name          ("")
         , textualizer   (nullptr)
         , executor      (nullptr)
     { }
@@ -499,6 +525,7 @@ namespace Jasse {
         , rd            (obj.rd)
         , rs1           (obj.rs1)
         , rs2           (obj.rs2)
+        , name          (obj.name)
         , textualizer   (obj.textualizer)
         , executor      (obj.executor)
     { }
@@ -552,12 +579,17 @@ namespace Jasse {
         }
     }
 
-    inline RVInstructionTextualizer* RVInstruction::GetTextualizer() const
+    inline const std::string& RVInstruction::GetName() const
+    {
+        return name;
+    }
+
+    inline RVInstructionTextualizer RVInstruction::GetTextualizer() const
     {
         return textualizer;
     }
 
-    inline RVInstructionExecutor* RVInstruction::GetExecutor() const
+    inline RVInstructionExecutor RVInstruction::GetExecutor() const
     {
         return executor;
     }
@@ -587,12 +619,17 @@ namespace Jasse {
         this->rs2 = rs2;
     }
 
-    inline void RVInstruction::SetTextualizer(RVInstructionTextualizer* textualizer)
+    inline void RVInstruction::SetName(const std::string& name)
+    {
+        this->name = name;
+    }
+
+    inline void RVInstruction::SetTextualizer(RVInstructionTextualizer textualizer)
     {
         this->textualizer = textualizer;
     }
 
-    inline void RVInstruction::SetExecutor(RVInstructionExecutor* executor)
+    inline void RVInstruction::SetExecutor(RVInstructionExecutor executor)
     {
         this->executor = executor;
     }
@@ -874,6 +911,99 @@ namespace Jasse {
         imm_t imm = DecodeRV32ImmediateTypeJ(insnraw);
 
         return IMM64_SIGNEXT32(imm);
+    }
+}
+
+
+// Implementation of Instruction Textualizers
+namespace Jasse {
+    std::string TextualizeRVGR(int GR)
+    {
+        std::ostringstream oss;
+
+        oss << "x";
+        oss << GR;
+
+        return oss.str();
+    }
+
+    std::string TextualizeRVGR_ABI(int GR)
+    {
+        // TODO
+
+        return std::string();
+    }
+
+    std::string TextualizeRVTypeR(const RVInstruction& insn)
+    {
+        std::ostringstream oss;
+
+        oss << insn.GetName()                   << " \t";
+        oss << TextualizeRVGR(insn.GetRD())     << ", ";
+        oss << TextualizeRVGR(insn.GetRS1())    << ", ";
+        oss << TextualizeRVGR(insn.GetRS2());
+
+        return oss.str();
+    }
+
+    std::string TextualizeRVTypeI(const RVInstruction& insn)
+    {
+        std::ostringstream oss;
+
+        oss << insn.GetName()                   << " \t";
+        oss << TextualizeRVGR(insn.GetRD())     << ", ";
+        oss << TextualizeRVGR(insn.GetRS1())    << ", ";
+        oss << "0x" << std::hex << std::setw(3) << std::setfill('0') << (insn.GetImmediate().imm32 & 0xFFF);
+        // Note: Only display 12 bits of immediate value here.
+        //       Because higher bits are only produced by sign-extension. The same below.
+
+        return oss.str();
+    }
+
+    std::string TextualizeRVTypeS(const RVInstruction& insn)
+    {
+        std::ostringstream oss;
+
+        oss << insn.GetName()                   << " \t";
+        oss << TextualizeRVGR(insn.GetRS1())    << ", ";
+        oss << TextualizeRVGR(insn.GetRS2())    << ", ";
+        oss << "0x" << std::hex << std::setw(3) << std::setfill('0') << (insn.GetImmediate().imm32 & 0xFFF);
+
+        return oss.str();
+    }
+
+    std::string TextualizeRVTypeB(const RVInstruction& insn)
+    {
+        std::ostringstream oss;
+
+        oss << insn.GetName()                   << " \t";
+        oss << TextualizeRVGR(insn.GetRS1())    << ", ";
+        oss << TextualizeRVGR(insn.GetRS2())    << ", ";
+        oss << "0x" << std::hex << std::setw(4) << std::setfill('0') << (insn.GetImmediate().imm32 & 0xFFFF);
+
+        return oss.str();
+    }
+
+    std::string TextualizeRVTypeU(const RVInstruction& insn)
+    {
+        std::ostringstream oss;
+
+        oss << insn.GetName()                   << " \t";
+        oss << TextualizeRVGR(insn.GetRD())     << ", ";
+        oss << "0x" << std::hex << std::setw(8) << std::setfill('0') << (insn.GetImmediate().imm32);
+
+        return oss.str();
+    }
+
+    std::string TextualizeRVTypeJ(const RVInstruction& insn)
+    {
+        std::ostringstream oss;
+
+        oss << insn.GetName()                   << " \t";
+        oss << TextualizeRVGR(insn.GetRD())     << ", ";
+        oss << "0x" << std::hex << std::setw(6) << std::setfill('0') << (insn.GetImmediate().imm32 & 0x00FFFFFF);
+
+        return oss.str();
     }
 }
 
