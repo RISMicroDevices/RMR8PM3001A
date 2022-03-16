@@ -16,6 +16,9 @@
 #define GET_OPERAND(insn, mask, offset) \
     ((insn & mask) >> offset)
 
+#define IMM64_SIGNEXT32(imm) \
+    (imm.imm64 = (arch64_t)((int32_t)imm.imm32), imm);
+
 
 namespace Jasse {
     // Type definition of Architectural Register Value of XLEN=32
@@ -231,6 +234,23 @@ namespace Jasse {
 
         bool                Decode(insnraw_t insnraw, RVInstruction& insn) const;
     };
+
+
+    // RISC-V Instruction Immediate Decoder
+    typedef imm_t       (*RVImmediateDecoder)(insnraw_t insnraw);
+
+    imm_t DecodeRV32ImmediateTypeR(insnraw_t insnraw);
+    imm_t DecodeRV64ImmediateTypeR(insnraw_t insnraw);
+    imm_t DecodeRV32ImmediateTypeI(insnraw_t insnraw);
+    imm_t DecodeRV64ImmediateTypeI(insnraw_t insnraw);
+    imm_t DecodeRV32ImmediateTypeS(insnraw_t insnraw);
+    imm_t DecodeRV64ImmediateTypeS(insnraw_t insnraw);
+    imm_t DecodeRV32ImmediateTypeB(insnraw_t insnraw);
+    imm_t DecodeRV64ImmediateTypeB(insnraw_t insnraw);
+    imm_t DecodeRV32ImmediateTypeU(insnraw_t insnraw);
+    imm_t DecodeRV64ImmediateTypeU(insnraw_t insnraw);
+    imm_t DecodeRV32ImmediateTypeJ(insnraw_t insnraw);
+    imm_t DecodeRV64ImmediateTypeJ(insnraw_t insnraw);
 
 
     // RISC-V Instance
@@ -615,6 +635,7 @@ namespace Jasse {
     }
 }
 
+
 // Implementation of: class RVDecoderCollection
 namespace Jasse {
     /*
@@ -739,6 +760,120 @@ namespace Jasse {
                 return true;
 
         return false;
+    }
+}
+
+
+// Implementation of Immediate Decoders
+namespace Jasse {
+    imm_t DecodeRV32ImmediateTypeR(insnraw_t insnraw)
+    {
+        imm_t imm;
+        imm.imm32 = 0;
+
+        return imm;
+    }
+
+    imm_t DecodeRV64ImmediateTypeR(insnraw_t insnraw)
+    {
+        imm_t imm;
+        imm.imm64 = 0;
+
+        return imm;
+    }
+
+    imm_t DecodeRV32ImmediateTypeI(insnraw_t insnraw)
+    {
+        imm_t imm;
+        imm.imm32 = 0;
+
+        imm.imm32 |= ((insnraw & 0xFFF00000U) >> 20);
+        imm.imm32 |= ((insnraw & 0x80000000U) ? 0xFFFFF000U : 0);
+
+        return imm;
+    }
+
+    imm_t DecodeRV64ImmediateTypeI(insnraw_t insnraw)
+    {
+        imm_t imm = DecodeRV32ImmediateTypeI(insnraw);
+
+        return IMM64_SIGNEXT32(imm);
+    }
+
+    imm_t DecodeRV32ImmediateTypeS(insnraw_t insnraw)
+    {
+        imm_t imm;
+        imm.imm32 = 0;
+
+        imm.imm32 |= ((insnraw & 0x00000F80U) >> 7);
+        imm.imm32 |= ((insnraw & 0xFE000000U) >> 20);
+        imm.imm32 |= ((insnraw & 0x80000000U) ? 0xFFFFF000U : 0);
+
+        return imm;
+    }
+
+    imm_t DecodeRV64ImmediateTypeS(insnraw_t insnraw)
+    {
+        imm_t imm = DecodeRV32ImmediateTypeS(insnraw);
+
+        return IMM64_SIGNEXT32(imm);
+    }
+
+    imm_t DecodeRV32ImmediateTypeB(insnraw_t insnraw)
+    {
+        imm_t imm;
+        imm.imm32 = 0;
+
+        imm.imm32 |= ((insnraw & 0x00000F00U) >> 7);
+        imm.imm32 |= ((insnraw & 0x00000080U) << 4);
+        imm.imm32 |= ((insnraw & 0x7E000000U) >> 20);
+        imm.imm32 |= ((insnraw & 0x80000000U) ? 0xFFFFF000U : 0);
+
+        return imm;
+    }
+
+    imm_t DecodeRV64ImmediateTypeB(insnraw_t insnraw)
+    {
+        imm_t imm = DecodeRV32ImmediateTypeB(insnraw);
+
+        return IMM64_SIGNEXT32(imm);
+    }
+
+    imm_t DecodeRV32ImmediateTypeU(insnraw_t insnraw)
+    {
+        imm_t imm;
+        imm.imm32 = 0;
+
+        imm.imm32 |= ((insnraw & 0xFFFFF000));
+
+        return imm;
+    }
+
+    imm_t DecodeRV64ImmediateTypeU(insnraw_t insnraw)
+    {
+        imm_t imm = DecodeRV32ImmediateTypeU(insnraw);
+
+        return IMM64_SIGNEXT32(imm);
+    }
+
+    imm_t DecodeRV32ImmediateTypeJ(insnraw_t insnraw)
+    {
+        imm_t imm;
+        imm.imm32 = 0;
+
+        imm.imm32 |= ((insnraw & 0x7FE00000U) >> 20);
+        imm.imm32 |= ((insnraw & 0x00100000U) >> 9);
+        imm.imm32 |= ((insnraw & 0x000FF000U));
+        imm.imm32 |= ((insnraw & 0x80000000U) ? 0xFFF00000U : 0);
+
+        return imm;
+    }
+
+    imm_t DecodeRV64ImmediateTypeJ(insnraw_t insnraw)
+    {
+        imm_t imm = DecodeRV32ImmediateTypeJ(insnraw);
+
+        return IMM64_SIGNEXT32(imm);
     }
 }
 
