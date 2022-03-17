@@ -5,8 +5,17 @@
 //
 //
 
+// Standard operand format
+#define GET_OPERAND(insn, mask, offset) \
+    ((insn & mask) >> offset)
+
+#define GET_STD_OPERAND(insn, name) \
+    ((insn & name##_MASK) >> name##_OFFSET)
+
+
 // Basis
 #define RV_ARCH_REG_COUNT                   32
+
 
 // Operand
 #define RV_OPERAND_RD_MASK                  0x00000F80
