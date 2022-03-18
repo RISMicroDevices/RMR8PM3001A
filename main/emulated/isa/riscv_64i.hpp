@@ -216,11 +216,6 @@ namespace Jasse {
 // executors
 namespace Jasse {
 
-
-
-
-
-
     // ADDI
     void RV64I_ADDI(const RVInstruction& insn, RVArchitectural& arch)
     {
@@ -283,6 +278,35 @@ namespace Jasse {
     {
         arch.GR64()[insn.GetRD()]
             = (int64_t)arch.GR64()[insn.GetRS1()] >> insn.GetOperand(SHAMT6);
+    }
+
+
+    // ADDIW
+    void RV64I_ADDIW(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        arch.GR64()[insn.GetRD()]
+            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm32);
+    }
+
+    // SLLIW
+    void RV64I_SLLIW(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        arch.GR64()[insn.GetRD()]
+            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] << insn.GetOperand(SHAMT5));
+    }
+
+    // SRLIW
+    void RV64I_SRLIW(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        arch.GR64()[insn.GetRD()]
+            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] >> insn.GetOperand(SHAMT5));
+    }
+
+    // SRAIW
+    void RV64I_SRAIW(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        arch.GR64()[insn.GetRD()]
+            = SEXT_W((int32_t)arch.GR64()[insn.GetRS1()] >> insn.GetOperand(SHAMT5));
     }
 
 
@@ -354,6 +378,42 @@ namespace Jasse {
     {
         arch.GR64()[insn.GetRD()]
             = (int64_t)arch.GR64()[insn.GetRS1()] >> (arch.GR64()[insn.GetRS2()] & 0x003F);
+    }
+
+
+    // ADDW
+    void RV64I_ADDW(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        arch.GR64()[insn.GetRD()]
+            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] + (uint32_t)arch.GR64()[insn.GetRS2()]);
+    }
+
+    // SUBW
+    void RV64I_SUBW(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        arch.GR64()[insn.GetRD()]
+            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] - (uint32_t)arch.GR64()[insn.GetRS2()]);
+    }
+
+    // SLLW
+    void RV64I_SLLW(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        arch.GR64()[insn.GetRD()]
+            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] << (arch.GR64()[insn.GetRS2()] & 0x001F));
+    }
+
+    // SRLW
+    void RV64I_SRLW(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        arch.GR64()[insn.GetRD()]
+            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] >> (arch.GR64()[insn.GetRS2()] & 0x001F));
+    }
+
+    // SRAW
+    void RV64I_SRAW(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        arch.GR64()[insn.GetRD()]
+            = SEXT_W((int32_t)arch.GR64()[insn.GetRS1()] >> (arch.GR64()[insn.GetRS2()] & 0x001F));
     }
 
 
@@ -434,7 +494,7 @@ namespace Jasse {
         if ((uint64_t)arch.GR64()[insn.GetRS1()] >= (uint64_t)arch.GR64()[insn.GetRS2()])
             arch.SetPC64(arch.PC().pc64 + insn.GetImmediate().imm64);
     }
-    
+
 
 }
 
@@ -443,6 +503,9 @@ namespace Jasse {
     insn.SetName(name); \
     insn.SetExecutor(&executor);
 
+#define RV64I_TYPE(T) \
+    DecodeNormalRV64Type##T(insnraw, insn);
+
 // codepoints
 namespace Jasse {
 
@@ -450,61 +513,53 @@ namespace Jasse {
     //
     bool RV64ICodePoint_Funct3_ADDI(insnraw_t insnraw, RVInstruction& insn)
     {
-        DecodeNormalRV64TypeI(insnraw, insn);
-        RV64I_INSNDEF("addi", RV64I_ADDI)
+        RV64I_TYPE(I) RV64I_INSNDEF("addi", RV64I_ADDI);
 
         return true;
     }
 
     bool RV64ICodePoint_Funct3_SLTI(insnraw_t insnraw, RVInstruction& insn)
     {
-        DecodeNormalRV64TypeI(insnraw, insn);
-        RV64I_INSNDEF("slti", RV64I_ADDI)
+        RV64I_TYPE(I) RV64I_INSNDEF("slti", RV64I_ADDI);
 
         return true;
     }
 
     bool RV64ICodePoint_Funct3_SLTIU(insnraw_t insnraw, RVInstruction& insn)
     {
-        DecodeNormalRV64TypeI(insnraw, insn);
-        RV64I_INSNDEF("sltiu", RV64I_SLTIU)
+        RV64I_TYPE(I) RV64I_INSNDEF("sltiu", RV64I_SLTIU);
 
         return true;
     }
 
     bool RV64ICodePoint_Funct3_ANDI(insnraw_t insnraw, RVInstruction& insn)
     {
-        DecodeNormalRV64TypeI(insnraw, insn);
-        RV64I_INSNDEF("andi", RV64I_ANDI)
+        RV64I_TYPE(I) RV64I_INSNDEF("andi", RV64I_ANDI);
 
         return true;
     }
 
     bool RV64ICodePoint_Funct3_ORI(insnraw_t insnraw, RVInstruction& insn)
     {
-        DecodeNormalRV64TypeI(insnraw, insn);
-        RV64I_INSNDEF("ori", RV64I_ORI)
+        RV64I_TYPE(I) RV64I_INSNDEF("ori", RV64I_ORI);
 
         return true;
     }
 
     bool RV64ICodePoint_Funct3_XORI(insnraw_t insnraw, RVInstruction& insn)
     {
-        DecodeNormalRV64TypeI(insnraw, insn);
-        RV64I_INSNDEF("xori", RV64I_XORI)
+        RV64I_TYPE(I) RV64I_INSNDEF("xori", RV64I_XORI);
 
         return true;
     }
 
-    //
     bool RV64ICodePoint_Funct3_SLLI(insnraw_t insnraw, RVInstruction& insn)
     {
         int funct6 = GET_STD_OPERAND(insnraw, RV64I_FUNCT6);
 
         if (funct6 == RV64I_FUNCT6_SLLI)
         {
-            DecodeNormalRV64TypeI(insnraw, insn);
-            RV64I_INSNDEF("slli", RV64I_SLLI)
+            RV64I_TYPE(I) RV64I_INSNDEF("slli", RV64I_SLLI);
 
             return true;
         }
@@ -518,15 +573,55 @@ namespace Jasse {
 
         if (funct6 == RV64I_FUNCT6_SRLI)
         {
-            DecodeNormalRV64TypeI(insnraw, insn);
-            RV64I_INSNDEF("srli", RV64I_SRLI)
+            RV64I_TYPE(I) RV64I_INSNDEF("srli", RV64I_SRLI);
 
             return true;
         }
         else if (funct6 == RV64I_FUNCT6_SRAI)
         {
-            DecodeNormalRV64TypeI(insnraw, insn);
-            RV64I_INSNDEF("srai", RV64I_SRAI)
+            RV64I_TYPE(I) RV64I_INSNDEF("srai", RV64I_SRAI);
+
+            return true;
+        }
+        else
+            return false;
+    }
+
+    //
+    bool RV64ICodePoint_Funct3_ADDIW(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(I) RV64I_INSNDEF("addiw", RV64I_ADDIW);
+
+        return true;
+    }
+
+    bool RV64ICodePoint_Funct3_SLLIW(insnraw_t insnraw, RVInstruction& insn)
+    {
+        int funct7 = GET_STD_OPERAND(insnraw, RV64I_FUNCT7);
+
+        if (funct7 == RV64I_FUNCT7_SLLIW)
+        {
+            RV64I_TYPE(I) RV64I_INSNDEF("slliw", RV64I_SLLIW);
+
+            return true;
+        }
+        else
+            return false;
+    }
+
+    bool RV64ICodePoint_Funct3_SRLIW__SRAIW(insnraw_t insnraw, RVInstruction& insn)
+    {
+        int funct7 = GET_STD_OPERAND(insnraw, RV64I_FUNCT7);
+
+        if (funct7 == RV64I_FUNCT7_SRLIW)
+        {
+            RV64I_TYPE(I) RV64I_INSNDEF("srliw", RV64I_SRLIW);
+
+            return true;
+        }
+        else if (funct7 == RV64I_FUNCT7_SRAIW)
+        {
+            RV64I_TYPE(I) RV64I_INSNDEF("sraiw", RV64I_SRAIW);
 
             return true;
         }
@@ -541,15 +636,13 @@ namespace Jasse {
 
         if (funct7 == RV32I_FUNCT7_ADD)
         {
-            DecodeNormalRV64TypeR(insnraw, insn);
-            RV64I_INSNDEF("add", RV64I_ADD)
+            RV64I_TYPE(R) RV64I_INSNDEF("add", RV64I_ADD);
 
             return true;
         }
         else if (funct7 == RV32I_FUNCT7_SUB)
         {
-            DecodeNormalRV64TypeR(insnraw, insn);
-            RV64I_INSNDEF("sub", RV64I_SUB)
+            RV64I_TYPE(R) RV64I_INSNDEF("sub", RV64I_SUB);
 
             return true;
         }
@@ -563,8 +656,7 @@ namespace Jasse {
 
         if (funct7 == RV32I_FUNCT7_SLT)
         {
-            DecodeNormalRV64TypeR(insnraw, insn);
-            RV64I_INSNDEF("slt", RV64I_SLT)
+            RV64I_TYPE(R) RV64I_INSNDEF("slt", RV64I_SLT);
 
             return true;
         }
@@ -578,8 +670,7 @@ namespace Jasse {
 
         if (funct7 == RV32I_FUNCT7_SLTU)
         {
-            DecodeNormalRV64TypeR(insnraw, insn);
-            RV64I_INSNDEF("sltu", RV64I_SLTU)
+            RV64I_TYPE(R) RV64I_INSNDEF("sltu", RV64I_SLTU);
 
             return true;
         }
@@ -593,8 +684,7 @@ namespace Jasse {
 
         if (funct7 == RV32I_FUNCT7_AND)
         {
-            DecodeNormalRV64TypeR(insnraw, insn);
-            RV64I_INSNDEF("and", RV64I_AND)
+            RV64I_TYPE(R) RV64I_INSNDEF("and", RV64I_AND);
 
             return true;
         }
@@ -608,8 +698,7 @@ namespace Jasse {
 
         if (funct7 == RV32I_FUNCT7_OR)
         {
-            DecodeNormalRV64TypeR(insnraw, insn);
-            RV64I_INSNDEF("or", RV64I_OR)
+            RV64I_TYPE(R) RV64I_INSNDEF("or", RV64I_OR);
 
             return true;
         }
@@ -623,8 +712,7 @@ namespace Jasse {
 
         if (funct7 == RV32I_FUNCT7_XOR)
         {
-            DecodeNormalRV64TypeR(insnraw, insn);
-            RV64I_INSNDEF("xor", RV64I_XOR)
+            RV64I_TYPE(R) RV64I_INSNDEF("xor", RV64I_XOR);
 
             return true;
         }
@@ -638,8 +726,7 @@ namespace Jasse {
 
         if (funct7 == RV32I_FUNCT7_SLL)
         {
-            DecodeNormalRV64TypeR(insnraw, insn);
-            RV64I_INSNDEF("sll", RV64I_SLL)
+            RV64I_TYPE(R) RV64I_INSNDEF("sll", RV64I_SLL);
 
             return true;
         }
@@ -653,15 +740,68 @@ namespace Jasse {
 
         if (funct7 == RV32I_FUNCT7_SRL)
         {
-            DecodeNormalRV64TypeR(insnraw, insn);
-            RV64I_INSNDEF("srl", RV64I_SRL)
+            RV64I_TYPE(R) RV64I_INSNDEF("srl", RV64I_SRL);
 
             return true;
         }
         else if (funct7 == RV32I_FUNCT7_SRA)
         {
-            DecodeNormalRV64TypeR(insnraw, insn);
-            RV64I_INSNDEF("sra", RV64I_SRA)
+            RV64I_TYPE(R) RV64I_INSNDEF("sra", RV64I_SRA);
+
+            return true;
+        }
+        else
+            return false;
+    }
+
+    //
+    bool RV64ICodePoint_Funct3_ADDW__SUBW(insnraw_t insnraw, RVInstruction& insn)
+    {
+        int funct7 = GET_STD_OPERAND(insnraw, RV64I_FUNCT7);
+
+        if (funct7 == RV64I_FUNCT7_ADDW)
+        {
+            RV64I_TYPE(R) RV64I_INSNDEF("addw", RV64I_ADDW);
+
+            return true;
+        }
+        else if (funct7 == RV64I_FUNCT7_SUBW)
+        {
+            RV64I_TYPE(R) RV64I_INSNDEF("subw", RV64I_SUBW);
+
+            return true;
+        }
+        else
+            return false;
+    }
+
+    bool RV64ICodePoint_Funct3_SLLW(insnraw_t insnraw, RVInstruction& insn)
+    {
+        int funct7 = GET_STD_OPERAND(insnraw, RV64I_FUNCT7);
+
+        if (funct7 == RV64I_FUNCT7_SLLW)
+        {
+            RV64I_TYPE(R) RV64I_INSNDEF("sllw", RV64I_SLLW);
+
+            return true;
+        }
+        else
+            return false;
+    }
+
+    bool RV64ICodePoint_Funct3_SRLW__SRAW(insnraw_t insnraw, RVInstruction& insn)
+    {
+        int funct7 = GET_STD_OPERAND(insnraw, RV64I_FUNCT7);
+
+        if (funct7 == RV64I_FUNCT7_SRLW)
+        {
+            RV64I_TYPE(R) RV64I_INSNDEF("srlw", RV64I_SRLW);
+
+            return true;
+        }
+        else if (funct7 == RV64I_FUNCT7_SRAW)
+        {
+            RV64I_TYPE(R) RV64I_INSNDEF("sraw", RV64I_SRAW);
 
             return true;
         }
@@ -670,6 +810,48 @@ namespace Jasse {
     }
 
 
+    //
+    bool RV64ICodePoint_Funct3_BEQ(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(B) RV64I_INSNDEF("beq", RV64I_BEQ);
+
+        return true;
+    }
+
+    bool RV64ICodePoint_Funct3_BNE(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(B) RV64I_INSNDEF("bne", RV64I_BNE);
+
+        return true;
+    }
+
+    bool RV64ICodePoint_Funct3_BLT(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(B) RV64I_INSNDEF("blt", RV64I_BLT);
+
+        return true;
+    }
+
+    bool RV64ICodePoint_Funct3_BLTU(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(B) RV64I_INSNDEF("bltu", RV64I_BLTU);
+
+        return true;
+    }
+
+    bool RV64ICodePoint_Funct3_BGE(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(B) RV64I_INSNDEF("bge", RV64I_BGE);
+
+        return true;
+    }
+
+    bool RV64ICodePoint_Funct3_BGEU(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(B) RV64I_INSNDEF("bgeu", RV64I_BGEU);
+
+        return true;
+    }
 
     //
 }
@@ -679,17 +861,75 @@ namespace Jasse {
     //
     __RV64I_FUNCT3_CODEGROUP_CONSTRUCTOR(OP_IMM)
     {
-
+        Define(RV32I_FUNCT3_ADDI,           &RV64ICodePoint_Funct3_ADDI);
+        Define(RV32I_FUNCT3_SLTI,           &RV64ICodePoint_Funct3_SLTI);
+        Define(RV32I_FUNCT3_SLTIU,          &RV64ICodePoint_Funct3_SLTIU);
+        Define(RV32I_FUNCT3_ANDI,           &RV64ICodePoint_Funct3_ANDI);
+        Define(RV32I_FUNCT3_ORI,            &RV64ICodePoint_Funct3_ORI);
+        Define(RV32I_FUNCT3_XORI,           &RV64ICodePoint_Funct3_XORI);
+        Define(RV32I_FUNCT3_SLLI,           &RV64ICodePoint_Funct3_SLLI);
+        Define(RV32I_FUNCT3_SRLI__SRAI,     &RV64ICodePoint_Funct3_SRLI__SRAI);
     }
 
     __RV64I_FUNCT3_CODEGROUP_DECONSTRUCTOR(OP_IMM)
     { }
 
     //
+    __RV64I_FUNCT3_CODEGROUP_CONSTRUCTOR(OP_IMM_32)
+    {
+        Define(RV64I_FUNCT3_ADDIW,          &RV64ICodePoint_Funct3_ADDIW);
+        Define(RV64I_FUNCT3_SLLIW,          &RV64ICodePoint_Funct3_SLLIW);
+        Define(RV64I_FUNCT3_SRLIW__SRAIW,   &RV64ICodePoint_Funct3_SRLIW__SRAIW);
+    }
+
+    __RV64I_FUNCT3_CODEGROUP_DECONSTRUCTOR(OP_IMM_32)
+    { }
+
+    //
+    __RV64I_FUNCT3_CODEGROUP_CONSTRUCTOR(OP)
+    {
+        Define(RV32I_FUNCT3_ADD__SUB,       &RV64ICodePoint_Funct3_ADD__SUB);
+        Define(RV32I_FUNCT3_SLT,            &RV64ICodePoint_Funct3_SLT);
+        Define(RV32I_FUNCT3_SLTU,           &RV64ICodePoint_Funct3_SLTU);
+        Define(RV32I_FUNCT3_AND,            &RV64ICodePoint_Funct3_AND);
+        Define(RV32I_FUNCT3_OR,             &RV64ICodePoint_Funct3_OR);
+        Define(RV32I_FUNCT3_XOR,            &RV64ICodePoint_Funct3_XOR);
+        Define(RV32I_FUNCT3_SLL,            &RV64ICodePoint_Funct3_SLL);
+        Define(RV32I_FUNCT3_SRL__SRA,       &RV64ICodePoint_Funct3_SRL__SRA);
+    }
+
+    __RV64I_FUNCT3_CODEGROUP_DECONSTRUCTOR(OP)
+    { }
+
+    //
+    __RV64I_FUNCT3_CODEGROUP_CONSTRUCTOR(OP_32)
+    {
+        Define(RV64I_FUNCT3_ADDW__SUBW,     &RV64ICodePoint_Funct3_ADDW__SUBW);
+        Define(RV64I_FUNCT3_SLLW,           &RV64ICodePoint_Funct3_SLLW);
+        Define(RV64I_FUNCT3_SRLW__SRAW,     &RV64ICodePoint_Funct3_SRLW__SRAW);
+    }
+
+    __RV64I_FUNCT3_CODEGROUP_DECONSTRUCTOR(OP_32)
+    { }
+
+    // 
+    __RV64I_FUNCT3_CODEGROUP_CONSTRUCTOR(BRANCH)
+    {
+        Define(RV32I_FUNCT3_BEQ,            &RV64ICodePoint_Funct3_BEQ);
+        Define(RV32I_FUNCT3_BNE,            &RV64ICodePoint_Funct3_BNE);
+        Define(RV32I_FUNCT3_BLT,            &RV64ICodePoint_Funct3_BLT);
+        Define(RV32I_FUNCT3_BLTU,           &RV64ICodePoint_Funct3_BLTU);
+        Define(RV32I_FUNCT3_BGE,            &RV64ICodePoint_Funct3_BGE);
+        Define(RV32I_FUNCT3_BGEU,           &RV64ICodePoint_Funct3_BGEU);
+    }
+
+    __RV64I_FUNCT3_CODEGROUP_DECONSTRUCTOR(BRANCH)
+    { }
+
+    //
     __RV64I_UNIQUE_CODEGROUP_DEFINE_FUNC(LUI, RV64ICodeGroup_Unique_LUI)
     {
-        DecodeNormalRV64TypeU(insnraw, insn);
-        RV64I_INSNDEF("lui", RV64I_LUI)
+        RV64I_TYPE(U) RV64I_INSNDEF("lui", RV64I_LUI);
 
         return true;
     }
@@ -697,10 +937,30 @@ namespace Jasse {
     //
     __RV64I_UNIQUE_CODEGROUP_DEFINE_FUNC(AUIPC, RV64ICodeGroup_Unique_AUIPC)
     {
-        DecodeNormalRV64TypeU(insnraw, insn);
-        RV64I_INSNDEF("auipc", RV64I_AUIPC)
+        RV64I_TYPE(U) RV64I_INSNDEF("auipc", RV64I_AUIPC);
 
         return true;
+    }
+
+    //
+    __RV64I_UNIQUE_CODEGROUP_DEFINE_FUNC(JAL, RV64ICodeGroup_Unique_JAL)
+    {
+        RV64I_TYPE(J) RV64I_INSNDEF("jal", RV64I_JAL);
+
+        return true;
+    }
+
+    //
+    __RV64I_UNIQUE_CODEGROUP_DEFINE_FUNC(JALR, RV64ICodeGroup_Unique_JALR)
+    {
+        if (GET_STD_OPERAND(insnraw, RV32I_FUNCT3) == RV32I_FUNCT3_JALR)
+        {
+            RV64I_TYPE(I) RV64I_INSNDEF("jalr", RV64I_JALR);
+
+            return true;
+        }
+        else
+            return false;
     }
 }
 

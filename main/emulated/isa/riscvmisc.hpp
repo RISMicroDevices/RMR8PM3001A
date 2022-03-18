@@ -9,7 +9,10 @@
 
 
 #define IMM64_SIGNEXT32(imm) \
-    (imm.imm64 = (arch64_t)((int32_t)imm.imm32), imm);
+    (imm.imm64 = (arch64_t)((int32_t)imm.imm32), imm)
+
+#define SEXT_W(expr) \
+    ((uint64_t)((int32_t)(expr)))
 
 
 namespace Jasse {
