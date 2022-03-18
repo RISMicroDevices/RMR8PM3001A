@@ -22,6 +22,12 @@ namespace Jasse {
     // Type definition of Architectural Register Value of XLEN=64
     typedef     uint64_t        arch64_t;
 
+    // Type definition of Memory Address of XLEN=32/64 (64 bits unified in emulation, zero extension)
+    typedef     uint32_t        addr32_t;
+    typedef     uint64_t        addr64_t;
+
+    typedef     addr64_t        addr_t;
+
     // Type definition of Immediate Value of XLEN=32/64
     typedef union {
         arch64_t    imm64 = 0;
@@ -67,7 +73,37 @@ namespace Jasse {
 
     // RISC-V General Registers container of XLEN=64
     using RVGeneralRegisters64  = RVGeneralRegisters<arch64_t>;
+    
 
+    // RISC-V Memory Operation Status
+    typedef enum {
+        MOP_SUCCESS = 0,
+        MOP_ADDRESS_MISALIGNED,
+        MOP_ACCESS_FAULT
+    } RVMOPStatus;
+
+    // RISC-V Memory Opeation Width
+    typedef uint64_t        RVMOPWidth;
+
+    static constexpr RVMOPWidth MOPW_BYTE           = 0x00000000000000FFUL;
+    static constexpr RVMOPWidth MOPW_HALF_WORD      = 0x000000000000FFFFUL;
+    static constexpr RVMOPWidth MOPW_WORD           = 0x00000000FFFFFFFFUL;
+    static constexpr RVMOPWidth MOPW_DOUBLE_WORD    = 0xFFFFFFFFFFFFFFFFUL;
+
+    // Type definition of RISC-V Memory Data
+    typedef union {
+        uint8_t     data8;      // byte
+        uint16_t    data16;     // half-word
+        uint32_t    data32;     // word
+        uint64_t    data64;     // double-word  
+    } data_t;
+
+    // RISC-V Memory Interface (Proxy in case of RVWMO) 
+    class RVMemoryInterface { // *pure virtual*
+    public:
+        virtual RVMOPStatus     Read (addr_t address, RVMOPWidth width, data_t* dst) = 0;
+        virtual RVMOPStatus     Write(addr_t address, RVMOPWidth width, data_t  src) = 0;
+    };
 
 
     // X-Len Enumeration
@@ -87,10 +123,12 @@ namespace Jasse {
 
         RVGeneralRegisters64*   _GR64;
 
+        RVMemoryInterface*      _MI;
+
         // TODO
 
     public:
-        RVArchitectural(XLen XLEN);
+        RVArchitectural(XLen XLEN, RVMemoryInterface* MI);
         RVArchitectural(const RVArchitectural& obj);
         ~RVArchitectural();
 
@@ -101,6 +139,8 @@ namespace Jasse {
         void                            SetPC32(arch32_t pc);
         void                            SetPC64(arch64_t pc);
 
+        void                            SetMI(RVMemoryInterface* MI);
+
         bool                            IsGR32() const;
         bool                            IsGR64() const;
 
@@ -108,6 +148,9 @@ namespace Jasse {
         RVGeneralRegisters32&           GR32();
         const RVGeneralRegisters64&     GR64() const;
         RVGeneralRegisters64&           GR64();
+
+        const RVMemoryInterface*        MI() const;
+        RVMemoryInterface*              MI();
 
         // TODO
     };
@@ -237,6 +280,7 @@ namespace Jasse {
         bool                Decode(insnraw_t insnraw, RVInstruction& insn) const;
     };
 
+
     // RISC-V Instance
     class RVInstance {
 
@@ -319,11 +363,14 @@ namespace Jasse {
     RVGeneralRegisters32*   _GR32;
 
     RVGeneralRegisters64*   _GR64;
+
+    RVMemoryInterface*      _MI;
     */
 
-    RVArchitectural::RVArchitectural(XLen XLEN)
+    RVArchitectural::RVArchitectural(XLen XLEN, RVMemoryInterface* MI)
         : _XLEN (XLEN)
         , _PC   (pc_t())
+        , _MI   (MI)
     {
         switch (XLEN)
         {
@@ -391,6 +438,11 @@ namespace Jasse {
         _PC.pc64 = pc;
     }
 
+    inline void RVArchitectural::SetMI(RVMemoryInterface* MI)
+    {
+        _MI = MI;
+    }
+
     inline bool RVArchitectural::IsGR32() const
     {
         return _GR32;
@@ -431,6 +483,16 @@ namespace Jasse {
             throw std::logic_error("non-GR64 arch");
         
         return *_GR64;
+    }
+
+    const RVMemoryInterface* RVArchitectural::MI() const
+    {
+        return _MI;
+    }
+
+    RVMemoryInterface* RVArchitectural::MI()
+    {
+        return _MI;
     }
 }
 
