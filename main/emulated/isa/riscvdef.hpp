@@ -5,6 +5,33 @@
 //
 //
 
+
+// Global type definitions
+namespace Jasse {
+
+    // Type definition of Architectural Register Value of XLEN=32
+    typedef     uint32_t        arch32_t;
+
+    // Type definition of Architectural Register Value of XLEN=64
+    typedef     uint64_t        arch64_t;
+
+    // Type definition of Immediate Value of XLEN=32/64
+    typedef union {
+        arch64_t    imm64 = 0;
+        arch32_t    imm32;
+    } imm_t;
+
+    // Type definition of PC Register Value of XLEN=32/64
+    typedef union {
+        arch64_t    pc64 = 0;
+        arch32_t    pc32;
+    } pc_t;
+
+    // Type definition of Raw Instruction
+    typedef     uint32_t        insnraw_t;
+}
+
+
 // Standard operand format
 #define GET_OPERAND(insn, mask, offset) \
     ((insn & mask) >> offset)
