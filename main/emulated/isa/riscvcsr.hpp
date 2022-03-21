@@ -437,7 +437,6 @@ namespace Jasse {
         virtual RVCSR*          Clone() = 0;
 
         virtual bool            CheckBitBound(int bit) noexcept;
-        virtual RVCSRFieldSpec  GetSpec(int bit) noexcept = 0;
 
         virtual csr_t           GetValue() noexcept = 0;
         virtual void            SetValue(csr_t value) noexcept = 0;
