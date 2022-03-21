@@ -8,3 +8,6 @@
 
 # cross-project & cross-platform shared folders
 **/shared/
+
+# untracked local files
+**/__untracked__**/
