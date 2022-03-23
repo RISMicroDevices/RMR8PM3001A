@@ -12,12 +12,12 @@
 #define CSR_mtvec_FIELD_MODE_OFFSET                 0
 
 // BASE field   - [63:2]    (MXLEN=64 only)
-#define CSR_mtvec_FIELD_BASE64_MASK                 0xFFFFFFFF_FFFFFFFCUL
-#define CSR_mtvec_FIELD_BASE64_OFFSET               0
+#define CSR_mtvec_FIELD_BASE_MX64_MASK              0xFFFFFFFF'FFFFFFFCUL
+#define CSR_mtvec_FIELD_BASE_MX64_OFFSET            0
 
 // BASE field   - [31:2]    (MXLEN=32 only)
-#define CSR_mtvec_FIELD_BASE32_MASK                 0xFFFFFFFCU
-#define CSR_mtvec_FIELD_BASE32_OFFSET               0
+#define CSR_mtvec_FIELD_BASE_MX32_MASK              0xFFFFFFFCU
+#define CSR_mtvec_FIELD_BASE_MX32_OFFSET            0
 
 
 //

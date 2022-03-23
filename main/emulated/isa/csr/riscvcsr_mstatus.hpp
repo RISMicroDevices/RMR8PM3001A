@@ -72,28 +72,28 @@
 #define CSR_mstatus_FIELD_TSR_OFFSET            22
 
 // UXL field    - [33:32]
-#define CSR_mstatus_FIELD_UXL_MASK              0x00000003_00000000UL
+#define CSR_mstatus_FIELD_UXL_MASK              0x00000003'00000000UL
 #define CSR_mstatus_FIELD_UXL_OFFSET            32
 
 // SXL field    - [35:34]
-#define CSR_mstatus_FIELD_SXL_MASK              0x0000000C_00000000UL
+#define CSR_mstatus_FIELD_SXL_MASK              0x0000000C'00000000UL
 #define CSR_mstatus_FIELD_SXL_OFFSET            34
 
 // SBE field    - [36]
-#define CSR_mstatus_FIELD_SBE_MASK              0x00000010_00000000UL
+#define CSR_mstatus_FIELD_SBE_MASK              0x00000010'00000000UL
 #define CSR_mstatus_FIELD_SBE_OFFSET            36
 
 // MBE field    - [37]
-#define CSR_mstatus_FIELD_MBE_MASK              0x00000020_00000000UL
+#define CSR_mstatus_FIELD_MBE_MASK              0x00000020'00000000UL
 #define CSR_mstatus_FIELD_MBE_OFFSET            37
 
 // SD field     - [63]
-#define CSR_mstatus_FIELD_SD_MASK               0x80000000_00000000UL
-#define CSR_mstatus_FIELD_SD_OFFSET             63
+#define CSR_mstatus_FIELD_SD_MX64_MASK          0x80000000'00000000UL
+#define CSR_mstatus_FIELD_SD_MX64_OFFSET        63
 
 // SD field     - [31] (RV32 only)
-#define CSR_mstatus_FIELD_SD32_MASK             0x80000000U
-#define CSR_mstatus_FIELD_SD32_OFFSET           31
+#define CSR_mstatus_FIELD_SD_MX32_MASK          0x80000000U
+#define CSR_mstatus_FIELD_SD_MX32_OFFSET        31
 
 
 //

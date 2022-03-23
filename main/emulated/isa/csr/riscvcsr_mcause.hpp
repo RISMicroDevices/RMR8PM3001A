@@ -8,20 +8,20 @@
 #include "riscvcsr.hpp"
 
 // Interrupt field      - [63]  (MXLEN=64 only)
-#define CSR_mcause_FIELD_INTERRUPT64_MASK               0x80000000_00000000UL
-#define CSR_mcause_FIELD_INTERRUPT64_OFFSET             63
+#define CSR_mcause_FIELD_INTERRUPT_MX64_MASK            0x80000000'00000000UL
+#define CSR_mcause_FIELD_INTERRUPT_MX64_OFFSET          63
 
 // Interrupt field      - [31]  (MXLEN=32 only)
-#define CSR_mcause_FIELD_INTERRUPT32_MASK               0x80000000U
-#define CSR_mcause_FIELD_INTERRUPT32_OFFSET             31
+#define CSR_mcause_FIELD_INTERRUPT_MX32_MASK            0x80000000U
+#define CSR_mcause_FIELD_INTERRUPT_MX32_OFFSET          31
 
 // Exception code field - [0]   (MXLEN=64 only)
-#define CSR_mcause_FIELD_EXCEPTION_CODE64_MASK          0x7FFFFFFF_FFFFFFFFUL
-#define CSR_mcause_FIELD_EXCEPTION_CODE64_OFFSET        0
+#define CSR_mcause_FIELD_EXCEPTION_CODE_MX64_MASK       0x7FFFFFFF'FFFFFFFFUL
+#define CSR_mcause_FIELD_EXCEPTION_CODE_MX64_OFFSET     0
 
 // Exception code field - [0]   (MXLEN=32 only)
-#define CSR_mcause_FIELD_EXCEPTION_CODE32_MASK          0x7FFFFFFFU
-#define CSR_mcause_FIELD_EXCEPTION_CODE32_OFFSET        0
+#define CSR_mcause_FIELD_EXCEPTION_CODE_MX32_MASK       0x7FFFFFFFU
+#define CSR_mcause_FIELD_EXCEPTION_CODE_MX32_OFFSET     0
 
 
 //
