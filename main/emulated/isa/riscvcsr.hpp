@@ -382,6 +382,16 @@
 #define CSR_dscratch1               0x7B3       // Debug scratch register 1
 
 
+//
+#define GET_CSR_FIELD(value, name) \
+    ((value & name##_MASK) >> name##_OFFSET)
+
+#define SET_CSR_BITS(value, mask) \
+    (value | mask)
+
+#define CLEAR_CSR_BITS(value, mask) \
+    (value & ~mask)
+
 
 namespace Jasse {
 
@@ -502,6 +512,7 @@ namespace Jasse {
 
         bool    CheckBound(int index) const noexcept;
 
+        void    SetCSRs(std::initializer_list<const RVCSRDefinition> list) noexcept;
         void    SetCSR(const RVCSRDefinition definition) noexcept;
         void    SetCSR(int address, const RVCSRAllocator allocator) noexcept;
         RVCSR*  GetCSR(int address) noexcept;
@@ -687,8 +698,7 @@ namespace Jasse {
     RVCSRSpace::RVCSRSpace(std::initializer_list<const RVCSRDefinition> list)
         : subspaces (new SubspaceL1*[__RVCSRSPACE_ARR_SIZE]())
     { 
-        for (auto iter = list.begin(); iter != list.end(); iter++)
-            SetCSR(*iter);
+        SetCSRs(list);
     }
 
     RVCSRSpace::RVCSRSpace(const RVCSRSpace& obj)
@@ -713,6 +723,12 @@ namespace Jasse {
     inline bool RVCSRSpace::CheckBound(int index) const noexcept
     {
         return index >= 0 && index < (1 << 12);
+    }
+
+    void RVCSRSpace::SetCSRs(std::initializer_list<const RVCSRDefinition> list) noexcept
+    {
+        for (auto iter = list.begin(); iter != list.end(); iter++)
+            SetCSR(*iter);
     }
 
     inline void RVCSRSpace::SetCSR(const RVCSRDefinition definition) noexcept

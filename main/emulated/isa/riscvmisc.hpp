@@ -8,11 +8,28 @@
 #include "riscv.hpp"
 
 
-#define IMM64_SIGNEXT32(imm) \
-    (imm.imm64 = (arch64_t)((int32_t)imm.imm32), imm)
-
 #define SEXT_W(expr) \
     ((uint64_t)((int32_t)(expr)))
+
+#define SEXT_H(expr) \
+    ((uint64_t)((int16_t)(expr)))
+
+#define SEXT_B(expr) \
+    ((uint64_t)((int8_t)(expr)))
+
+#define ZEXT_W(expr) \
+    ((uint64_t)((uint32_t)(expr)))
+
+#define ZEXT_H(expr) \
+    ((uint64_t)((uint16_t)(expr)))
+
+#define ZEXT_B(expr) \
+    ((uint64_t)((uint8_t)(expr)))
+
+
+#define IMM64_SEXT_W(imm) \
+    (imm.imm64 = SEXT_W(imm.imm32), imm)
+
 
 
 namespace Jasse {
@@ -91,7 +108,7 @@ namespace Jasse {
     {
         imm_t imm = DecodeRV32ImmediateTypeI(insnraw);
 
-        return IMM64_SIGNEXT32(imm);
+        return IMM64_SEXT_W(imm);
     }
 
     imm_t DecodeRV32ImmediateTypeS(insnraw_t insnraw)
@@ -110,7 +127,7 @@ namespace Jasse {
     {
         imm_t imm = DecodeRV32ImmediateTypeS(insnraw);
 
-        return IMM64_SIGNEXT32(imm);
+        return IMM64_SEXT_W(imm);
     }
 
     imm_t DecodeRV32ImmediateTypeB(insnraw_t insnraw)
@@ -130,7 +147,7 @@ namespace Jasse {
     {
         imm_t imm = DecodeRV32ImmediateTypeB(insnraw);
 
-        return IMM64_SIGNEXT32(imm);
+        return IMM64_SEXT_W(imm);
     }
 
     imm_t DecodeRV32ImmediateTypeU(insnraw_t insnraw)
@@ -147,7 +164,7 @@ namespace Jasse {
     {
         imm_t imm = DecodeRV32ImmediateTypeU(insnraw);
 
-        return IMM64_SIGNEXT32(imm);
+        return IMM64_SEXT_W(imm);
     }
 
     imm_t DecodeRV32ImmediateTypeJ(insnraw_t insnraw)
@@ -167,7 +184,7 @@ namespace Jasse {
     {
         imm_t imm = DecodeRV32ImmediateTypeJ(insnraw);
 
-        return IMM64_SIGNEXT32(imm);
+        return IMM64_SEXT_W(imm);
     }
 }
 
