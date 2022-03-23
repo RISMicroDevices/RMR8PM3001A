@@ -11,6 +11,7 @@
 
 #include "riscv.hpp"
 #include "riscvmisc.hpp"
+#include "riscvexcept.hpp"
 #include "riscv_32i.hpp"
 
 
@@ -31,6 +32,10 @@
 #define RV64I_FUNCT3_SRLW                       0b101
 #define RV64I_FUNCT3_SRAW                       0b101
 #define RV64I_FUNCT3_SRLW__SRAW                 0b101
+
+#define RV64I_FUNCT3_LD                         0b011
+#define RV64I_FUNCT3_LWU                        0b110
+#define RV64I_FUNCT3_SD                         0b011
 
 
 // Function-6
@@ -263,21 +268,21 @@ namespace Jasse {
     void RV64I_SLLI(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
-            = arch.GR64()[insn.GetRS1()] << insn.GetOperand(SHAMT6);
+            = arch.GR64()[insn.GetRS1()] << insn.GetOperand(RVOPERAND_SHAMT6);
     }
 
     // SRLI
     void RV64I_SRLI(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
-            = (uint64_t)arch.GR64()[insn.GetRS1()] >> insn.GetOperand(SHAMT6);
+            = (uint64_t)arch.GR64()[insn.GetRS1()] >> insn.GetOperand(RVOPERAND_SHAMT6);
     }
 
     // SRAI
     void RV64I_SRAI(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
-            = (int64_t)arch.GR64()[insn.GetRS1()] >> insn.GetOperand(SHAMT6);
+            = (int64_t)arch.GR64()[insn.GetRS1()] >> insn.GetOperand(RVOPERAND_SHAMT6);
     }
 
 
@@ -292,21 +297,21 @@ namespace Jasse {
     void RV64I_SLLIW(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
-            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] << insn.GetOperand(SHAMT5));
+            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] << insn.GetOperand(RVOPERAND_SHAMT5));
     }
 
     // SRLIW
     void RV64I_SRLIW(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
-            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] >> insn.GetOperand(SHAMT5));
+            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] >> insn.GetOperand(RVOPERAND_SHAMT5));
     }
 
     // SRAIW
     void RV64I_SRAIW(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
-            = SEXT_W((int32_t)arch.GR64()[insn.GetRS1()] >> insn.GetOperand(SHAMT5));
+            = SEXT_W((int32_t)arch.GR64()[insn.GetRS1()] >> insn.GetOperand(RVOPERAND_SHAMT5));
     }
 
 
@@ -496,6 +501,222 @@ namespace Jasse {
     }
 
 
+
+    inline void __RV64I_MEMORYIO_EXCEPTION(const RVInstruction& insn, RVArchitectural& arch, RVTrapCause cause, addr_t address)
+    {
+        // Writing into 'mtval'
+        // *NOTICE: Action of writing address into 'mtval' is just an implementation-decided
+        //          behaviour, not necessary according to privileged specification.
+        //          If this action is not included in your processor or implementation, you
+        //          could disable this action by "commenting" this part of code.
+        RVCSR* mtval = arch.CSR()->GetCSR(CSR_mtval);
+
+        if (mtval)
+            mtval->SetValue(address);
+        //
+
+        Trap(arch, TRAP_EXCEPTION, cause);
+    }
+
+    inline void __RV64I_LOAD_EXCEPTION(const RVInstruction& insn, RVArchitectural& arch, RVMOPStatus status, addr_t address)
+    {
+        RVTrapCause cause;
+
+        switch (status)
+        {
+            case MOP_ADDRESS_MISALIGNED:
+                cause = EXCEPTION_LOAD_ADDRESS_MISALIGNED;
+                break;
+
+            case MOP_ACCESS_FAULT:
+                cause = EXCEPTION_LOAD_ACCESS_FAULT;
+                break;
+
+            default:
+                // SHOULD_NOT_REACH_HERE()
+        }
+
+        __RV64I_MEMORYIO_EXCEPTION(insn, arch, cause, address);
+    }
+
+    // LD
+    void RV64I_LD(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
+        data_t data;
+
+        RVMOPStatus status 
+            = arch.MI()->Read(addr, MOPW_DOUBLE_WORD, &data);
+
+        if (status == MOP_SUCCESS)
+            arch.GR64()[insn.GetRD()] = data.data64;
+        else
+            __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
+    }
+
+    // LW
+    void RV64I_LW(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
+        data_t data;
+
+        RVMOPStatus status 
+            = arch.MI()->Read(addr, MOPW_WORD, &data);
+
+        if (status == MOP_SUCCESS)
+            arch.GR64()[insn.GetRD()] = SEXT_W(data.data32);
+        else
+            __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
+    }
+
+    // LH
+    void RV64I_LH(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
+        data_t data;
+
+        RVMOPStatus status 
+            = arch.MI()->Read(addr, MOPW_HALF_WORD, &data);
+
+        if (status == MOP_SUCCESS)
+            arch.GR64()[insn.GetRD()] = SEXT_H(data.data16);
+        else
+            __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
+    }
+
+    // LB
+    void RV64I_LB(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
+        data_t data;
+
+        RVMOPStatus status
+            = arch.MI()->Read(addr, MOPW_BYTE, &data);
+
+        if (status == MOP_SUCCESS)
+            arch.GR64()[insn.GetRD()] = SEXT_B(data.data8);
+        else
+            __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
+    }
+
+    // LWU
+    void RV64I_LWU(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
+        data_t data;
+
+        RVMOPStatus status 
+            = arch.MI()->Read(addr, MOPW_WORD, &data);
+
+        if (status == MOP_SUCCESS)
+            arch.GR64()[insn.GetRD()] = ZEXT_W(data.data32);
+        else
+            __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
+    }
+
+    // LHU
+    void RV64I_LHU(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
+        data_t data;
+
+        RVMOPStatus status 
+            = arch.MI()->Read(addr, MOPW_HALF_WORD, &data);
+
+        if (status == MOP_SUCCESS)
+            arch.GR64()[insn.GetRD()] = ZEXT_H(data.data16);
+        else
+            __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
+    }
+
+    // LBU
+    void RV64I_LBU(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
+        data_t data;
+
+        RVMOPStatus status
+            = arch.MI()->Read(addr, MOPW_BYTE, &data);
+
+        if (status == MOP_SUCCESS)
+            arch.GR64()[insn.GetRD()] = ZEXT_B(data.data8);
+        else
+            __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
+    }
+
+
+    inline void __RV64I_STORE_EXCEPTION(const RVInstruction& insn, RVArchitectural& arch, RVMOPStatus status, addr_t address)
+    {
+        RVTrapCause cause;
+
+        switch (status)
+        {
+            case MOP_ADDRESS_MISALIGNED:
+                cause = EXCEPTION_STORE_ADDRESS_MISALIGNED;
+                break;
+
+            case MOP_ACCESS_FAULT:
+                cause = EXCEPTION_STORE_ACCESS_FAULT;
+                break;
+
+            default:
+                // SHOULD_NOT_REACH_HERE()
+        }
+
+        __RV64I_MEMORYIO_EXCEPTION(insn, arch, cause, address);
+    }
+    
+    // SD
+    void RV64I_SD(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        addr_t addr =   arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
+        data_t data = { arch.GR64()[insn.GetRS2()] };
+
+        RVMOPStatus status 
+            = arch.MI()->Write(addr, MOPW_DOUBLE_WORD, data);
+
+        if (status != MOP_SUCCESS)
+            __RV64I_STORE_EXCEPTION(insn, arch, status, addr);
+    }
+
+    // SW
+    void RV64I_SW(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        addr_t addr =   arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
+        data_t data = { arch.GR64()[insn.GetRS2()] };
+
+        RVMOPStatus status 
+            = arch.MI()->Write(addr, MOPW_WORD, data);
+
+        if (status != MOP_SUCCESS)
+            __RV64I_STORE_EXCEPTION(insn, arch, status, addr);
+    }
+
+    // SH
+    void RV64I_SH(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        addr_t addr =   arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
+        data_t data = { arch.GR64()[insn.GetRS2()] };
+
+        RVMOPStatus status
+            = arch.MI()->Write(addr, MOPW_HALF_WORD, data);
+
+        if (status != MOP_SUCCESS)
+            __RV64I_STORE_EXCEPTION(insn, arch, status, addr);
+    }
+
+    // SB
+    void RV64I_SB(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        addr_t addr =   arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
+        data_t data = { arch.GR64()[insn.GetRS2()] };
+
+        RVMOPStatus status
+            = arch.MI()->Write(addr, MOPW_BYTE, data);
+
+        if (status != MOP_SUCCESS)
+            __RV64I_STORE_EXCEPTION(insn, arch, status, addr);
+    }
 }
 
 
@@ -854,6 +1075,85 @@ namespace Jasse {
     }
 
     //
+    bool RV64ICodePoint_Funct3_LD(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(I) RV64I_INSNDEF("ld", RV64I_LD);
+
+        return true;
+    }
+
+    bool RV64ICodePoint_Funct3_LW(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(I) RV64I_INSNDEF("lw", RV64I_LW);
+
+        return true;
+    }
+
+    bool RV64ICodePoint_Funct3_LH(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(I) RV64I_INSNDEF("lh", RV64I_LH);
+
+        return true;
+    }
+
+    bool RV64ICodePoint_Funct3_LB(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(I) RV64I_INSNDEF("lb", RV64I_LB);
+
+        return true;
+    }
+
+    bool RV64ICodePoint_Funct3_LWU(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(I) RV64I_INSNDEF("lwu", RV64I_LWU);
+
+        return true;
+    }
+
+    bool RV64ICodePoint_Funct3_LHU(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(I) RV64I_INSNDEF("lhu", RV64I_LHU);
+
+        return true;
+    }
+
+    bool RV64ICodePoint_Funct3_LBU(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(I) RV64I_INSNDEF("lbu", RV64I_LBU);
+
+        return true;
+    }
+
+    //
+    bool RV64ICodePoint_Funct3_SD(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(S) RV64I_INSNDEF("sd", RV64I_SD);
+
+        return true;
+    }
+
+    bool RV64ICodePoint_Funct3_SW(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(S) RV64I_INSNDEF("sw", RV64I_SW);
+
+        return true;
+    }
+
+    bool RV64ICodePoint_Funct3_SH(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(S) RV64I_INSNDEF("sh", RV64I_SH);
+
+        return true;
+    }
+
+    bool RV64ICodePoint_Funct3_SB(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(S) RV64I_INSNDEF("sb", RV64I_SB);
+
+        return true;
+    }
+
+    // TODO MISC-MEM SYSTEM
 }
 
 // codegroups
@@ -924,6 +1224,33 @@ namespace Jasse {
     }
 
     __RV64I_FUNCT3_CODEGROUP_DECONSTRUCTOR(BRANCH)
+    { }
+
+    //
+    __RV64I_FUNCT3_CODEGROUP_CONSTRUCTOR(LOAD)
+    {
+        Define(RV64I_FUNCT3_LD,             &RV64ICodePoint_Funct3_LD);
+        Define(RV32I_FUNCT3_LW,             &RV64ICodePoint_Funct3_LW);
+        Define(RV32I_FUNCT3_LH,             &RV64ICodePoint_Funct3_LH);
+        Define(RV32I_FUNCT3_LB,             &RV64ICodePoint_Funct3_LB);
+        Define(RV64I_FUNCT3_LWU,            &RV64ICodePoint_Funct3_LWU);
+        Define(RV32I_FUNCT3_LHU,            &RV64ICodePoint_Funct3_LHU);
+        Define(RV32I_FUNCT3_LBU,            &RV64ICodePoint_Funct3_LBU);
+    }
+
+    __RV64I_FUNCT3_CODEGROUP_DECONSTRUCTOR(LOAD)
+    { }
+
+    // 
+    __RV64I_FUNCT3_CODEGROUP_CONSTRUCTOR(STORE)
+    {
+        Define(RV64I_FUNCT3_SD,             &RV64ICodePoint_Funct3_SD);
+        Define(RV32I_FUNCT3_SW,             &RV64ICodePoint_Funct3_SW);
+        Define(RV32I_FUNCT3_SH,             &RV64ICodePoint_Funct3_SH);
+        Define(RV32I_FUNCT3_SB,             &RV64ICodePoint_Funct3_SB);
+    }
+
+    __RV64I_FUNCT3_CODEGROUP_DECONSTRUCTOR(STORE)
     { }
 
     //
