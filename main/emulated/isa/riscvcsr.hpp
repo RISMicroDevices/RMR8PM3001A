@@ -383,9 +383,19 @@
 
 
 //
-#define GET_CSR_FIELD(value, name) \
-    ((value & name##_MASK) >> name##_OFFSET)
+#define GET_CSR_FIELD(src, name) \
+    ((src & name##_MASK) >> name##_OFFSET)
 
+#define GET_CSR_MXFIELD(src, name, mxlen) \
+    ((src & name##mxlen##_MASK) >> name##mxlen##_OFFSET)
+
+#define SET_CSR_FIELD(dst, name, value) \
+    dst = ((dst & ~name##_MASK) | ((value << name##_OFFSET) & name##_MASK))
+
+#define SET_CSR_MXFIELD(dst, name, value, mxlen) \
+    dst = ((dst & ~name##_##mxlen##_MASK) | ((value << name##_##mxlen##_OFFSET) & name##_##mxlen##_MASK))
+
+//
 #define SET_CSR_BITS(value, mask) \
     (value | mask)
 
@@ -402,7 +412,11 @@ namespace Jasse {
     static constexpr RVPrivLevel    PRIV_SUPERVISOR     = 0b01; // S: Supervisor
     static constexpr RVPrivLevel    PRIV_MACHINE        = 0b11; // M: Machine
 
-    // Type definition of normal CSR value (M/S/UXLEN=64 currently supported only)
+    // Type definition of normal CSR value
+    // *Notice: In Jasse implementation, MXLEN is bounded to XLEN.
+    //          The actual width of CSR in memory is decided by the maximum XLEN supported.
+    //          CSR width modulation is simpilifed, and any MXLEN related implementation
+    //          should refer to XLEN value.
     typedef     uint64_t        csr_t;
 
     // CSR Access
@@ -515,9 +529,9 @@ namespace Jasse {
         void    SetCSRs(std::initializer_list<const RVCSRDefinition> list) noexcept;
         void    SetCSR(const RVCSRDefinition definition) noexcept;
         void    SetCSR(int address, const RVCSRAllocator allocator) noexcept;
-        RVCSR*  GetCSR(int address) noexcept;
+        RVCSR*  GetCSR(int address) const noexcept;
         
-        RVCSR*  RequireCSR(int address, const char* hint_name = nullptr);
+        RVCSR*  RequireCSR(int address, const char* hint_name = nullptr) const;
 
         void    operator=(const RVCSRSpace& obj) = delete;
     };
@@ -746,7 +760,7 @@ namespace Jasse {
         subspaces[index]->SetCSR(address, allocator);
     }
 
-    RVCSR* RVCSRSpace::GetCSR(int address) noexcept
+    RVCSR* RVCSRSpace::GetCSR(int address) const noexcept
     {
         int index = (address & 0xF00) >> 8;
 
@@ -756,7 +770,7 @@ namespace Jasse {
             return subspaces[index]->GetCSR(address);
     }
 
-    RVCSR* RVCSRSpace::RequireCSR(int address, const char* hint_name)
+    RVCSR* RVCSRSpace::RequireCSR(int address, const char* hint_name) const
     {
         int index = (address & 0xF00) >> 8;
 

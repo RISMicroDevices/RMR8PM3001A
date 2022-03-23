@@ -14,6 +14,7 @@
 
 #include "riscvdef.hpp"
 #include "riscvmem.hpp"
+#include "riscvcsr.hpp"
 
 
 namespace Jasse {
@@ -67,10 +68,12 @@ namespace Jasse {
 
         RVMemoryInterface*      _MI;
 
+        RVCSRSpace*             _CSR;
+
         // TODO
 
     public:
-        RVArchitectural(XLen XLEN, RVMemoryInterface* MI);
+        RVArchitectural(XLen XLEN, RVMemoryInterface* MI, RVCSRSpace* CSR);
         RVArchitectural(const RVArchitectural& obj);
         ~RVArchitectural();
 
@@ -82,6 +85,7 @@ namespace Jasse {
         void                            SetPC64(arch64_t pc);
 
         void                            SetMI(RVMemoryInterface* MI);
+        void                            SetCSR(RVCSRSpace* CSR);
 
         bool                            IsGR32() const;
         bool                            IsGR64() const;
@@ -94,79 +98,85 @@ namespace Jasse {
         const RVMemoryInterface*        MI() const;
         RVMemoryInterface*              MI();
 
+        const RVCSRSpace*               CSR() const;
+        RVCSRSpace*                     CSR();
+
         // TODO
     };
 
 
     // Enumeration of RISC-V special operands
     typedef enum {
-        SHAMT5 = 0,
-        SHAMT6,
-        CSR,
-        CSR_UIMM
+        RVOPERAND_SHAMT5 = 0,
+        RVOPERAND_SHAMT6,
+        RVOPERAND_CSR,
+        RVOPERAND_CSR_UIMM
     } RVSpecialOperand;
 
-    // RISC-V Decoded Instruction Textualizer
-    typedef std::string (*RVInstructionTextualizer)(const RVInstruction&);
-
-    // RISC-V Decoded Instruction Executor
-    typedef void        (*RVInstructionExecutor)(const RVInstruction&, RVArchitectural&);
+    
 
     // RISC-V Decoded Instruction
     class RVInstruction {
+    public:
+        // RISC-V Decoded Instruction Textualizer
+        typedef std::string (*Textualizer)(const RVInstruction&);
+
+        // RISC-V Decoded Instruction Executor
+        typedef void        (*Executor)(const RVInstruction&, RVArchitectural&);
+
     private:
-        insnraw_t                   insn;
+        insnraw_t       insn;
 
-        imm_t                       imm;
-        int                         rd;
-        int                         rs1;
-        int                         rs2;
+        imm_t           imm;
+        int             rd;
+        int             rs1;
+        int             rs2;
 
-        std::string                 name;
+        std::string     name;
         
-        RVInstructionTextualizer    textualizer;
-        RVInstructionExecutor       executor;
+        Textualizer     textualizer;
+        Executor        executor;
 
     public:
         RVInstruction(
-            insnraw_t                   insn,
-            imm_t                       imm,
-            int                         rd, 
-            int                         rs1, 
-            int                         rs2, 
-            std::string                 name,
-            RVInstructionTextualizer    textualizer,
-            RVInstructionExecutor       executor);
+            insnraw_t       insn,
+            imm_t           imm,
+            int             rd, 
+            int             rs1, 
+            int             rs2, 
+            std::string     name,
+            Textualizer     textualizer,
+            Executor        executor);
 
         RVInstruction();
         RVInstruction(const RVInstruction& obj);
         ~RVInstruction();
 
-        insnraw_t                   GetRaw() const;
-        imm_t                       GetImmediate() const;
-        int                         GetRD() const;
-        int                         GetRS1() const;
-        int                         GetRS2() const;
-        int                         GetOperand(RVSpecialOperand operand) const;
+        insnraw_t               GetRaw() const;
+        imm_t                   GetImmediate() const;
+        int                     GetRD() const;
+        int                     GetRS1() const;
+        int                     GetRS2() const;
+        int                     GetOperand(RVSpecialOperand operand) const;
 
-        const std::string&          GetName() const;
+        const std::string&      GetName() const;
 
-        RVInstructionTextualizer    GetTextualizer() const;
-        RVInstructionExecutor       GetExecutor() const;
+        Textualizer             GetTextualizer() const;
+        Executor                GetExecutor() const;
 
-        void                        SetRaw(insnraw_t insn);
-        void                        SetImmediate(imm_t imm);
-        void                        SetRD(int rd);
-        void                        SetRS1(int rs1);
-        void                        SetRS2(int rs2);
+        void                    SetRaw(insnraw_t insn);
+        void                    SetImmediate(imm_t imm);
+        void                    SetRD(int rd);
+        void                    SetRS1(int rs1);
+        void                    SetRS2(int rs2);
 
-        void                        SetName(const std::string& name);
+        void                    SetName(const std::string& name);
 
-        void                        SetTextualizer(RVInstructionTextualizer textualizer);
-        void                        SetExecutor(RVInstructionExecutor executor);
+        void                    SetTextualizer(Textualizer textualizer);
+        void                    SetExecutor(Executor executor);
 
-        void                        Execute(RVArchitectural& arch) const;
-        std::string                 ToString() const;
+        void                    Execute(RVArchitectural& arch) const;
+        std::string             ToString() const;
     };
 
 
@@ -309,10 +319,11 @@ namespace Jasse {
     RVMemoryInterface*      _MI;
     */
 
-    RVArchitectural::RVArchitectural(XLen XLEN, RVMemoryInterface* MI)
+    RVArchitectural::RVArchitectural(XLen XLEN, RVMemoryInterface* MI, RVCSRSpace* CSR)
         : _XLEN (XLEN)
         , _PC   (pc_t())
         , _MI   (MI)
+        , _CSR  (CSR)
     {
         switch (XLEN)
         {
@@ -385,6 +396,11 @@ namespace Jasse {
         _MI = MI;
     }
 
+    inline void RVArchitectural::SetCSR(RVCSRSpace* CSR)
+    {
+        _CSR = CSR;
+    }
+
     inline bool RVArchitectural::IsGR32() const
     {
         return _GR32;
@@ -427,14 +443,24 @@ namespace Jasse {
         return *_GR64;
     }
 
-    const RVMemoryInterface* RVArchitectural::MI() const
+    inline const RVMemoryInterface* RVArchitectural::MI() const
     {
         return _MI;
     }
 
-    RVMemoryInterface* RVArchitectural::MI()
+    inline RVMemoryInterface* RVArchitectural::MI()
     {
         return _MI;
+    }
+
+    inline const RVCSRSpace* RVArchitectural::CSR() const
+    {
+        return _CSR;
+    }
+
+    inline RVCSRSpace* RVArchitectural::CSR()
+    {
+        return _CSR;
     }
 }
 
@@ -456,14 +482,14 @@ namespace Jasse {
     */
 
     RVInstruction::RVInstruction(
-        insnraw_t                   insn,
-        imm_t                       imm,
-        int                         rd,
-        int                         rs1,
-        int                         rs2,
-        std::string                 name,
-        RVInstructionTextualizer    textualizer,
-        RVInstructionExecutor       executor)
+        insnraw_t       insn,
+        imm_t           imm,
+        int             rd,
+        int             rs1,
+        int             rs2,
+        std::string     name,
+        Textualizer     textualizer,
+        Executor        executor)
         : insn          (insn)
         , imm           (imm)
         , rd            (rd)
@@ -528,16 +554,16 @@ namespace Jasse {
     {
         switch (operand)
         {
-            case SHAMT5:
+            case RVOPERAND_SHAMT5:
                 return GET_OPERAND(insn, RV_OPERAND_SHAMT5_MASK, RV_OPERAND_SHAMT5_OFFSET);
 
-            case SHAMT6:
+            case RVOPERAND_SHAMT6:
                 return GET_OPERAND(insn, RV_OPERAND_SHAMT6_MASK, RV_OPERAND_SHAMT6_OFFSET);
 
-            case CSR:
+            case RVOPERAND_CSR:
                 return GET_OPERAND(insn, RV_OPERAND_CSR_MASK, RV_OPERAND_CSR_OFFSET);
 
-            case CSR_UIMM:
+            case RVOPERAND_CSR_UIMM:
                 return GET_OPERAND(insn, RV_OPERAND_CSR_UIMM_MASK, RV_OPERAND_CSR_UIMM_OFFSET);
 
             default:
@@ -550,12 +576,12 @@ namespace Jasse {
         return name;
     }
 
-    inline RVInstructionTextualizer RVInstruction::GetTextualizer() const
+    inline RVInstruction::Textualizer RVInstruction::GetTextualizer() const
     {
         return textualizer;
     }
 
-    inline RVInstructionExecutor RVInstruction::GetExecutor() const
+    inline RVInstruction::Executor RVInstruction::GetExecutor() const
     {
         return executor;
     }
@@ -590,12 +616,12 @@ namespace Jasse {
         this->name = name;
     }
 
-    inline void RVInstruction::SetTextualizer(RVInstructionTextualizer textualizer)
+    inline void RVInstruction::SetTextualizer(Textualizer textualizer)
     {
         this->textualizer = textualizer;
     }
 
-    inline void RVInstruction::SetExecutor(RVInstructionExecutor executor)
+    inline void RVInstruction::SetExecutor(Executor executor)
     {
         this->executor = executor;
     }
