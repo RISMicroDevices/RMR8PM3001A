@@ -33,10 +33,10 @@ namespace Jasse {
 
     // Type definition of RISC-V Memory Data
     typedef union {
-        uint8_t     data8;      // byte
-        uint16_t    data16;     // half-word
-        uint32_t    data32;     // word
         uint64_t    data64;     // double-word  
+        uint32_t    data32;     // word
+        uint16_t    data16;     // half-word
+        uint8_t     data8;      // byte
     } data_t;
 
     // RISC-V Memory Interface (EEI defined, Proxy in case of RVWMO) 
