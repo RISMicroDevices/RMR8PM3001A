@@ -387,7 +387,7 @@
     ((src & name##_MASK) >> name##_OFFSET)
 
 #define GET_CSR_MXFIELD(src, name, mxlen) \
-    ((src & name##mxlen##_MASK) >> name##mxlen##_OFFSET)
+    ((src & name##_##mxlen##_MASK) >> name##_##mxlen##_OFFSET)
 
 #define SET_CSR_FIELD(dst, name, value) \
     dst = ((dst & ~name##_MASK) | ((value << name##_OFFSET) & name##_MASK))
