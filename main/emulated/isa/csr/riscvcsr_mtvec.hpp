@@ -21,6 +21,11 @@
 
 
 //
+#define CSR_mtvec_FIELD_MODE_DEF_DIRECT             0
+#define CSR_mtvec_FIELD_MODE_DEF_VECTORED           1
+
+
+//
 #define CSR_mtvec_DEFAULT_AT_COMPILE                0
 
 
