@@ -86,9 +86,32 @@
 #define RV32I_FUNCT12_EBREAK                    0b000000000001
 
 
-//
-#ifndef __INCLUDE_RV64I
+// Operands
+#define RV32I_OPERAND_LOAD_FM_MASK              0xF0000000U
+#define RV32I_OPERAND_LOAD_FM_OFFSET            28
 
-// ...
+#define RV32I_OPERAND_LOAD_PI_MASK              0x08000000U
+#define RV32I_OPERAND_LOAD_PI_OFFSET            27
 
-#endif
+#define RV32I_OPERAND_LOAD_PO_MASK              0x04000000U
+#define RV32I_OPERAND_LOAD_PO_OFFSET            26
+
+#define RV32I_OPERAND_LOAD_PR_MASK              0x02000000U
+#define RV32I_OPERAND_LOAD_PR_OFFSET            25
+
+#define RV32I_OPERAND_LOAD_PW_MASK              0x01000000U
+#define RV32I_OPERAND_LOAD_PW_OFFSET            24
+
+#define RV32I_OPERAND_LOAD_SI_MASK              0x00800000U
+#define RV32I_OPERAND_LOAD_SI_OFFSET            23
+
+#define RV32I_OPERAND_LOAD_SO_MASK              0x00400000U
+#define RV32I_OPERAND_LOAD_SO_OFFSET            22
+
+#define RV32I_OPERAND_LOAD_SR_MASK              0x00200000U
+#define RV32I_OPERAND_LOAD_SR_OFFSET            21
+
+#define RV32I_OPERAND_LOAD_SW_MASK              0x00100000U
+#define RV32I_OPERAND_LOAD_SW_OFFSET            20
+
+

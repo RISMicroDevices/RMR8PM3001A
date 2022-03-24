@@ -164,8 +164,9 @@ namespace Jasse {
     __RV64I_FUNCT3_CODEGROUP_DECLARE(BRANCH)
     __RV64I_FUNCT3_CODEGROUP_DECLARE(LOAD)
     __RV64I_FUNCT3_CODEGROUP_DECLARE(STORE)
-    __RV64I_FUNCT3_CODEGROUP_DECLARE(MISC_MEM)
     __RV64I_FUNCT3_CODEGROUP_DECLARE(SYSTEM)
+
+    __RV64I_UNIQUE_CODEGROUP_DECLARE(MISC_MEM)
 
     __RV64I_UNIQUE_CODEGROUP_DECLARE(LUI)
     __RV64I_UNIQUE_CODEGROUP_DECLARE(AUIPC)
@@ -268,21 +269,21 @@ namespace Jasse {
     void RV64I_SLLI(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
-            = arch.GR64()[insn.GetRS1()] << insn.GetOperand(RVOPERAND_SHAMT6);
+            = arch.GR64()[insn.GetRS1()] << GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT6);
     }
 
     // SRLI
     void RV64I_SRLI(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
-            = (uint64_t)arch.GR64()[insn.GetRS1()] >> insn.GetOperand(RVOPERAND_SHAMT6);
+            = (uint64_t)arch.GR64()[insn.GetRS1()] >> GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT6);
     }
 
     // SRAI
     void RV64I_SRAI(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
-            = (int64_t)arch.GR64()[insn.GetRS1()] >> insn.GetOperand(RVOPERAND_SHAMT6);
+            = (int64_t)arch.GR64()[insn.GetRS1()] >> GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT6);
     }
 
 
@@ -297,21 +298,21 @@ namespace Jasse {
     void RV64I_SLLIW(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
-            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] << insn.GetOperand(RVOPERAND_SHAMT5));
+            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] << GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT5));
     }
 
     // SRLIW
     void RV64I_SRLIW(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
-            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] >> insn.GetOperand(RVOPERAND_SHAMT5));
+            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] >> GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT5));
     }
 
     // SRAIW
     void RV64I_SRAIW(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
-            = SEXT_W((int32_t)arch.GR64()[insn.GetRS1()] >> insn.GetOperand(RVOPERAND_SHAMT5));
+            = SEXT_W((int32_t)arch.GR64()[insn.GetRS1()] >> GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT5));
     }
 
 
@@ -717,6 +718,15 @@ namespace Jasse {
         if (status != MOP_SUCCESS)
             __RV64I_STORE_EXCEPTION(insn, arch, status, addr);
     }
+
+
+    // FENCE
+    void RV64I_FENCE(const RVInstruction& insn, RVArchitectural& arch)
+    {
+        // nothing to be done in emulator
+    }
+
+
 }
 
 
@@ -1153,7 +1163,9 @@ namespace Jasse {
         return true;
     }
 
-    // TODO MISC-MEM SYSTEM
+    //
+
+    // TODO SYSTEM
 }
 
 // codegroups
@@ -1252,6 +1264,23 @@ namespace Jasse {
 
     __RV64I_FUNCT3_CODEGROUP_DECONSTRUCTOR(STORE)
     { }
+
+    //
+    __RV64I_UNIQUE_CODEGROUP_DEFINE_FUNC(MISC_MEM, RV64ICodeGroup_Unique_MISC_MEM)
+    {
+        if (GET_STD_OPERAND(insnraw, RV_OPERAND_RD) != 0)
+            return false;
+
+        if (GET_STD_OPERAND(insnraw, RV_OPERAND_RS1) != 0)
+            return false;
+
+        if (GET_STD_OPERAND(insnraw, RV32I_FUNCT3) != RV32I_FUNCT3_FENCE)
+            return false;
+
+        RV64I_TYPE(I) RV64I_INSNDEF("fence", RV64I_FENCE);
+
+        return true;
+    }
 
     //
     __RV64I_UNIQUE_CODEGROUP_DEFINE_FUNC(LUI, RV64ICodeGroup_Unique_LUI)
