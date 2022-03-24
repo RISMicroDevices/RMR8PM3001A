@@ -105,16 +105,6 @@ namespace Jasse {
     };
 
 
-    // Enumeration of RISC-V special operands
-    typedef enum {
-        RVOPERAND_SHAMT5 = 0,
-        RVOPERAND_SHAMT6,
-        RVOPERAND_CSR,
-        RVOPERAND_CSR_UIMM
-    } RVSpecialOperand;
-
-    
-
     // RISC-V Decoded Instruction
     class RVInstruction {
     public:
@@ -157,7 +147,6 @@ namespace Jasse {
         int                     GetRD() const;
         int                     GetRS1() const;
         int                     GetRS2() const;
-        int                     GetOperand(RVSpecialOperand operand) const;
 
         const std::string&      GetName() const;
 
@@ -548,27 +537,6 @@ namespace Jasse {
     inline int RVInstruction::GetRS2() const
     {
         return rs2;
-    }
-
-    inline int RVInstruction::GetOperand(RVSpecialOperand operand) const
-    {
-        switch (operand)
-        {
-            case RVOPERAND_SHAMT5:
-                return GET_OPERAND(insn, RV_OPERAND_SHAMT5_MASK, RV_OPERAND_SHAMT5_OFFSET);
-
-            case RVOPERAND_SHAMT6:
-                return GET_OPERAND(insn, RV_OPERAND_SHAMT6_MASK, RV_OPERAND_SHAMT6_OFFSET);
-
-            case RVOPERAND_CSR:
-                return GET_OPERAND(insn, RV_OPERAND_CSR_MASK, RV_OPERAND_CSR_OFFSET);
-
-            case RVOPERAND_CSR_UIMM:
-                return GET_OPERAND(insn, RV_OPERAND_CSR_UIMM_MASK, RV_OPERAND_CSR_UIMM_OFFSET);
-
-            default:
-                return 0;
-        }
     }
 
     inline const std::string& RVInstruction::GetName() const
