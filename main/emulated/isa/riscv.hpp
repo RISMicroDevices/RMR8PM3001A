@@ -105,14 +105,23 @@ namespace Jasse {
     };
 
 
+    // RISC-V Instruction Execution Status
+    typedef enum {
+        EXEC_SEQUENTIAL = 0,
+        EXEC_PC_HOLD,
+        EXEC_PC_JUMP,
+        EXEC_EXCEPTION,
+        EXEC_WAIT_FOR_INTERRUPT
+    } RVExecStatus ;
+
     // RISC-V Decoded Instruction
     class RVInstruction {
     public:
         // RISC-V Decoded Instruction Textualizer
-        typedef std::string (*Textualizer)(const RVInstruction&);
+        typedef std::string     (*Textualizer)(const RVInstruction&);
 
         // RISC-V Decoded Instruction Executor
-        typedef void        (*Executor)(const RVInstruction&, RVArchitectural&);
+        typedef RVExecStatus    (*Executor)(const RVInstruction&, RVArchitectural&);
 
     private:
         insnraw_t       insn;
