@@ -8,6 +8,7 @@
 #include "riscv.hpp"
 #include "riscvcsr.hpp"
 
+#include "csr/riscvcsr_mstatus.hpp"
 #include "csr/riscvcsr_mcause.hpp"
 #include "csr/riscvcsr_mtvec.hpp"
 
@@ -64,20 +65,21 @@ namespace Jasse {
     // * Notice: Only PC and necessary CSRs (excluding 'mtval' .etc) are manipulated in this
     //           Trap-Procedure. Other software-defined or EEI-defined CSR/General Registers
     //           actions should be done out of this Trap-Procedure.
-    void Trap(RVArchitectural& arch, RVTrapType type, RVTrapCause cause);
-
+    void TrapEnter  (RVArchitectural& arch, RVTrapType type, RVTrapCause cause);
+    void TrapReturn (RVArchitectural& arch);
 }
 
 
 namespace Jasse {
 
-    void Trap(RVArchitectural& arch, RVTrapType type, RVTrapCause cause)
+    void TrapEnter(RVArchitectural& arch, RVTrapType type, RVTrapCause cause)
     {
         // only M-mode supported currently
 
         // Write 'mepc' CSR
         arch.CSR()->RequireCSR(CSR_mepc, "mepc")
             ->SetValue(arch.PC().pc64); // always zero-extended in XLEN=32, actually doesn't matter
+        
 
         // Write 'mcause' CSR
         csr_t mcause = 0;
@@ -95,6 +97,24 @@ namespace Jasse {
 
         arch.CSR()->RequireCSR(CSR_mcause, "mcause")
             ->SetValue(mcause);
+        
+
+        // Write 'mstatus' CSR
+        RVCSR* p_mstatus = arch.CSR()->RequireCSR(CSR_mstatus, "mstatus");
+
+        csr_t mstatus = p_mstatus->GetValue(); // read 'mstatus'
+
+        SET_CSR_FIELD(mstatus, CSR_mstatus_FIELD_MPIE,
+            GET_CSR_FIELD(mstatus, CSR_mstatus_FIELD_MIE)); // xPIE is set to the value of xIE
+
+        SET_CSR_FIELD(mstatus, CSR_mstatus_FIELD_MIE, 0); // xIE is set to 0
+
+        // *NOTICE: MPP writing now hardwired to PRIV_MACHINE, this is not a standard implementation.
+        //          Rewrite this part after other privileged levels supported.
+        SET_CSR_FIELD(mstatus, CSR_mstatus_FIELD_MPP, /*NOTICE*/ PRIV_MACHINE);
+
+        p_mstatus->SetValue(mstatus); // write 'mstatus'
+
 
         // Write PC
         csr_t mtvec = arch.CSR()->RequireCSR(CSR_mtvec, "mtvec")->GetValue(); // read 'mtvec'
@@ -114,7 +134,40 @@ namespace Jasse {
             else // XLEN=64
                 arch.SetPC64(GET_CSR_MXFIELD(mtvec, CSR_mtvec_FIELD_BASE, MX64));
         }
+    }
 
+    void TrapReturn(RVArchitectural& arch)
+    {
+        // only M-mode supported currently
+
+        // Write 'mstatus' CSR
+        RVCSR* p_mstatus  = arch.CSR()->RequireCSR(CSR_mstatus, "mstatus");
+
+        csr_t mstatus = p_mstatus->GetValue(); // read 'mstatus'
+
+        SET_CSR_FIELD(mstatus, CSR_mstatus_FIELD_MIE,
+            GET_CSR_FIELD(mstatus, CSR_mstatus_FIELD_MPIE)); // xIE is set to xPIE
+
+        SET_CSR_FIELD(mstatus, CSR_mstatus_FIELD_MPIE, 1); // xPIE is set to 1
+
+        // xPP is set to the least-privileged supported mode.
+        // *NOTICE: For M-mode supported only, the least-privileged level is M-mode.
+        //          Rewrite this part after other privileged levels supported.
+        SET_CSR_FIELD(mstatus, CSR_mstatus_FIELD_MPP, PRIV_MACHINE); // 
+
+        // Privileged Level should be set to MPP (or xPP), not implemented now.
+        // GET_CSR_FIELD(mstatus, CSR_mstatus_FIELD_MPP);
+
+        p_mstatus->SetValue(mstatus); // write 'mstatus'
+
+
+        // Write PC
+        csr_t mepc = arch.CSR()->RequireCSR(CSR_mepc, "mepc")->GetValue();
+
+        if (arch.XLEN() == XLEN32) // XLEN=32
+            arch.SetPC32((uint32_t)mepc);
+        else
+            arch.SetPC64(mepc);
     }
 }
 
