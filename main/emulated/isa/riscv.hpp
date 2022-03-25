@@ -70,7 +70,7 @@ namespace Jasse {
 
         RVCSRSpace*             _CSR;
 
-        // TODO
+        // TODO ... More architectural states could be appended here ...
 
     public:
         RVArchitectural(XLen XLEN, RVMemoryInterface* MI, RVCSRSpace* CSR);
@@ -101,18 +101,54 @@ namespace Jasse {
         const RVCSRSpace*               CSR() const;
         RVCSRSpace*                     CSR();
 
-        // TODO
+        // TODO ... More architectural states could be appended here ...
     };
 
 
     // RISC-V Instruction Execution Status
+    // *NOTICE: Special actions (e.g. WFI-Wait For Interrupt) should be handled by EEI or 
+    //          external EEI-defined components.
+    //          They aren't and shouldn't be embedded in the instruction execution procedures.
+    //          The processing procedure of external interrupts MUST run ahead of any instruction
+    //          execution procedure.
     typedef enum {
+        // Naturally increase the PC. Execute instruction stream in sequence normally.
         EXEC_SEQUENTIAL = 0,
+
+        // PC Hold. PC shouldn't be changed in instruction execution procedure.
+        // And PC value MUST NOT be manipulated in EEI instance or out of iustruction
+        // execution procedure.
         EXEC_PC_HOLD,
+
+        // PC Jump. PC is changed in instruction execution procedure.
+        // And PC value MUST NOT be manipulated in EEI instance or out of iustruction
+        // execution procedure.
         EXEC_PC_JUMP,
-        EXEC_EXCEPTION,
-        EXEC_WAIT_FOR_INTERRUPT
-    } RVExecStatus ;
+
+        // Trap Enter. Results of instruction execution procedure shouldn't be commited
+        // to the architectural states.
+        // Trap-related CSRs or EEI-defined related registers were manipulated in
+        // instruction execution procedure.
+        // @see Jasse::TrapEnter (in header "riscvexcept.hpp")
+        EXEC_TRAP_ENTER,
+
+        // Trap Return. 
+        // Trap-related CSRs or EEI-defined related registers were manipulated in
+        // instruction execution procedure.
+        // @see Jasse::TrapReturn (in header "riscvexcept.hpp")
+        EXEC_TRAP_RETURN,
+
+        // WFI. Wait-For-Interrupt.
+        // WFI function is implemented in EEI. Interrupt-related procedures were not
+        // necessary in instruction execution procedure. 
+        // For the simplest implementation, PC is held still till a interrupt occurs.
+        EXEC_WAIT_FOR_INTERRUPT,    // EEI-defined
+
+        // Not Implemented. 
+        // Instruction codepoint exists, but the execution procedure not implemented.
+        // The way of handling this status (Raising an exception, or .etc) is EEI-defined.
+        EXEC_NOT_IMPLEMENTED
+    } RVExecStatus;
 
     // RISC-V Decoded Instruction
     class RVInstruction {
