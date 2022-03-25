@@ -164,9 +164,9 @@ namespace Jasse {
     __RV64I_FUNCT3_CODEGROUP_DECLARE(BRANCH)
     __RV64I_FUNCT3_CODEGROUP_DECLARE(LOAD)
     __RV64I_FUNCT3_CODEGROUP_DECLARE(STORE)
-    __RV64I_FUNCT3_CODEGROUP_DECLARE(SYSTEM)
 
     __RV64I_UNIQUE_CODEGROUP_DECLARE(MISC_MEM)
+    __RV64I_UNIQUE_CODEGROUP_DECLARE(SYSTEM)
 
     __RV64I_UNIQUE_CODEGROUP_DECLARE(LUI)
     __RV64I_UNIQUE_CODEGROUP_DECLARE(AUIPC)
@@ -651,7 +651,7 @@ namespace Jasse {
         else
         {
             __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
-            return EXEC_EXCEPTION;
+            return EXEC_TRAP_ENTER;
         }
     }
 
@@ -672,7 +672,7 @@ namespace Jasse {
         else
         {
             __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
-            return EXEC_EXCEPTION;
+            return EXEC_TRAP_ENTER;
         }
     }
 
@@ -693,7 +693,7 @@ namespace Jasse {
         else
         {
             __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
-            return EXEC_EXCEPTION;
+            return EXEC_TRAP_ENTER;
         }
     }
 
@@ -714,7 +714,7 @@ namespace Jasse {
         else
         {
             __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
-            return EXEC_EXCEPTION;
+            return EXEC_TRAP_ENTER;
         }
     }
 
@@ -735,7 +735,7 @@ namespace Jasse {
         else
         {
             __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
-            return EXEC_EXCEPTION;
+            return EXEC_TRAP_ENTER;
         }
     }
 
@@ -756,7 +756,7 @@ namespace Jasse {
         else
         {
             __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
-            return EXEC_EXCEPTION;
+            return EXEC_TRAP_ENTER;
         }
     }
 
@@ -777,7 +777,7 @@ namespace Jasse {
         else
         {
             __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
-            return EXEC_EXCEPTION;
+            return EXEC_TRAP_ENTER;
         }
     }
 
@@ -815,7 +815,7 @@ namespace Jasse {
         if (status != MOP_SUCCESS)
         {
             __RV64I_STORE_EXCEPTION(insn, arch, status, addr);
-            return EXEC_EXCEPTION;
+            return EXEC_TRAP_ENTER;
         }
         else
             return EXEC_SEQUENTIAL;
@@ -833,7 +833,7 @@ namespace Jasse {
         if (status != MOP_SUCCESS)
         {
             __RV64I_STORE_EXCEPTION(insn, arch, status, addr);
-            return EXEC_EXCEPTION;
+            return EXEC_TRAP_ENTER;
         }
         else
             return EXEC_SEQUENTIAL;
@@ -851,7 +851,7 @@ namespace Jasse {
         if (status != MOP_SUCCESS)
         {
             __RV64I_STORE_EXCEPTION(insn, arch, status, addr);
-            return EXEC_EXCEPTION;
+            return EXEC_TRAP_ENTER;
         }
         else
             return EXEC_SEQUENTIAL;
@@ -869,7 +869,7 @@ namespace Jasse {
         if (status != MOP_SUCCESS)
         {
             __RV64I_STORE_EXCEPTION(insn, arch, status, addr);
-            return EXEC_EXCEPTION;
+            return EXEC_TRAP_ENTER;
         }
         else
             return EXEC_SEQUENTIAL;
@@ -886,34 +886,46 @@ namespace Jasse {
 
 
     // ECALL
-    void RV64I_ECALL(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64I_ECALL(const RVInstruction& insn, RVArchitectural& arch)
     {
-        // TODO
+        // only M-mode supported currently
+
+        TrapEnter(arch, TRAP_EXCEPTION, EXCEPTION_ECALL_FROM_M);
+
+        return EXEC_TRAP_ENTER;
     }
 
     // EBREAK
-    void RV64I_EBREAK(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64I_EBREAK(const RVInstruction& insn, RVArchitectural& arch)
     {
-        // TODO
+        TrapEnter(arch, TRAP_EXCEPTION, EXCEPTION_BREAKPOINT);
+
+        return EXEC_TRAP_ENTER;
     }
 
     // MRET
-    void RV64I_MRET(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64I_MRET(const RVInstruction& insn, RVArchitectural& arch)
     {
-        // TODO
+        TrapReturn(arch);
+
+        return EXEC_TRAP_RETURN;
     }
 
     // SRET
-    void RV64I_SRET(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64I_SRET(const RVInstruction& insn, RVArchitectural& arch)
     {
         // TODO to be implemented
+
+        return EXEC_NOT_IMPLEMENTED;
     }
 
-    // URET
-    void RV64I_URET(const RVInstruction& insn, RVArchitectural& arch)
+    // WFI
+    RVExecStatus RV64I_WFI(const RVInstruction& insn, RVArchitectural& arch)
     {
-        // TODO to be implemented
+        return EXEC_WAIT_FOR_INTERRUPT;
     }
+
+    // TODO ... Add RV64I instructions here ...
 }
 
 
@@ -926,7 +938,6 @@ namespace Jasse {
 
 // codepoints
 namespace Jasse {
-
 
     //
     bool RV64ICodePoint_Funct3_ADDI(insnraw_t insnraw, RVInstruction& insn)
@@ -1351,8 +1362,42 @@ namespace Jasse {
     }
 
     //
+    bool RV64ICodePoint_Funct12_ECALL(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(I) RV64I_INSNDEF("ecall", RV64I_ECALL);
 
-    // TODO SYSTEM
+        return true;
+    }
+
+    bool RV64ICodePoint_Funct12_EBREAK(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(I) RV64I_INSNDEF("ebreak", RV64I_EBREAK);
+
+        return true;
+    }
+
+    bool RV64ICodePoint_Funct12_MRET(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(I) RV64I_INSNDEF("mret", RV64I_MRET);
+
+        return true;
+    }
+
+    bool RV64ICodePoint_Funct12_SRET(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(I) RV64I_INSNDEF("sret", RV64I_SRET);
+
+        return true;
+    }
+
+    bool RV64ICodePoint_Funct12_WFI(insnraw_t insnraw, RVInstruction& insn)
+    {
+        RV64I_TYPE(I) RV64I_INSNDEF("wfi", RV64I_WFI);
+
+        return true;
+    }
+
+    // TODO ... Add RV64I instruction codepoints here ...
 }
 
 // codegroups
@@ -1467,6 +1512,40 @@ namespace Jasse {
         RV64I_TYPE(I) RV64I_INSNDEF("fence", RV64I_FENCE);
 
         return true;
+    }
+
+    // 
+    __RV64I_UNIQUE_CODEGROUP_DEFINE_FUNC(SYSTEM, RV64ICodeGroup_Unique_SYSTEM)
+    {
+        if (GET_STD_OPERAND(insnraw, RV_OPERAND_RD) != 0)
+            return false;
+
+        if (GET_STD_OPERAND(insnraw, RV_OPERAND_RS1) != 0)
+            return false;
+
+        if (GET_STD_OPERAND(insnraw, RV32I_FUNCT3) != 0)
+            return false;
+
+        switch (GET_STD_OPERAND(insnraw, RV32I_FUNCT12))
+        {
+            case RV32I_FUNCT12_ECALL:
+                return RV64ICodePoint_Funct12_ECALL(insnraw, insn);
+
+            case RV32I_FUNCT12_EBREAK:
+                return RV64ICodePoint_Funct12_EBREAK(insnraw, insn);
+
+            case RV32I_FUNCT12_MRET:
+                return RV64ICodePoint_Funct12_MRET(insnraw, insn);
+
+            case RV32I_FUNCT12_SRET:
+                return RV64ICodePoint_Funct12_SRET(insnraw, insn);
+
+            case RV32I_FUNCT12_WFI:
+                return RV64ICodePoint_Funct12_WFI(insnraw, insn);
+
+            default:
+                return false;
+        }
     }
 
     //

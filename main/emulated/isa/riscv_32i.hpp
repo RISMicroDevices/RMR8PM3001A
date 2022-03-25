@@ -8,7 +8,7 @@
 #include "riscvdef.hpp"
 
 // Function-3
-#define RV32I_FUNCT3_MASK                       0x00007000
+#define RV32I_FUNCT3_MASK                       0x00007000U
 #define RV32I_FUNCT3_OFFSET                     12
 
 #define RV32I_FUNCT3_ADDI                       0b000
@@ -57,7 +57,7 @@
 
 
 // Function-7
-#define RV32I_FUNCT7_MASK                       0xFE000000
+#define RV32I_FUNCT7_MASK                       0xFE000000U
 #define RV32I_FUNCT7_OFFSET                     25
 
 #define RV32I_FUNCT7_SLLI                       0b0000000
@@ -79,11 +79,16 @@
 
 
 // Function-12
-#define RV32I_FUNCT12_MASK                      0xFFF00000
+#define RV32I_FUNCT12_MASK                      0xFFF00000U
 #define RV32I_FUNCT12_OFFSET                    20
 
-#define RV32I_FUNCT12_ECALL                     0b000000000000
-#define RV32I_FUNCT12_EBREAK                    0b000000000001
+#define RV32I_FUNCT12_ECALL                     0b0000000'00000
+#define RV32I_FUNCT12_EBREAK                    0b0000000'00001
+
+#define RV32I_FUNCT12_SRET                      0b0001000'00010
+#define RV32I_FUNCT12_MRET                      0b0011000'00010
+
+#define RV32I_FUNCT12_WFI                       0b0001000'00101
 
 
 // Operands
