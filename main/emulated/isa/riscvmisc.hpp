@@ -56,6 +56,7 @@ namespace Jasse {
     std::string TextualizeRVTypeB(const RVInstruction& insn);
     std::string TextualizeRVTypeU(const RVInstruction& insn);
     std::string TextualizeRVTypeJ(const RVInstruction& insn);
+    std::string TextualizeRVZeroOperand(const RVInstruction& insn);
 
     // RISC-V 64 Normal Instruction Form Decoder
     void DecodeNormalRV64TypeR(insnraw_t insnraw, RVInstruction& insn);
@@ -279,6 +280,11 @@ namespace Jasse {
 
         return oss.str();
     }
+
+    std::string TextualizeRVZeroOperand(const RVInstruction& insn)
+    {
+        return insn.GetName();
+    }
 }
 
 
@@ -290,8 +296,6 @@ namespace Jasse {
         insn.SetRD (GET_STD_OPERAND(insnraw, RV_OPERAND_RD));
         insn.SetRS1(GET_STD_OPERAND(insnraw, RV_OPERAND_RS1));
         insn.SetRS2(GET_STD_OPERAND(insnraw, RV_OPERAND_RS2));
-
-        insn.SetTextualizer(&TextualizeRVTypeR);
     }
 
     inline void DecodeNormalRV64TypeI(insnraw_t insnraw, RVInstruction& insn)
@@ -299,8 +303,6 @@ namespace Jasse {
         insn.SetRD (GET_STD_OPERAND(insnraw, RV_OPERAND_RD));
         insn.SetRS1(GET_STD_OPERAND(insnraw, RV_OPERAND_RS1));
         insn.SetImmediate(DecodeRV64ImmediateTypeI(insnraw));
-
-        insn.SetTextualizer(&TextualizeRVTypeI);
     }
 
     inline void DecodeNormalRV64TypeS(insnraw_t insnraw, RVInstruction& insn)
@@ -308,8 +310,6 @@ namespace Jasse {
         insn.SetRS1(GET_STD_OPERAND(insnraw, RV_OPERAND_RS1));
         insn.SetRS2(GET_STD_OPERAND(insnraw, RV_OPERAND_RS2));
         insn.SetImmediate(DecodeRV64ImmediateTypeS(insnraw));
-
-        insn.SetTextualizer(&TextualizeRVTypeS);
     }
 
     inline void DecodeNormalRV64TypeB(insnraw_t insnraw, RVInstruction& insn)
@@ -317,24 +317,18 @@ namespace Jasse {
         insn.SetRS1(GET_STD_OPERAND(insnraw, RV_OPERAND_RS1));
         insn.SetRS2(GET_STD_OPERAND(insnraw, RV_OPERAND_RS2));
         insn.SetImmediate(DecodeRV64ImmediateTypeB(insnraw));
-
-        insn.SetTextualizer(&TextualizeRVTypeB);
     }
 
     inline void DecodeNormalRV64TypeU(insnraw_t insnraw, RVInstruction& insn)
     {
         insn.SetRD (GET_STD_OPERAND(insnraw, RV_OPERAND_RD));
         insn.SetImmediate(DecodeRV64ImmediateTypeU(insnraw));
-
-        insn.SetTextualizer(&TextualizeRVTypeU);
     }
 
     inline void DecodeNormalRV64TypeJ(insnraw_t insnraw, RVInstruction& insn)
     {
         insn.SetRD (GET_STD_OPERAND(insnraw, RV_OPERAND_RD));
         insn.SetImmediate(DecodeRV64ImmediateTypeJ(insnraw));
-
-        insn.SetTextualizer(&TextualizeRVTypeJ);
     }
 
     // RV32
@@ -343,8 +337,6 @@ namespace Jasse {
         insn.SetRD (GET_STD_OPERAND(insnraw, RV_OPERAND_RD));
         insn.SetRS1(GET_STD_OPERAND(insnraw, RV_OPERAND_RS1));
         insn.SetRS2(GET_STD_OPERAND(insnraw, RV_OPERAND_RS2));
-
-        insn.SetTextualizer(&TextualizeRVTypeR);
     }
 
     inline void DecodeNormalRV32TypeI(insnraw_t insnraw, RVInstruction& insn)
@@ -352,8 +344,6 @@ namespace Jasse {
         insn.SetRD (GET_STD_OPERAND(insnraw, RV_OPERAND_RD));
         insn.SetRS1(GET_STD_OPERAND(insnraw, RV_OPERAND_RS1));
         insn.SetImmediate(DecodeRV32ImmediateTypeI(insnraw));
-
-        insn.SetTextualizer(&TextualizeRVTypeI);
     }
 
     inline void DecodeNormalRV32TypeS(insnraw_t insnraw, RVInstruction& insn)
@@ -361,8 +351,6 @@ namespace Jasse {
         insn.SetRS1(GET_STD_OPERAND(insnraw, RV_OPERAND_RS1));
         insn.SetRS2(GET_STD_OPERAND(insnraw, RV_OPERAND_RS2));
         insn.SetImmediate(DecodeRV32ImmediateTypeS(insnraw));
-
-        insn.SetTextualizer(&TextualizeRVTypeS);
     }
 
     inline void DecodeNormalRV32TypeB(insnraw_t insnraw, RVInstruction& insn)
@@ -370,24 +358,18 @@ namespace Jasse {
         insn.SetRS1(GET_STD_OPERAND(insnraw, RV_OPERAND_RS1));
         insn.SetRS2(GET_STD_OPERAND(insnraw, RV_OPERAND_RS2));
         insn.SetImmediate(DecodeRV32ImmediateTypeB(insnraw));
-
-        insn.SetTextualizer(&TextualizeRVTypeB);
     }
 
     inline void DecodeNormalRV32TypeU(insnraw_t insnraw, RVInstruction& insn)
     {
         insn.SetRD (GET_STD_OPERAND(insnraw, RV_OPERAND_RD));
         insn.SetImmediate(DecodeRV32ImmediateTypeU(insnraw));
-
-        insn.SetTextualizer(&TextualizeRVTypeU);
     }
 
     inline void DecodeNormalRV32TypeJ(insnraw_t insnraw, RVInstruction& insn)
     {
         insn.SetRD (GET_STD_OPERAND(insnraw, RV_OPERAND_RD));
         insn.SetImmediate(DecodeRV32ImmediateTypeJ(insnraw));
-
-        insn.SetTextualizer(&TextualizeRVTypeJ);
     }
 }
 

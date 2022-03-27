@@ -138,17 +138,70 @@ namespace Jasse {
         // @see Jasse::TrapReturn (in header "riscvexcept.hpp")
         EXEC_TRAP_RETURN,
 
-        // WFI. Wait-For-Interrupt.
+        // WFI. Wait-For-Interrupt. *EEI-defined*
         // WFI function is implemented in EEI. Interrupt-related procedures were not
         // necessary in instruction execution procedure. 
         // For the simplest implementation, PC is held still till a interrupt occurs.
-        EXEC_WAIT_FOR_INTERRUPT,    // EEI-defined
+        EXEC_WAIT_FOR_INTERRUPT,
 
-        // Not Implemented. 
+        // Not Implemented. *EEI-defined*
         // Instruction codepoint exists, but the execution procedure not implemented.
         // The way of handling this status (Raising an exception, or .etc) is EEI-defined.
         EXEC_NOT_IMPLEMENTED
     } RVExecStatus;
+
+
+    // RISC-V Codepoint Type
+    typedef enum {
+        RVTYPE_R = 0,
+        RVTYPE_I,
+        RVTYPE_S,
+        RVTYPE_B,
+        RVTYPE_U,
+        RVTYPE_J
+    } RVCodepointType;
+
+    // RISC-V Codepoint
+    class RVCodepoint {
+    public:
+        // RISC-V Instruction Textualizer
+        typedef std::string     (*Textualizer)(const RVInstruction&);
+
+        // RISC-V Instruction Executor
+        typedef RVExecStatus    (*Executor)(const RVInstruction&, RVArchitectural&);
+
+    private:
+        std::string     name;
+        RVCodepointType type;
+
+        Textualizer     textualizer;
+        Executor        executor;
+
+    public:
+        RVCodepoint(const char*             name, 
+                    const RVCodepointType   type,
+                    const Textualizer       textualizer, 
+                    const Executor          executor);
+
+        RVCodepoint(const std::string&      name,
+                    const RVCodepointType   type,
+                    const Textualizer       textualizer,
+                    const Executor          executor);
+
+        RVCodepoint();
+        RVCodepoint(const RVCodepoint& obj);
+        ~RVCodepoint();
+
+        void                    SetName(const std::string& name);
+        void                    SetType(const RVCodepointType type);
+        void                    SetTextualizer(const Textualizer textualizer);
+        void                    SetExecutor(const Executor executor);
+
+        const std::string&      GetName() const;
+        RVCodepointType         GetType() const;
+        const Textualizer       GetTextualizer() const;
+        const Executor          GetExecutor() const;
+    };
 
     // RISC-V Decoded Instruction
     class RVInstruction {
@@ -167,21 +220,16 @@ namespace Jasse {
         int             rs1;
         int             rs2;
 
-        std::string     name;
-        
-        Textualizer     textualizer;
-        Executor        executor;
+        RVCodepoint     trait;
 
     public:
         RVInstruction(
-            insnraw_t       insn,
-            imm_t           imm,
-            int             rd, 
-            int             rs1, 
-            int             rs2, 
-            std::string     name,
-            Textualizer     textualizer,
-            Executor        executor);
+            insnraw_t           insn,
+            imm_t               imm,
+            int                 rd, 
+            int                 rs1, 
+            int                 rs2, 
+            const RVCodepoint&  trait);
 
         RVInstruction();
         RVInstruction(const RVInstruction& obj);
@@ -193,8 +241,10 @@ namespace Jasse {
         int                     GetRS1() const;
         int                     GetRS2() const;
 
-        const std::string&      GetName() const;
+        RVCodepoint&            GetTrait();
+        const RVCodepoint&      GetTrait() const;
 
+        const std::string&      GetName() const;
         Textualizer             GetTextualizer() const;
         Executor                GetExecutor() const;
 
@@ -204,8 +254,9 @@ namespace Jasse {
         void                    SetRS1(int rs1);
         void                    SetRS2(int rs2);
 
-        void                    SetName(const std::string& name);
+        void                    SetTrait(const RVCodepoint& trait);
 
+        void                    SetName(const std::string& name);
         void                    SetTextualizer(Textualizer textualizer);
         void                    SetExecutor(Executor executor);
 
@@ -214,6 +265,9 @@ namespace Jasse {
     };
 
 
+    // RISC-V Instruction Decoder Trait Function
+    typedef bool        (*RVDecoderTrait)(insnraw_t insnraw, RVInstruction& insn);
+
     // RISC-V Instruction Decoder
     class RVDecoder {
     private:
@@ -221,6 +275,7 @@ namespace Jasse {
         const std::string   name_canonical;
 
     public:
+        RVDecoder(const char* name, const char* name_canonical);
         RVDecoder(std::string name, std::string name_canonical);
         ~RVDecoder();
 
@@ -499,6 +554,95 @@ namespace Jasse {
 }
 
 
+// Implementation of: class RVCodepoint
+namespace Jasse {
+    /*
+    std::string     name;
+    RVCodepointType type;
+
+    Textualizer     textualizer;
+    Executor        executor;
+    */
+
+    RVCodepoint::RVCodepoint(const char*             name, 
+                             const RVCodepointType   type,
+                             const Textualizer       textualizer, 
+                             const Executor          executor)
+        : name          (std::string(name))
+        , type          (type)
+        , textualizer   (textualizer)
+        , executor      (executor)
+    { }
+
+    RVCodepoint::RVCodepoint(const std::string&      name,
+                             const RVCodepointType   type,
+                             const Textualizer       textualizer,
+                             const Executor          executor)
+        : name          (name)
+        , type          (type)
+        , textualizer   (textualizer)
+        , executor      (executor)
+    { }
+
+    RVCodepoint::RVCodepoint()
+        : name          ()
+        , type          ()
+        , textualizer   (nullptr)
+        , executor      (nullptr)
+    { }
+
+    RVCodepoint::RVCodepoint(const RVCodepoint& obj)
+        : name          (obj.name)
+        , type          (obj.type)
+        , textualizer   (obj.textualizer)
+        , executor      (obj.executor)
+    { }
+
+    RVCodepoint::~RVCodepoint()
+    { }
+
+    inline void RVCodepoint::SetName(const std::string& name)
+    {
+        this->name = name;
+    }
+
+    inline void RVCodepoint::SetType(const RVCodepointType type)
+    {
+        this->type = type;
+    }
+
+    inline void RVCodepoint::SetTextualizer(const Textualizer textualizer)
+    {
+        this->textualizer = textualizer;
+    }
+
+    inline void RVCodepoint::SetExecutor(const Executor executor)
+    {
+        this->executor = executor;
+    }
+
+    inline const std::string& RVCodepoint::GetName() const
+    {
+        return name;
+    }
+
+    inline RVCodepointType RVCodepoint::GetType() const
+    {
+        return type;
+    }
+
+    inline const RVCodepoint::Textualizer RVCodepoint::GetTextualizer() const
+    {
+        return textualizer;
+    }
+
+    inline const RVCodepoint::Executor RVCodepoint::GetExecutor() const
+    {
+        return executor;
+    }
+}
+
+
 // Implementation of: class RVInstruction
 namespace Jasse {
     /*
@@ -516,22 +660,18 @@ namespace Jasse {
     */
 
     RVInstruction::RVInstruction(
-        insnraw_t       insn,
-        imm_t           imm,
-        int             rd,
-        int             rs1,
-        int             rs2,
-        std::string     name,
-        Textualizer     textualizer,
-        Executor        executor)
+        insnraw_t           insn,
+        imm_t               imm,
+        int                 rd,
+        int                 rs1,
+        int                 rs2,
+        const RVCodepoint&  trait)
         : insn          (insn)
         , imm           (imm)
         , rd            (rd)
         , rs1           (rs1)
         , rs2           (rs2)
-        , name          (name)
-        , textualizer   (textualizer)
-        , executor      (executor)
+        , trait         (trait)
     { }
 
     RVInstruction::RVInstruction()
@@ -540,9 +680,7 @@ namespace Jasse {
         , rd            (0)
         , rs1           (0)
         , rs2           (0)
-        , name          ("")
-        , textualizer   (nullptr)
-        , executor      (nullptr)
+        , trait         ()
     { }
 
     RVInstruction::RVInstruction(const RVInstruction& obj)
@@ -551,9 +689,7 @@ namespace Jasse {
         , rd            (obj.rd)
         , rs1           (obj.rs1)
         , rs2           (obj.rs2)
-        , name          (obj.name)
-        , textualizer   (obj.textualizer)
-        , executor      (obj.executor)
+        , trait         ()
     { }
 
     RVInstruction::~RVInstruction()
@@ -584,19 +720,29 @@ namespace Jasse {
         return rs2;
     }
 
+    inline RVCodepoint& RVInstruction::GetTrait()
+    {
+        return trait;
+    }
+
+    inline const RVCodepoint& RVInstruction::GetTrait() const
+    {
+        return trait;
+    }
+
     inline const std::string& RVInstruction::GetName() const
     {
-        return name;
+        return trait.GetName();
     }
 
     inline RVInstruction::Textualizer RVInstruction::GetTextualizer() const
     {
-        return textualizer;
+        return trait.GetTextualizer();
     }
 
     inline RVInstruction::Executor RVInstruction::GetExecutor() const
     {
-        return executor;
+        return trait.GetExecutor();
     }
 
     inline void RVInstruction::SetRaw(insnraw_t insn)
@@ -624,29 +770,34 @@ namespace Jasse {
         this->rs2 = rs2;
     }
 
+    inline void RVInstruction::SetTrait(const RVCodepoint& trait)
+    {
+        this->trait = trait;
+    }
+
     inline void RVInstruction::SetName(const std::string& name)
     {
-        this->name = name;
+        trait.SetName(name);
     }
 
     inline void RVInstruction::SetTextualizer(Textualizer textualizer)
     {
-        this->textualizer = textualizer;
+        trait.SetTextualizer(textualizer);
     }
 
     inline void RVInstruction::SetExecutor(Executor executor)
     {
-        this->executor = executor;
+        trait.SetExecutor(executor);
     }
 
     inline void RVInstruction::Execute(RVArchitectural& arch) const
     {
-        (*executor)(*this, arch);
+        GetExecutor()(*this, arch);
     }
 
     inline std::string RVInstruction::ToString() const
     {
-        return (*textualizer)(*this);
+        return GetTextualizer()(*this);
     }
 }
 
@@ -661,6 +812,11 @@ namespace Jasse {
     RVDecoder::RVDecoder(std::string name, std::string name_canonical)
         : name              (name)
         , name_canonical    (name_canonical)
+    { }
+
+    RVDecoder::RVDecoder(const char* name, const char* name_canonical)
+        : name              (std::string(name))
+        , name_canonical    (std::string(name_canonical))
     { }
 
     RVDecoder::~RVDecoder()
