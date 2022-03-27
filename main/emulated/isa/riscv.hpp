@@ -161,6 +161,10 @@ namespace Jasse {
         RVTYPE_J
     } RVCodepointType;
 
+    
+    //
+    class RVInstruction;
+
     // RISC-V Codepoint
     class RVCodepoint {
     public:
@@ -205,13 +209,6 @@ namespace Jasse {
 
     // RISC-V Decoded Instruction
     class RVInstruction {
-    public:
-        // RISC-V Decoded Instruction Textualizer
-        typedef std::string     (*Textualizer)(const RVInstruction&);
-
-        // RISC-V Decoded Instruction Executor
-        typedef RVExecStatus    (*Executor)(const RVInstruction&, RVArchitectural&);
-
     private:
         insnraw_t       insn;
 
@@ -235,33 +232,33 @@ namespace Jasse {
         RVInstruction(const RVInstruction& obj);
         ~RVInstruction();
 
-        insnraw_t               GetRaw() const;
-        imm_t                   GetImmediate() const;
-        int                     GetRD() const;
-        int                     GetRS1() const;
-        int                     GetRS2() const;
+        insnraw_t                   GetRaw() const;
+        imm_t                       GetImmediate() const;
+        int                         GetRD() const;
+        int                         GetRS1() const;
+        int                         GetRS2() const;
 
-        RVCodepoint&            GetTrait();
-        const RVCodepoint&      GetTrait() const;
+        RVCodepoint&                GetTrait();
+        const RVCodepoint&          GetTrait() const;
 
-        const std::string&      GetName() const;
-        Textualizer             GetTextualizer() const;
-        Executor                GetExecutor() const;
+        const std::string&          GetName() const;
+        RVCodepoint::Textualizer    GetTextualizer() const;
+        RVCodepoint::Executor       GetExecutor() const;
 
-        void                    SetRaw(insnraw_t insn);
-        void                    SetImmediate(imm_t imm);
-        void                    SetRD(int rd);
-        void                    SetRS1(int rs1);
-        void                    SetRS2(int rs2);
+        void                        SetRaw(insnraw_t insn);
+        void                        SetImmediate(imm_t imm);
+        void                        SetRD(int rd);
+        void                        SetRS1(int rs1);
+        void                        SetRS2(int rs2);
 
-        void                    SetTrait(const RVCodepoint& trait);
+        void                        SetTrait(const RVCodepoint& trait);
 
-        void                    SetName(const std::string& name);
-        void                    SetTextualizer(Textualizer textualizer);
-        void                    SetExecutor(Executor executor);
+        void                        SetName(const std::string& name);
+        void                        SetTextualizer(RVCodepoint::Textualizer textualizer);
+        void                        SetExecutor(RVCodepoint::Executor executor);
 
-        void                    Execute(RVArchitectural& arch) const;
-        std::string             ToString() const;
+        void                        Execute(RVArchitectural& arch) const;
+        std::string                 ToString() const;
     };
 
 
@@ -735,12 +732,12 @@ namespace Jasse {
         return trait.GetName();
     }
 
-    inline RVInstruction::Textualizer RVInstruction::GetTextualizer() const
+    inline RVCodepoint::Textualizer RVInstruction::GetTextualizer() const
     {
         return trait.GetTextualizer();
     }
 
-    inline RVInstruction::Executor RVInstruction::GetExecutor() const
+    inline RVCodepoint::Executor RVInstruction::GetExecutor() const
     {
         return trait.GetExecutor();
     }
@@ -780,12 +777,12 @@ namespace Jasse {
         trait.SetName(name);
     }
 
-    inline void RVInstruction::SetTextualizer(Textualizer textualizer)
+    inline void RVInstruction::SetTextualizer(RVCodepoint::Textualizer textualizer)
     {
         trait.SetTextualizer(textualizer);
     }
 
-    inline void RVInstruction::SetExecutor(Executor executor)
+    inline void RVInstruction::SetExecutor(RVCodepoint::Executor executor)
     {
         trait.SetExecutor(executor);
     }
