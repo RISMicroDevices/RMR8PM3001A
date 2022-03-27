@@ -63,167 +63,14 @@
 #define RV64I_FUNCT7_SRAW                       0b0100000
 
 
-//
-#define __RV64I_UNIQUE_CODEGROUP(name) \
-    RV64IUniqueCodegroup_##name
 
-#define __RV64I_UNIQUE_CODEGROUP_DEFINE(name, function) \
-    __RV64I_UNIQUE_CODEGROUP(name)::__RV64I_UNIQUE_CODEGROUP(name)() \
-        : RV64IUniqueCodegroup (&function) \
-    { } \
-
-#define __RV64I_UNIQUE_CODEGROUP_DEFINE_FUNC(name, function) \
-    bool function##(insnraw_t insnraw, RVInstruction& insn); \
-    __RV64I_UNIQUE_CODEGROUP(name)::__RV64I_UNIQUE_CODEGROUP(name)() \
-        : RV64IUniqueCodegroup (&function) \
-    { } \
-    bool function##(insnraw_t insnraw, RVInstruction& insn) \
-
-#define __RV64I_UNIQUE_CODEGROUP_DECLARE(name) \
-    class __RV64I_UNIQUE_CODEGROUP(name) : public RV64IUniqueCodegroup { \
-    public: \
-        __RV64I_UNIQUE_CODEGROUP(name)(); \
-    }; \
-
-
-#define __RV64I_FUNCT3_CODEGROUP(name) \
-    RV64IFunct3Codegroup_##name
-
-#define __RV64I_FUNCT3_CODEGROUP_CONSTRUCTOR(name) \
-    __RV64I_FUNCT3_CODEGROUP(name)::__RV64I_FUNCT3_CODEGROUP(name)()
-
-#define __RV64I_FUNCT3_CODEGROUP_DECONSTRUCTOR(name) \
-    __RV64I_FUNCT3_CODEGROUP(name)::~__RV64I_FUNCT3_CODEGROUP(name)()
-
-
-#define __RV64I_FUNCT3_CODEGROUP_DECLARE(name) \
-    class __RV64I_FUNCT3_CODEGROUP(name) : public RV64IFunct3Codegroup { \
-    public: \
-        __RV64I_FUNCT3_CODEGROUP(name)(); \
-        ~__RV64I_FUNCT3_CODEGROUP(name)(); \
-    }; \
-
-//
-namespace Jasse {
-
-    // RV64I codepoint
-    typedef bool (*RV64Codepoint)(insnraw_t insnraw, RVInstruction& insn);
-
-    // RV64I codegroup (OPCODE base)
-    class RV64Codegroup {
-    public:
-        virtual bool    Decode(insnraw_t insnraw, RVInstruction& insn) const = 0;
-    };
-
-
-    // RV64I unique codegroup
-    class RV64IUniqueCodegroup : public RV64Codegroup {
-    private:
-        RV64Codepoint   codepoint;
-    
-    public:
-        RV64IUniqueCodegroup(RV64Codepoint codepoint);
-        ~RV64IUniqueCodegroup();
-
-        virtual bool    Decode(insnraw_t insnraw, RVInstruction& insn) const override;
-    };
-
-    // RV64I FUNCT3 codegroup
-    class RV64IFunct3Codegroup : public RV64Codegroup {
-    private:
-        RV64Codepoint*  codepoints; // 8 (2 ^ 3)
-
-    public:
-        RV64IFunct3Codegroup();
-        ~RV64IFunct3Codegroup();
-
-        void            Define(int funct3, RV64Codepoint codepoint);
-        virtual bool    Decode(insnraw_t insnraw, RVInstruction& insn) const override;
-    };
-
-
-    // RV64I Decoder
-    class RV64IDecoder : public RVDecoder {
-    private:
-        RV64IFunct3Codegroup**  codegroups; // 32 (2 ^ (7 - 2))
-
-    public:
-        RV64IDecoder();
-        ~RV64IDecoder();
-
-        virtual bool    Decode(insnraw_t insnraw, RVInstruction& insn) const override;
-    };
-
-
-    // Codepoint declarations
-    __RV64I_FUNCT3_CODEGROUP_DECLARE(OP)
-    __RV64I_FUNCT3_CODEGROUP_DECLARE(OP_32)
-    __RV64I_FUNCT3_CODEGROUP_DECLARE(OP_IMM)
-    __RV64I_FUNCT3_CODEGROUP_DECLARE(OP_IMM_32)
-
-    __RV64I_FUNCT3_CODEGROUP_DECLARE(BRANCH)
-    __RV64I_FUNCT3_CODEGROUP_DECLARE(LOAD)
-    __RV64I_FUNCT3_CODEGROUP_DECLARE(STORE)
-
-    __RV64I_UNIQUE_CODEGROUP_DECLARE(MISC_MEM)
-    __RV64I_UNIQUE_CODEGROUP_DECLARE(SYSTEM)
-
-    __RV64I_UNIQUE_CODEGROUP_DECLARE(LUI)
-    __RV64I_UNIQUE_CODEGROUP_DECLARE(AUIPC)
-    __RV64I_UNIQUE_CODEGROUP_DECLARE(JAL)
-    __RV64I_UNIQUE_CODEGROUP_DECLARE(JALR)
-};
-
-
-// Implementation of: class RV64IUniqueCodegroup
-namespace Jasse {
-    RV64IUniqueCodegroup::RV64IUniqueCodegroup(RV64Codepoint codepoint)
-        : codepoint (codepoint)
-    { }
-
-    RV64IUniqueCodegroup::~RV64IUniqueCodegroup()
-    { }
-
-    bool RV64IUniqueCodegroup::Decode(insnraw_t insnraw, RVInstruction& insn) const
-    {
-        return (*codepoint)(insnraw, insn);
-    }
-}
-
-
-// Implementation of: class RV64IFunct3Codegroup
-namespace Jasse {
-    RV64IFunct3Codegroup::RV64IFunct3Codegroup()
-        : codepoints(new RV64Codepoint[8]())
-    { }
-
-    RV64IFunct3Codegroup::~RV64IFunct3Codegroup()
-    { 
-        delete[] codepoints;
-    }
-
-    bool RV64IFunct3Codegroup::Decode(insnraw_t insnraw, RVInstruction& insn) const
-    {
-        int funct3 = GET_OPERAND(insnraw, RV64I_FUNCT3_MASK, RV64I_FUNCT3_OFFSET);
-
-        if (codepoints[funct3])
-            return (*(codepoints[funct3]))(insnraw, insn);
-        else
-            return false;
-    }
-
-    inline void RV64IFunct3Codegroup::Define(int funct3, RV64Codepoint codepoint)
-    {
-        codepoints[funct3] = codepoint;
-    }
-}
 
 
 // executors
 namespace Jasse {
 
     // ADDI
-    RVExecStatus RV64I_ADDI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_ADDI(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()] 
             = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
@@ -232,7 +79,7 @@ namespace Jasse {
     }
 
     // SLTI
-    RVExecStatus RV64I_SLTI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SLTI(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = (int64_t)arch.GR64()[insn.GetRS1()] < (int64_t)insn.GetImmediate().imm64;
@@ -241,7 +88,7 @@ namespace Jasse {
     }
 
     // SLTIU
-    RVExecStatus RV64I_SLTIU(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SLTIU(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = (uint64_t)arch.GR64()[insn.GetRS1()] < (uint64_t)insn.GetImmediate().imm64;
@@ -250,7 +97,7 @@ namespace Jasse {
     }
 
     // ANDI
-    RVExecStatus RV64I_ANDI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_ANDI(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = arch.GR64()[insn.GetRS1()] & insn.GetImmediate().imm64;
@@ -259,7 +106,7 @@ namespace Jasse {
     }
 
     // ORI
-    RVExecStatus RV64I_ORI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_ORI(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = arch.GR64()[insn.GetRS1()] | insn.GetImmediate().imm64;
@@ -268,7 +115,7 @@ namespace Jasse {
     }
 
     // XORI
-    RVExecStatus RV64I_XORI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_XORI(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = arch.GR64()[insn.GetRS1()] ^ insn.GetImmediate().imm64;
@@ -278,7 +125,7 @@ namespace Jasse {
 
     
     // SLLI
-    RVExecStatus RV64I_SLLI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SLLI(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = arch.GR64()[insn.GetRS1()] << GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT6);
@@ -287,7 +134,7 @@ namespace Jasse {
     }
 
     // SRLI
-    RVExecStatus RV64I_SRLI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SRLI(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = (uint64_t)arch.GR64()[insn.GetRS1()] >> GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT6);
@@ -296,7 +143,7 @@ namespace Jasse {
     }
 
     // SRAI
-    RVExecStatus RV64I_SRAI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SRAI(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = (int64_t)arch.GR64()[insn.GetRS1()] >> GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT6);
@@ -306,7 +153,7 @@ namespace Jasse {
 
 
     // ADDIW
-    RVExecStatus RV64I_ADDIW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_ADDIW(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm32);
@@ -315,7 +162,7 @@ namespace Jasse {
     }
 
     // SLLIW
-    RVExecStatus RV64I_SLLIW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SLLIW(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] << GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT5));
@@ -324,7 +171,7 @@ namespace Jasse {
     }
 
     // SRLIW
-    RVExecStatus RV64I_SRLIW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SRLIW(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] >> GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT5));
@@ -333,7 +180,7 @@ namespace Jasse {
     }
 
     // SRAIW
-    RVExecStatus RV64I_SRAIW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SRAIW(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = SEXT_W((int32_t)arch.GR64()[insn.GetRS1()] >> GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT5));
@@ -343,7 +190,7 @@ namespace Jasse {
 
 
     // ADD
-    RVExecStatus RV64I_ADD(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_ADD(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = arch.GR64()[insn.GetRS1()] + arch.GR64()[insn.GetRS2()];
@@ -352,7 +199,7 @@ namespace Jasse {
     }
 
     // SUB
-    RVExecStatus RV64I_SUB(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SUB(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = arch.GR64()[insn.GetRS1()] - arch.GR64()[insn.GetRS2()];
@@ -361,7 +208,7 @@ namespace Jasse {
     }
 
     // SLT
-    RVExecStatus RV64I_SLT(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SLT(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = (int64_t)arch.GR64()[insn.GetRS1()] < (int64_t)arch.GR64()[insn.GetRS2()];
@@ -370,7 +217,7 @@ namespace Jasse {
     }
 
     // SLTU
-    RVExecStatus RV64I_SLTU(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SLTU(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = (uint64_t)arch.GR64()[insn.GetRS1()] < (uint64_t)arch.GR64()[insn.GetRS2()];
@@ -379,7 +226,7 @@ namespace Jasse {
     }
 
     // AND
-    RVExecStatus RV64I_AND(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_AND(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = arch.GR64()[insn.GetRS1()] & arch.GR64()[insn.GetRS2()];
@@ -388,7 +235,7 @@ namespace Jasse {
     }
 
     // OR
-    RVExecStatus RV64I_OR(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_OR(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = arch.GR64()[insn.GetRS1()] | arch.GR64()[insn.GetRS2()];
@@ -397,7 +244,7 @@ namespace Jasse {
     }
 
     // XOR
-    RVExecStatus RV64I_XOR(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_XOR(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = arch.GR64()[insn.GetRS1()] ^ arch.GR64()[insn.GetRS2()];
@@ -406,7 +253,7 @@ namespace Jasse {
     }
 
     // SLL
-    RVExecStatus RV64I_SLL(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SLL(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = arch.GR64()[insn.GetRS1()] << (arch.GR64()[insn.GetRS2()] & 0x003F);
@@ -415,7 +262,7 @@ namespace Jasse {
     }
 
     // SRL
-    RVExecStatus RV64I_SRL(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SRL(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = (uint64_t)arch.GR64()[insn.GetRS1()] >> (arch.GR64()[insn.GetRS2()] & 0x003F);
@@ -424,7 +271,7 @@ namespace Jasse {
     }
 
     // SRA
-    RVExecStatus RV64I_SRA(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SRA(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = (int64_t)arch.GR64()[insn.GetRS1()] >> (arch.GR64()[insn.GetRS2()] & 0x003F);
@@ -434,7 +281,7 @@ namespace Jasse {
 
 
     // ADDW
-    RVExecStatus RV64I_ADDW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_ADDW(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] + (uint32_t)arch.GR64()[insn.GetRS2()]);
@@ -443,7 +290,7 @@ namespace Jasse {
     }
 
     // SUBW
-    RVExecStatus RV64I_SUBW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SUBW(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] - (uint32_t)arch.GR64()[insn.GetRS2()]);
@@ -452,7 +299,7 @@ namespace Jasse {
     }
 
     // SLLW
-    RVExecStatus RV64I_SLLW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SLLW(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] << (arch.GR64()[insn.GetRS2()] & 0x001F));
@@ -461,7 +308,7 @@ namespace Jasse {
     }
 
     // SRLW
-    RVExecStatus RV64I_SRLW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SRLW(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] >> (arch.GR64()[insn.GetRS2()] & 0x001F));
@@ -470,7 +317,7 @@ namespace Jasse {
     }
 
     // SRAW
-    RVExecStatus RV64I_SRAW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SRAW(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = SEXT_W((int32_t)arch.GR64()[insn.GetRS1()] >> (arch.GR64()[insn.GetRS2()] & 0x001F));
@@ -480,7 +327,7 @@ namespace Jasse {
 
 
     // LUI
-    RVExecStatus RV64I_LUI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_LUI(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()] 
             = insn.GetImmediate().imm64;
@@ -489,7 +336,7 @@ namespace Jasse {
     }
 
     // AUIPC
-    RVExecStatus RV64I_AUIPC(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_AUIPC(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()] 
             = insn.GetImmediate().imm64 + arch.PC().pc64;
@@ -499,7 +346,7 @@ namespace Jasse {
 
 
     // JAL
-    RVExecStatus RV64I_JAL(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_JAL(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = arch.PC().pc64 + 4;
@@ -511,7 +358,7 @@ namespace Jasse {
     }
 
     // JALR
-    RVExecStatus RV64I_JALR(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_JALR(const RVInstruction& insn, RVArchitectural& arch)
     {
         arch.GR64()[insn.GetRD()]
             = arch.PC().pc64 + 4;
@@ -524,7 +371,7 @@ namespace Jasse {
 
 
     // BEQ
-    RVExecStatus RV64I_BEQ(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_BEQ(const RVInstruction& insn, RVArchitectural& arch)
     {
         if (arch.GR64()[insn.GetRS1()] == arch.GR64()[insn.GetRS2()])
         {
@@ -536,7 +383,7 @@ namespace Jasse {
     }
 
     // BNE
-    RVExecStatus RV64I_BNE(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_BNE(const RVInstruction& insn, RVArchitectural& arch)
     {
         if (arch.GR64()[insn.GetRS1()] != arch.GR64()[insn.GetRS2()])
         {
@@ -548,7 +395,7 @@ namespace Jasse {
     }
 
     // BLT
-    RVExecStatus RV64I_BLT(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_BLT(const RVInstruction& insn, RVArchitectural& arch)
     {
         if ((int64_t)arch.GR64()[insn.GetRS1()] < (int64_t)arch.GR64()[insn.GetRS2()])
         {
@@ -560,7 +407,7 @@ namespace Jasse {
     }
 
     // BLTU
-    RVExecStatus RV64I_BLTU(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_BLTU(const RVInstruction& insn, RVArchitectural& arch)
     {
         if ((uint64_t)arch.GR64()[insn.GetRS1()] < (uint64_t)arch.GR64()[insn.GetRS2()])
         {
@@ -572,7 +419,7 @@ namespace Jasse {
     }
 
     // BGE
-    RVExecStatus RV64I_BGE(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_BGE(const RVInstruction& insn, RVArchitectural& arch)
     {
         if ((int64_t)arch.GR64()[insn.GetRS1()] >= (int64_t)arch.GR64()[insn.GetRS2()])
         {
@@ -584,7 +431,7 @@ namespace Jasse {
     }
 
     // BGEU
-    RVExecStatus RV64I_BGEU(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_BGEU(const RVInstruction& insn, RVArchitectural& arch)
     {
         if ((uint64_t)arch.GR64()[insn.GetRS1()] >= (uint64_t)arch.GR64()[insn.GetRS2()])
         {
@@ -628,14 +475,14 @@ namespace Jasse {
                 break;
 
             default:
-                // SHOULD_NOT_REACH_HERE()
+                ; // SHOULD_NOT_REACH_HERE()
         }
 
         __RV64I_MEMORYIO_EXCEPTION(insn, arch, cause, address);
     }
 
     // LD
-    RVExecStatus RV64I_LD(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_LD(const RVInstruction& insn, RVArchitectural& arch)
     {
         addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
         data_t data;
@@ -656,7 +503,7 @@ namespace Jasse {
     }
 
     // LW
-    RVExecStatus RV64I_LW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_LW(const RVInstruction& insn, RVArchitectural& arch)
     {
         addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
         data_t data;
@@ -677,7 +524,7 @@ namespace Jasse {
     }
 
     // LH
-    RVExecStatus RV64I_LH(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_LH(const RVInstruction& insn, RVArchitectural& arch)
     {
         addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
         data_t data;
@@ -698,7 +545,7 @@ namespace Jasse {
     }
 
     // LB
-    RVExecStatus RV64I_LB(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_LB(const RVInstruction& insn, RVArchitectural& arch)
     {
         addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
         data_t data;
@@ -719,7 +566,7 @@ namespace Jasse {
     }
 
     // LWU
-    RVExecStatus RV64I_LWU(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_LWU(const RVInstruction& insn, RVArchitectural& arch)
     {
         addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
         data_t data;
@@ -740,7 +587,7 @@ namespace Jasse {
     }
 
     // LHU
-    RVExecStatus RV64I_LHU(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_LHU(const RVInstruction& insn, RVArchitectural& arch)
     {
         addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
         data_t data;
@@ -761,7 +608,7 @@ namespace Jasse {
     }
 
     // LBU
-    RVExecStatus RV64I_LBU(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_LBU(const RVInstruction& insn, RVArchitectural& arch)
     {
         addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
         data_t data;
@@ -797,14 +644,14 @@ namespace Jasse {
                 break;
 
             default:
-                // SHOULD_NOT_REACH_HERE()
+                ; // SHOULD_NOT_REACH_HERE()
         }
 
         __RV64I_MEMORYIO_EXCEPTION(insn, arch, cause, address);
     }
     
     // SD
-    RVExecStatus RV64I_SD(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SD(const RVInstruction& insn, RVArchitectural& arch)
     {
         addr_t addr =   arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
         data_t data = { arch.GR64()[insn.GetRS2()] };
@@ -822,7 +669,7 @@ namespace Jasse {
     }
 
     // SW
-    RVExecStatus RV64I_SW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SW(const RVInstruction& insn, RVArchitectural& arch)
     {
         addr_t addr =   arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
         data_t data = { arch.GR64()[insn.GetRS2()] };
@@ -840,7 +687,7 @@ namespace Jasse {
     }
 
     // SH
-    RVExecStatus RV64I_SH(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SH(const RVInstruction& insn, RVArchitectural& arch)
     {
         addr_t addr =   arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
         data_t data = { arch.GR64()[insn.GetRS2()] };
@@ -858,7 +705,7 @@ namespace Jasse {
     }
 
     // SB
-    RVExecStatus RV64I_SB(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SB(const RVInstruction& insn, RVArchitectural& arch)
     {
         addr_t addr =   arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
         data_t data = { arch.GR64()[insn.GetRS2()] };
@@ -877,7 +724,7 @@ namespace Jasse {
 
 
     // FENCE
-    RVExecStatus RV64I_FENCE(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_FENCE(const RVInstruction& insn, RVArchitectural& arch)
     {
         // nothing to be done in emulator
 
@@ -886,7 +733,7 @@ namespace Jasse {
 
 
     // ECALL
-    RVExecStatus RV64I_ECALL(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_ECALL(const RVInstruction& insn, RVArchitectural& arch)
     {
         // only M-mode supported currently
 
@@ -896,7 +743,7 @@ namespace Jasse {
     }
 
     // EBREAK
-    RVExecStatus RV64I_EBREAK(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_EBREAK(const RVInstruction& insn, RVArchitectural& arch)
     {
         TrapEnter(arch, TRAP_EXCEPTION, EXCEPTION_BREAKPOINT);
 
@@ -904,7 +751,7 @@ namespace Jasse {
     }
 
     // MRET
-    RVExecStatus RV64I_MRET(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_MRET(const RVInstruction& insn, RVArchitectural& arch)
     {
         TrapReturn(arch);
 
@@ -912,7 +759,7 @@ namespace Jasse {
     }
 
     // SRET
-    RVExecStatus RV64I_SRET(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SRET(const RVInstruction& insn, RVArchitectural& arch)
     {
         // TODO to be implemented
 
@@ -920,7 +767,7 @@ namespace Jasse {
     }
 
     // WFI
-    RVExecStatus RV64I_WFI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_WFI(const RVInstruction& insn, RVArchitectural& arch)
     {
         return EXEC_WAIT_FOR_INTERRUPT;
     }
@@ -928,58 +775,114 @@ namespace Jasse {
     // TODO ... Add RV64I instructions here ...
 }
 
+// RV Codepoint instances
+namespace Jasse {
 
-#define RV64I_INSNDEF(name, executor) \
-    insn.SetName(name); \
-    insn.SetExecutor(&executor);
+//  static const RV64IDecoder* const    RV64I = new RV64IDecoder;   // RV64I Decoder Instance
 
-#define RV64I_TYPE(T) \
-    DecodeNormalRV64Type##T(insnraw, insn);
+    static const RVCodepoint RV64I_ADDI     = RVCodepoint("addi"    , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_ADDI);
+    static const RVCodepoint RV64I_SLTI     = RVCodepoint("slti"    , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_SLTI);
+    static const RVCodepoint RV64I_SLTIU    = RVCodepoint("sltiu"   , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_SLTIU);
+    static const RVCodepoint RV64I_ANDI     = RVCodepoint("andi"    , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_ANDI);
+    static const RVCodepoint RV64I_ORI      = RVCodepoint("ori"     , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_ORI);
+    static const RVCodepoint RV64I_XORI     = RVCodepoint("xori"    , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_XORI);
+    static const RVCodepoint RV64I_SLLI     = RVCodepoint("slli"    , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_SLLI);
+    static const RVCodepoint RV64I_SRLI     = RVCodepoint("srli"    , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_SRLI);
+    static const RVCodepoint RV64I_SRAI     = RVCodepoint("srai"    , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_SRAI);
 
-// codepoints
+    static const RVCodepoint RV64I_ADDIW    = RVCodepoint("addiw"   , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_ADDIW);
+    static const RVCodepoint RV64I_SLLIW    = RVCodepoint("slliw"   , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_SLLIW);
+    static const RVCodepoint RV64I_SRLIW    = RVCodepoint("srliw"   , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_SRLIW);
+    static const RVCodepoint RV64I_SRAIW    = RVCodepoint("sraiw"   , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_SRAIW);
+
+    static const RVCodepoint RV64I_ADD      = RVCodepoint("add"     , RVTYPE_R, &TextualizeRVTypeR, &RV64IExecutor_ADD);
+    static const RVCodepoint RV64I_SUB      = RVCodepoint("sub"     , RVTYPE_R, &TextualizeRVTypeR, &RV64IExecutor_SUB);
+    static const RVCodepoint RV64I_SLT      = RVCodepoint("slt"     , RVTYPE_R, &TextualizeRVTypeR, &RV64IExecutor_SLT);
+    static const RVCodepoint RV64I_SLTU     = RVCodepoint("sltu"    , RVTYPE_R, &TextualizeRVTypeR, &RV64IExecutor_SLTU);
+    static const RVCodepoint RV64I_AND      = RVCodepoint("and"     , RVTYPE_R, &TextualizeRVTypeR, &RV64IExecutor_AND);
+    static const RVCodepoint RV64I_OR       = RVCodepoint("or"      , RVTYPE_R, &TextualizeRVTypeR, &RV64IExecutor_OR);
+    static const RVCodepoint RV64I_XOR      = RVCodepoint("xor"     , RVTYPE_R, &TextualizeRVTypeR, &RV64IExecutor_XOR);
+    static const RVCodepoint RV64I_SLL      = RVCodepoint("sll"     , RVTYPE_R, &TextualizeRVTypeR, &RV64IExecutor_SLL);
+    static const RVCodepoint RV64I_SRL      = RVCodepoint("srl"     , RVTYPE_R, &TextualizeRVTypeR, &RV64IExecutor_SRL);
+    static const RVCodepoint RV64I_SRA      = RVCodepoint("sra"     , RVTYPE_R, &TextualizeRVTypeR, &RV64IExecutor_SRA);
+
+    static const RVCodepoint RV64I_ADDW     = RVCodepoint("addw"    , RVTYPE_R, &TextualizeRVTypeR, &RV64IExecutor_ADDW);
+    static const RVCodepoint RV64I_SUBW     = RVCodepoint("subw"    , RVTYPE_R, &TextualizeRVTypeR, &RV64IExecutor_SUBW);
+    static const RVCodepoint RV64I_SLLW     = RVCodepoint("sllw"    , RVTYPE_R, &TextualizeRVTypeR, &RV64IExecutor_SLLW);
+    static const RVCodepoint RV64I_SRLW     = RVCodepoint("srlw"    , RVTYPE_R, &TextualizeRVTypeR, &RV64IExecutor_SRLW);
+    static const RVCodepoint RV64I_SRAW     = RVCodepoint("sraw"    , RVTYPE_R, &TextualizeRVTypeR, &RV64IExecutor_SRAW);
+
+    static const RVCodepoint RV64I_BEQ      = RVCodepoint("beq"     , RVTYPE_B, &TextualizeRVTypeB, &RV64IExecutor_BEQ);
+    static const RVCodepoint RV64I_BNE      = RVCodepoint("bne"     , RVTYPE_B, &TextualizeRVTypeB, &RV64IExecutor_BNE);
+    static const RVCodepoint RV64I_BLT      = RVCodepoint("blt"     , RVTYPE_B, &TextualizeRVTypeB, &RV64IExecutor_BLT);
+    static const RVCodepoint RV64I_BLTU     = RVCodepoint("bltu"    , RVTYPE_B, &TextualizeRVTypeB, &RV64IExecutor_BLTU);
+    static const RVCodepoint RV64I_BGE      = RVCodepoint("bge"     , RVTYPE_B, &TextualizeRVTypeB, &RV64IExecutor_BGE);
+    static const RVCodepoint RV64I_BGEU     = RVCodepoint("bgeu"    , RVTYPE_B, &TextualizeRVTypeB, &RV64IExecutor_BGEU);
+
+    static const RVCodepoint RV64I_LD       = RVCodepoint("ld"      , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_LD);
+    static const RVCodepoint RV64I_LW       = RVCodepoint("lw"      , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_LW);
+    static const RVCodepoint RV64I_LH       = RVCodepoint("lh"      , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_LH);
+    static const RVCodepoint RV64I_LB       = RVCodepoint("lb"      , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_LB);
+    static const RVCodepoint RV64I_LWU      = RVCodepoint("lwu"     , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_LWU);
+    static const RVCodepoint RV64I_LHU      = RVCodepoint("lhu"     , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_LHU);
+    static const RVCodepoint RV64I_LBU      = RVCodepoint("lbu"     , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_LBU);
+
+    static const RVCodepoint RV64I_SD       = RVCodepoint("sd"      , RVTYPE_S, &TextualizeRVTypeS, &RV64IExecutor_SD);
+    static const RVCodepoint RV64I_SW       = RVCodepoint("sw"      , RVTYPE_S, &TextualizeRVTypeS, &RV64IExecutor_SW);
+    static const RVCodepoint RV64I_SH       = RVCodepoint("sh"      , RVTYPE_S, &TextualizeRVTypeS, &RV64IExecutor_SH);
+    static const RVCodepoint RV64I_SB       = RVCodepoint("sb"      , RVTYPE_S, &TextualizeRVTypeS, &RV64IExecutor_SB);
+
+    static const RVCodepoint RV64I_ECALL    = RVCodepoint("ecall"   , RVTYPE_I, &TextualizeRVZeroOperand, &RV64IExecutor_ECALL);
+    static const RVCodepoint RV64I_EBREAK   = RVCodepoint("ebreak"  , RVTYPE_I, &TextualizeRVZeroOperand, &RV64IExecutor_EBREAK);
+    static const RVCodepoint RV64I_MRET     = RVCodepoint("mret"    , RVTYPE_I, &TextualizeRVZeroOperand, &RV64IExecutor_MRET);
+    static const RVCodepoint RV64I_SRET     = RVCodepoint("sret"    , RVTYPE_I, &TextualizeRVZeroOperand, &RV64IExecutor_SRET);
+    static const RVCodepoint RV64I_WFI      = RVCodepoint("wfi"     , RVTYPE_I, &TextualizeRVZeroOperand, &RV64IExecutor_WFI);
+
+    static const RVCodepoint RV64I_FENCE    = RVCodepoint("fence"   , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_FENCE);
+
+    static const RVCodepoint RV64I_LUI      = RVCodepoint("lui"     , RVTYPE_U, &TextualizeRVTypeU, &RV64IExecutor_LUI);
+    static const RVCodepoint RV64I_AUIPC    = RVCodepoint("auipc"   , RVTYPE_U, &TextualizeRVTypeU, &RV64IExecutor_AUIPC);
+    
+    static const RVCodepoint RV64I_JAL      = RVCodepoint("jal"     , RVTYPE_J, &TextualizeRVTypeJ, &RV64IExecutor_JAL);
+    static const RVCodepoint RV64I_JALR     = RVCodepoint("jalr"    , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_JALR);
+}
+
+
+#define RV64I_DECINSN(T, codepoint) \
+    (DecodeNormalRV64Type##T(insnraw, insn), insn.SetTrait(codepoint), true)
+
+// codepoints - decoder facilities
 namespace Jasse {
 
     //
     bool RV64ICodePoint_Funct3_ADDI(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(I) RV64I_INSNDEF("addi", RV64I_ADDI);
-
-        return true;
+        return RV64I_DECINSN(I, RV64I_ADDI);
     }
 
     bool RV64ICodePoint_Funct3_SLTI(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(I) RV64I_INSNDEF("slti", RV64I_ADDI);
-
-        return true;
+        return RV64I_DECINSN(I, RV64I_SLTI);
     }
 
     bool RV64ICodePoint_Funct3_SLTIU(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(I) RV64I_INSNDEF("sltiu", RV64I_SLTIU);
-
-        return true;
+        return RV64I_DECINSN(I, RV64I_SLTIU);
     }
 
     bool RV64ICodePoint_Funct3_ANDI(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(I) RV64I_INSNDEF("andi", RV64I_ANDI);
-
-        return true;
+        return RV64I_DECINSN(I, RV64I_ANDI);
     }
 
     bool RV64ICodePoint_Funct3_ORI(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(I) RV64I_INSNDEF("ori", RV64I_ORI);
-
-        return true;
+        return RV64I_DECINSN(I, RV64I_ORI);
     }
 
     bool RV64ICodePoint_Funct3_XORI(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(I) RV64I_INSNDEF("xori", RV64I_XORI);
-
-        return true;
+        return RV64I_DECINSN(I, RV64I_XORI);
     }
 
     bool RV64ICodePoint_Funct3_SLLI(insnraw_t insnraw, RVInstruction& insn)
@@ -987,11 +890,7 @@ namespace Jasse {
         int funct6 = GET_STD_OPERAND(insnraw, RV64I_FUNCT6);
 
         if (funct6 == RV64I_FUNCT6_SLLI)
-        {
-            RV64I_TYPE(I) RV64I_INSNDEF("slli", RV64I_SLLI);
-
-            return true;
-        }
+            return RV64I_DECINSN(I, RV64I_SLLI);
         else
             return false;
     }
@@ -1001,17 +900,9 @@ namespace Jasse {
         int funct6 = GET_STD_OPERAND(insnraw, RV64I_FUNCT6);
 
         if (funct6 == RV64I_FUNCT6_SRLI)
-        {
-            RV64I_TYPE(I) RV64I_INSNDEF("srli", RV64I_SRLI);
-
-            return true;
-        }
+            return RV64I_DECINSN(I, RV64I_SRLI);
         else if (funct6 == RV64I_FUNCT6_SRAI)
-        {
-            RV64I_TYPE(I) RV64I_INSNDEF("srai", RV64I_SRAI);
-
-            return true;
-        }
+            return RV64I_DECINSN(I, RV64I_SRAI);
         else
             return false;
     }
@@ -1019,9 +910,7 @@ namespace Jasse {
     //
     bool RV64ICodePoint_Funct3_ADDIW(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(I) RV64I_INSNDEF("addiw", RV64I_ADDIW);
-
-        return true;
+        return RV64I_DECINSN(I, RV64I_ADDIW);
     }
 
     bool RV64ICodePoint_Funct3_SLLIW(insnraw_t insnraw, RVInstruction& insn)
@@ -1029,11 +918,7 @@ namespace Jasse {
         int funct7 = GET_STD_OPERAND(insnraw, RV64I_FUNCT7);
 
         if (funct7 == RV64I_FUNCT7_SLLIW)
-        {
-            RV64I_TYPE(I) RV64I_INSNDEF("slliw", RV64I_SLLIW);
-
-            return true;
-        }
+            return RV64I_DECINSN(I, RV64I_SLLIW);
         else
             return false;
     }
@@ -1043,17 +928,9 @@ namespace Jasse {
         int funct7 = GET_STD_OPERAND(insnraw, RV64I_FUNCT7);
 
         if (funct7 == RV64I_FUNCT7_SRLIW)
-        {
-            RV64I_TYPE(I) RV64I_INSNDEF("srliw", RV64I_SRLIW);
-
-            return true;
-        }
+            return RV64I_DECINSN(I, RV64I_SRLIW);
         else if (funct7 == RV64I_FUNCT7_SRAIW)
-        {
-            RV64I_TYPE(I) RV64I_INSNDEF("sraiw", RV64I_SRAIW);
-
-            return true;
-        }
+            return RV64I_DECINSN(I, RV64I_SRAIW);
         else
             return false;
     }
@@ -1064,17 +941,9 @@ namespace Jasse {
         int funct7 = GET_STD_OPERAND(insnraw, RV32I_FUNCT7);
 
         if (funct7 == RV32I_FUNCT7_ADD)
-        {
-            RV64I_TYPE(R) RV64I_INSNDEF("add", RV64I_ADD);
-
-            return true;
-        }
+            return RV64I_DECINSN(R, RV64I_ADD);
         else if (funct7 == RV32I_FUNCT7_SUB)
-        {
-            RV64I_TYPE(R) RV64I_INSNDEF("sub", RV64I_SUB);
-
-            return true;
-        }
+            return RV64I_DECINSN(R, RV64I_SUB);
         else
             return false;
     }
@@ -1084,11 +953,7 @@ namespace Jasse {
         int funct7 = GET_STD_OPERAND(insnraw, RV32I_FUNCT7);
 
         if (funct7 == RV32I_FUNCT7_SLT)
-        {
-            RV64I_TYPE(R) RV64I_INSNDEF("slt", RV64I_SLT);
-
-            return true;
-        }
+            return RV64I_DECINSN(R, RV64I_SLT);
         else
             return false;
     }
@@ -1098,11 +963,7 @@ namespace Jasse {
         int funct7 = GET_STD_OPERAND(insnraw, RV32I_FUNCT7);
 
         if (funct7 == RV32I_FUNCT7_SLTU)
-        {
-            RV64I_TYPE(R) RV64I_INSNDEF("sltu", RV64I_SLTU);
-
-            return true;
-        }
+            return RV64I_DECINSN(R, RV64I_SLTU);
         else
             return false;
     }
@@ -1112,11 +973,7 @@ namespace Jasse {
         int funct7 = GET_STD_OPERAND(insnraw, RV32I_FUNCT7);
 
         if (funct7 == RV32I_FUNCT7_AND)
-        {
-            RV64I_TYPE(R) RV64I_INSNDEF("and", RV64I_AND);
-
-            return true;
-        }
+            return RV64I_DECINSN(R, RV64I_AND);
         else
             return false;
     }
@@ -1126,11 +983,7 @@ namespace Jasse {
         int funct7 = GET_STD_OPERAND(insnraw, RV32I_FUNCT7);
 
         if (funct7 == RV32I_FUNCT7_OR)
-        {
-            RV64I_TYPE(R) RV64I_INSNDEF("or", RV64I_OR);
-
-            return true;
-        }
+            return RV64I_DECINSN(R, RV64I_OR);
         else
             return false;
     }
@@ -1140,11 +993,7 @@ namespace Jasse {
         int funct7 = GET_STD_OPERAND(insnraw, RV32I_FUNCT7);
 
         if (funct7 == RV32I_FUNCT7_XOR)
-        {
-            RV64I_TYPE(R) RV64I_INSNDEF("xor", RV64I_XOR);
-
-            return true;
-        }
+            return RV64I_DECINSN(R, RV64I_XOR);
         else
             return false;
     }
@@ -1154,11 +1003,7 @@ namespace Jasse {
         int funct7 = GET_STD_OPERAND(insnraw, RV32I_FUNCT7);
 
         if (funct7 == RV32I_FUNCT7_SLL)
-        {
-            RV64I_TYPE(R) RV64I_INSNDEF("sll", RV64I_SLL);
-
-            return true;
-        }
+            return RV64I_DECINSN(R, RV64I_SLL);
         else
             return false;
     }
@@ -1168,17 +1013,9 @@ namespace Jasse {
         int funct7 = GET_STD_OPERAND(insnraw, RV32I_FUNCT7);
 
         if (funct7 == RV32I_FUNCT7_SRL)
-        {
-            RV64I_TYPE(R) RV64I_INSNDEF("srl", RV64I_SRL);
-
-            return true;
-        }
+            return RV64I_DECINSN(R, RV64I_SRL);
         else if (funct7 == RV32I_FUNCT7_SRA)
-        {
-            RV64I_TYPE(R) RV64I_INSNDEF("sra", RV64I_SRA);
-
-            return true;
-        }
+            return RV64I_DECINSN(R, RV64I_SRA);
         else
             return false;
     }
@@ -1189,17 +1026,9 @@ namespace Jasse {
         int funct7 = GET_STD_OPERAND(insnraw, RV64I_FUNCT7);
 
         if (funct7 == RV64I_FUNCT7_ADDW)
-        {
-            RV64I_TYPE(R) RV64I_INSNDEF("addw", RV64I_ADDW);
-
-            return true;
-        }
+            return RV64I_DECINSN(R, RV64I_ADDW);
         else if (funct7 == RV64I_FUNCT7_SUBW)
-        {
-            RV64I_TYPE(R) RV64I_INSNDEF("subw", RV64I_SUBW);
-
-            return true;
-        }
+            return RV64I_DECINSN(R, RV64I_SUBW);
         else
             return false;
     }
@@ -1209,11 +1038,7 @@ namespace Jasse {
         int funct7 = GET_STD_OPERAND(insnraw, RV64I_FUNCT7);
 
         if (funct7 == RV64I_FUNCT7_SLLW)
-        {
-            RV64I_TYPE(R) RV64I_INSNDEF("sllw", RV64I_SLLW);
-
-            return true;
-        }
+            return RV64I_DECINSN(R, RV64I_SLLW);
         else
             return false;
     }
@@ -1223,17 +1048,9 @@ namespace Jasse {
         int funct7 = GET_STD_OPERAND(insnraw, RV64I_FUNCT7);
 
         if (funct7 == RV64I_FUNCT7_SRLW)
-        {
-            RV64I_TYPE(R) RV64I_INSNDEF("srlw", RV64I_SRLW);
-
-            return true;
-        }
+            return RV64I_DECINSN(R, RV64I_SRLW);
         else if (funct7 == RV64I_FUNCT7_SRAW)
-        {
-            RV64I_TYPE(R) RV64I_INSNDEF("sraw", RV64I_SRAW);
-
-            return true;
-        }
+            return RV64I_DECINSN(R, RV64I_SRAW);
         else
             return false;
     }
@@ -1242,162 +1059,281 @@ namespace Jasse {
     //
     bool RV64ICodePoint_Funct3_BEQ(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(B) RV64I_INSNDEF("beq", RV64I_BEQ);
-
-        return true;
+        return RV64I_DECINSN(B, RV64I_BEQ);
     }
 
     bool RV64ICodePoint_Funct3_BNE(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(B) RV64I_INSNDEF("bne", RV64I_BNE);
-
-        return true;
+        return RV64I_DECINSN(B, RV64I_BNE);
     }
 
     bool RV64ICodePoint_Funct3_BLT(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(B) RV64I_INSNDEF("blt", RV64I_BLT);
-
-        return true;
+        return RV64I_DECINSN(B, RV64I_BLT);
     }
 
     bool RV64ICodePoint_Funct3_BLTU(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(B) RV64I_INSNDEF("bltu", RV64I_BLTU);
-
-        return true;
+        return RV64I_DECINSN(B, RV64I_BLTU);
     }
 
     bool RV64ICodePoint_Funct3_BGE(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(B) RV64I_INSNDEF("bge", RV64I_BGE);
-
-        return true;
+        return RV64I_DECINSN(B, RV64I_BGE);
     }
 
     bool RV64ICodePoint_Funct3_BGEU(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(B) RV64I_INSNDEF("bgeu", RV64I_BGEU);
-
-        return true;
+        return RV64I_DECINSN(B, RV64I_BGEU);
     }
 
     //
     bool RV64ICodePoint_Funct3_LD(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(I) RV64I_INSNDEF("ld", RV64I_LD);
-
-        return true;
+        return RV64I_DECINSN(I, RV64I_LD);
     }
 
     bool RV64ICodePoint_Funct3_LW(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(I) RV64I_INSNDEF("lw", RV64I_LW);
-
-        return true;
+        return RV64I_DECINSN(I, RV64I_LW);
     }
 
     bool RV64ICodePoint_Funct3_LH(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(I) RV64I_INSNDEF("lh", RV64I_LH);
-
-        return true;
+        return RV64I_DECINSN(I, RV64I_LH);
     }
 
     bool RV64ICodePoint_Funct3_LB(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(I) RV64I_INSNDEF("lb", RV64I_LB);
-
-        return true;
+        return RV64I_DECINSN(I, RV64I_LB);
     }
 
     bool RV64ICodePoint_Funct3_LWU(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(I) RV64I_INSNDEF("lwu", RV64I_LWU);
-
-        return true;
+        return RV64I_DECINSN(I, RV64I_LWU);
     }
 
     bool RV64ICodePoint_Funct3_LHU(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(I) RV64I_INSNDEF("lhu", RV64I_LHU);
-
-        return true;
+        return RV64I_DECINSN(I, RV64I_LHU);
     }
 
     bool RV64ICodePoint_Funct3_LBU(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(I) RV64I_INSNDEF("lbu", RV64I_LBU);
-
-        return true;
+        return RV64I_DECINSN(I, RV64I_LBU);
     }
 
     //
     bool RV64ICodePoint_Funct3_SD(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(S) RV64I_INSNDEF("sd", RV64I_SD);
-
-        return true;
+        return RV64I_DECINSN(S, RV64I_SD);
     }
 
     bool RV64ICodePoint_Funct3_SW(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(S) RV64I_INSNDEF("sw", RV64I_SW);
-
-        return true;
+        return RV64I_DECINSN(S, RV64I_SW);
     }
 
     bool RV64ICodePoint_Funct3_SH(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(S) RV64I_INSNDEF("sh", RV64I_SH);
-
-        return true;
+        return RV64I_DECINSN(S, RV64I_SH);
     }
 
     bool RV64ICodePoint_Funct3_SB(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(S) RV64I_INSNDEF("sb", RV64I_SB);
-
-        return true;
+        return RV64I_DECINSN(S, RV64I_SB);
     }
 
     //
     bool RV64ICodePoint_Funct12_ECALL(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(I) RV64I_INSNDEF("ecall", RV64I_ECALL);
-
-        return true;
+        return RV64I_DECINSN(I, RV64I_ECALL);
     }
 
     bool RV64ICodePoint_Funct12_EBREAK(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(I) RV64I_INSNDEF("ebreak", RV64I_EBREAK);
-
-        return true;
+        return RV64I_DECINSN(I, RV64I_EBREAK);
     }
 
     bool RV64ICodePoint_Funct12_MRET(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(I) RV64I_INSNDEF("mret", RV64I_MRET);
-
-        return true;
+        return RV64I_DECINSN(I, RV64I_MRET);
     }
 
     bool RV64ICodePoint_Funct12_SRET(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(I) RV64I_INSNDEF("sret", RV64I_SRET);
-
-        return true;
+        return RV64I_DECINSN(I, RV64I_SRET);
     }
 
     bool RV64ICodePoint_Funct12_WFI(insnraw_t insnraw, RVInstruction& insn)
     {
-        RV64I_TYPE(I) RV64I_INSNDEF("wfi", RV64I_WFI);
-
-        return true;
+        return RV64I_DECINSN(I, RV64I_WFI);
     }
 
     // TODO ... Add RV64I instruction codepoints here ...
+}
+
+
+
+//
+namespace Jasse {
+
+    // RV64I codepoint
+    typedef bool (*RV64ICodepoint)(insnraw_t insnraw, RVInstruction& insn);
+
+    // RV64I codegroup (OPCODE base)
+    class RV64ICodegroup {
+    public:
+        virtual bool    Decode(insnraw_t insnraw, RVInstruction& insn) const = 0;
+    };
+
+
+    // RV64I unique codegroup
+    class RV64IUniqueCodegroup : public RV64ICodegroup {
+    private:
+        RV64ICodepoint   codepoint;
+    
+    public:
+        RV64IUniqueCodegroup(RV64ICodepoint codepoint);
+        ~RV64IUniqueCodegroup();
+
+        virtual bool    Decode(insnraw_t insnraw, RVInstruction& insn) const override;
+    };
+
+    // RV64I FUNCT3 codegroup
+    class RV64IFunct3Codegroup : public RV64ICodegroup {
+    private:
+        RV64ICodepoint*  codepoints; // 8 (2 ^ 3)
+
+    public:
+        RV64IFunct3Codegroup();
+        ~RV64IFunct3Codegroup();
+
+        void            Define(int funct3, RV64ICodepoint codepoint);
+        virtual bool    Decode(insnraw_t insnraw, RVInstruction& insn) const override;
+    };
+
+
+    // RV64I Decoder
+    class RV64IDecoder : public RVDecoder {
+    private:
+        RV64ICodegroup**    codegroups; // 32 (2 ^ (7 - 2))
+
+    public:
+        RV64IDecoder();
+        ~RV64IDecoder();
+
+        virtual bool    Decode(insnraw_t insnraw, RVInstruction& insn) const override;
+    };
+
+    // RV64I Decoder Instance
+    static const RV64IDecoder* const    RV64I = new RV64IDecoder;
+}
+
+
+namespace Jasse {
+
+#define __RV64I_UNIQUE_CODEGROUP(name) \
+    RV64IUniqueCodegroup_##name
+
+#define __RV64I_UNIQUE_CODEGROUP_DEFINE(name, function) \
+    __RV64I_UNIQUE_CODEGROUP(name)::__RV64I_UNIQUE_CODEGROUP(name)() \
+        : RV64IUniqueCodegroup (&function) \
+    { } \
+
+#define __RV64I_UNIQUE_CODEGROUP_DEFINE_FUNC(name, function) \
+    bool function(insnraw_t insnraw, RVInstruction& insn); \
+    __RV64I_UNIQUE_CODEGROUP(name)::__RV64I_UNIQUE_CODEGROUP(name)() \
+        : RV64IUniqueCodegroup (&function) \
+    { } \
+    bool function(insnraw_t insnraw, RVInstruction& insn) \
+
+#define __RV64I_UNIQUE_CODEGROUP_DECLARE(name) \
+    class __RV64I_UNIQUE_CODEGROUP(name) : public RV64IUniqueCodegroup { \
+    public: \
+        __RV64I_UNIQUE_CODEGROUP(name)(); \
+    }; \
+
+
+#define __RV64I_FUNCT3_CODEGROUP(name) \
+    RV64IFunct3Codegroup_##name
+
+#define __RV64I_FUNCT3_CODEGROUP_CONSTRUCTOR(name) \
+    __RV64I_FUNCT3_CODEGROUP(name)::__RV64I_FUNCT3_CODEGROUP(name)()
+
+#define __RV64I_FUNCT3_CODEGROUP_DECONSTRUCTOR(name) \
+    __RV64I_FUNCT3_CODEGROUP(name)::~__RV64I_FUNCT3_CODEGROUP(name)()
+
+
+#define __RV64I_FUNCT3_CODEGROUP_DECLARE(name) \
+    class __RV64I_FUNCT3_CODEGROUP(name) : public RV64IFunct3Codegroup { \
+    public: \
+        __RV64I_FUNCT3_CODEGROUP(name)(); \
+        ~__RV64I_FUNCT3_CODEGROUP(name)(); \
+    }; \
+
+
+    // Codepoint declarations
+    __RV64I_FUNCT3_CODEGROUP_DECLARE(OP)
+    __RV64I_FUNCT3_CODEGROUP_DECLARE(OP_32)
+    __RV64I_FUNCT3_CODEGROUP_DECLARE(OP_IMM)
+    __RV64I_FUNCT3_CODEGROUP_DECLARE(OP_IMM_32)
+
+    __RV64I_FUNCT3_CODEGROUP_DECLARE(BRANCH)
+    __RV64I_FUNCT3_CODEGROUP_DECLARE(LOAD)
+    __RV64I_FUNCT3_CODEGROUP_DECLARE(STORE)
+
+    __RV64I_UNIQUE_CODEGROUP_DECLARE(MISC_MEM)
+    __RV64I_UNIQUE_CODEGROUP_DECLARE(SYSTEM)
+
+    __RV64I_UNIQUE_CODEGROUP_DECLARE(LUI)
+    __RV64I_UNIQUE_CODEGROUP_DECLARE(AUIPC)
+    __RV64I_UNIQUE_CODEGROUP_DECLARE(JAL)
+    __RV64I_UNIQUE_CODEGROUP_DECLARE(JALR)
+};
+
+
+// Implementation of: class RV64IUniqueCodegroup
+namespace Jasse {
+    RV64IUniqueCodegroup::RV64IUniqueCodegroup(RV64ICodepoint codepoint)
+        : codepoint (codepoint)
+    { }
+
+    RV64IUniqueCodegroup::~RV64IUniqueCodegroup()
+    { }
+
+    bool RV64IUniqueCodegroup::Decode(insnraw_t insnraw, RVInstruction& insn) const
+    {
+        return (*codepoint)(insnraw, insn);
+    }
+}
+
+
+// Implementation of: class RV64IFunct3Codegroup
+namespace Jasse {
+    RV64IFunct3Codegroup::RV64IFunct3Codegroup()
+        : codepoints(new RV64ICodepoint[8]())
+    { }
+
+    RV64IFunct3Codegroup::~RV64IFunct3Codegroup()
+    { 
+        delete[] codepoints;
+    }
+
+    bool RV64IFunct3Codegroup::Decode(insnraw_t insnraw, RVInstruction& insn) const
+    {
+        int funct3 = GET_OPERAND(insnraw, RV64I_FUNCT3_MASK, RV64I_FUNCT3_OFFSET);
+
+        if (codepoints[funct3])
+            return (*(codepoints[funct3]))(insnraw, insn);
+        else
+            return false;
+    }
+
+    inline void RV64IFunct3Codegroup::Define(int funct3, RV64ICodepoint codepoint)
+    {
+        codepoints[funct3] = codepoint;
+    }
 }
 
 // codegroups
@@ -1509,9 +1445,7 @@ namespace Jasse {
         if (GET_STD_OPERAND(insnraw, RV32I_FUNCT3) != RV32I_FUNCT3_FENCE)
             return false;
 
-        RV64I_TYPE(I) RV64I_INSNDEF("fence", RV64I_FENCE);
-
-        return true;
+        return RV64I_DECINSN(I, RV64I_FENCE);
     }
 
     // 
@@ -1551,36 +1485,26 @@ namespace Jasse {
     //
     __RV64I_UNIQUE_CODEGROUP_DEFINE_FUNC(LUI, RV64ICodeGroup_Unique_LUI)
     {
-        RV64I_TYPE(U) RV64I_INSNDEF("lui", RV64I_LUI);
-
-        return true;
+        return RV64I_DECINSN(U, RV64I_LUI);
     }
 
     //
     __RV64I_UNIQUE_CODEGROUP_DEFINE_FUNC(AUIPC, RV64ICodeGroup_Unique_AUIPC)
     {
-        RV64I_TYPE(U) RV64I_INSNDEF("auipc", RV64I_AUIPC);
-
-        return true;
+        return RV64I_DECINSN(U, RV64I_AUIPC);
     }
 
     //
     __RV64I_UNIQUE_CODEGROUP_DEFINE_FUNC(JAL, RV64ICodeGroup_Unique_JAL)
     {
-        RV64I_TYPE(J) RV64I_INSNDEF("jal", RV64I_JAL);
-
-        return true;
+        return RV64I_DECINSN(J, RV64I_JAL);
     }
 
     //
     __RV64I_UNIQUE_CODEGROUP_DEFINE_FUNC(JALR, RV64ICodeGroup_Unique_JALR)
     {
         if (GET_STD_OPERAND(insnraw, RV32I_FUNCT3) == RV32I_FUNCT3_JALR)
-        {
-            RV64I_TYPE(I) RV64I_INSNDEF("jalr", RV64I_JALR);
-
-            return true;
-        }
+            return RV64I_DECINSN(I, RV64I_JALR);
         else
             return false;
     }
@@ -1588,4 +1512,57 @@ namespace Jasse {
 
 
 
+
+
+// Implementation of: class RV64IDecoder
+namespace Jasse {
+    /*
+    RV64IFunct3Codegroup**  codegroups; // 32 (2 ^ (7 - 2))
+    */
+
+    RV64IDecoder::RV64IDecoder()
+        : RVDecoder     ("I", "RV64I")
+        , codegroups    (new RV64ICodegroup*[32]())
+    { 
+        codegroups[RV_OPCODE_OP         >> 2]   = new __RV64I_FUNCT3_CODEGROUP(OP);
+        codegroups[RV_OPCODE_OP_32      >> 2]   = new __RV64I_FUNCT3_CODEGROUP(OP_32);
+        codegroups[RV_OPCODE_OP_IMM     >> 2]   = new __RV64I_FUNCT3_CODEGROUP(OP_IMM);
+        codegroups[RV_OPCODE_OP_IMM_32  >> 2]   = new __RV64I_FUNCT3_CODEGROUP(OP_IMM_32);
+
+        codegroups[RV_OPCODE_BRANCH     >> 2]   = new __RV64I_FUNCT3_CODEGROUP(BRANCH);
+        codegroups[RV_OPCODE_LOAD       >> 2]   = new __RV64I_FUNCT3_CODEGROUP(LOAD);
+        codegroups[RV_OPCODE_STORE      >> 2]   = new __RV64I_FUNCT3_CODEGROUP(STORE);
+
+        codegroups[RV_OPCODE_MISC_MEM   >> 2]   = new __RV64I_UNIQUE_CODEGROUP(MISC_MEM);
+        codegroups[RV_OPCODE_SYSTEM     >> 2]   = new __RV64I_UNIQUE_CODEGROUP(SYSTEM);
+
+        codegroups[RV_OPCODE_LUI        >> 2]   = new __RV64I_UNIQUE_CODEGROUP(LUI);
+        codegroups[RV_OPCODE_AUIPC      >> 2]   = new __RV64I_UNIQUE_CODEGROUP(AUIPC);
+        codegroups[RV_OPCODE_JAL        >> 2]   = new __RV64I_UNIQUE_CODEGROUP(JAL);
+        codegroups[RV_OPCODE_JALR       >> 2]   = new __RV64I_UNIQUE_CODEGROUP(JALR);
+    }
+
+    RV64IDecoder::~RV64IDecoder()
+    {
+        for (int i = 0; i < 32; i++)
+            if (codegroups[i])
+                delete codegroups[i];
+
+        delete[] codegroups;
+    }
+
+    bool RV64IDecoder::Decode(insnraw_t insnraw, RVInstruction& insn) const
+    {
+        if ((insnraw & 0x00000003U) != 0x03)
+            return false;
+
+        RV64ICodegroup* codegroup 
+            = codegroups[GET_STD_OPERAND(insnraw, RV_OPCODE) >> 2];
+
+        if (!codegroup)
+            return false;
+
+        return codegroup->Decode(insnraw, insn);
+    }
+}
 
