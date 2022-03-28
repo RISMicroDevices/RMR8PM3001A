@@ -11,6 +11,8 @@
 #include <iomanip>
 #include <sstream>
 #include <list>
+#include <initializer_list>
+#include <memory>
 
 #include "riscvdef.hpp"
 #include "riscvmem.hpp"
@@ -294,6 +296,7 @@ namespace Jasse {
 
     public:
         RVDecoderCollection();
+        RVDecoderCollection(std::initializer_list<const RVDecoder*> list);
         RVDecoderCollection(const RVDecoderCollection& obj);
         ~RVDecoderCollection();
 
@@ -321,7 +324,62 @@ namespace Jasse {
 
     // RISC-V Instance
     class RVInstance {
+    public:
+        class Builder;
 
+    private:
+        RVDecoderCollection                 decoders;
+
+        std::shared_ptr<RVArchitectural>    arch;
+        std::shared_ptr<RVMemoryInterface>  MI;
+        std::shared_ptr<RVCSRSpace>         CSR;
+
+    public:
+        RVInstance(const RVDecoderCollection&           decoders,
+                   std::shared_ptr<RVArchitectural>     arch,
+                   std::shared_ptr<RVMemoryInterface>   MI,
+                   std::shared_ptr<RVCSRSpace>          CSR);
+
+        RVInstance() = delete;
+        RVInstance(const RVInstance& obj) = delete;
+        ~RVInstance();
+
+        // TODO
+
+        void    operator=(const RVInstance& obj) = delete;
+    };
+
+    class RVInstance::Builder {
+    private:
+        XLen                                xlen;
+        pc_t                                startup_pc;
+
+        std::shared_ptr<RVMemoryInterface>  MI;
+            
+        RVCSRSpace                          CSR;        // inner-constructed
+
+        RVDecoderCollection                 decoders;   // inner-constructed
+        
+    public:
+        Builder();
+        ~Builder();
+
+        Builder&                        XLEN(XLen xlen);
+
+        Builder&                        StartupPC(pc_t pc);
+        Builder&                        StartupPC32(arch32_t pc);
+        Builder&                        StartupPC64(arch64_t pc);
+
+        Builder&                        Decoder(const RVDecoder* decoder);
+        Builder&                        Decoder(std::initializer_list<const RVDecoder*> decoders);
+
+        Builder&                        MI(RVMemoryInterface*&& MI);
+        Builder&                        MI(std::shared_ptr<RVMemoryInterface> MI);
+
+        Builder&                        CSR(const RVCSRDefinition& CSR);
+        Builder&                        CSR(std::initializer_list<RVCSRDefinition> CSRs);
+
+        std::shared_ptr<RVInstance>     Build() const;
     };
 }
 
@@ -432,6 +490,8 @@ namespace Jasse {
     RVArchitectural::RVArchitectural(const RVArchitectural& obj)
         : _XLEN (obj._XLEN)
         , _PC   (obj._PC)
+        , _MI   (obj._MI)
+        , _CSR  (obj._CSR)
     {
         _GR32 = obj._GR32 ? new RVGeneralRegisters32(*obj._GR32) : nullptr;
         _GR64 = obj._GR64 ? new RVGeneralRegisters64(*obj._GR64) : nullptr;
@@ -839,6 +899,10 @@ namespace Jasse {
 
     RVDecoderCollection::RVDecoderCollection()
         : decoders  (std::list<const RVDecoder*>())
+    { }
+
+    RVDecoderCollection::RVDecoderCollection(std::initializer_list<const RVDecoder*> list)
+        : decoders  (std::list<const RVDecoder*>(list))
     { }
 
     RVDecoderCollection::RVDecoderCollection(const RVDecoderCollection& obj)
