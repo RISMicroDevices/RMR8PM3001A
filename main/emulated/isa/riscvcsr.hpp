@@ -495,7 +495,7 @@ namespace Jasse {
             SubspaceL2(const SubspaceL2& obj);
             ~SubspaceL2();
 
-            void    SetCSR(int index, const RVCSRAllocator allocator) noexcept;
+            RVCSR*  SetCSR(int index, const RVCSRAllocator allocator) noexcept;
             RVCSR*  GetCSR(int index) noexcept;
 
             void    operator=(const SubspaceL2& obj) = delete;
@@ -510,7 +510,7 @@ namespace Jasse {
             SubspaceL1(const SubspaceL1& obj);
             ~SubspaceL1();
 
-            void    SetCSR(int index, const RVCSRAllocator allocator) noexcept;
+            RVCSR*  SetCSR(int index, const RVCSRAllocator allocator) noexcept;
             RVCSR*  GetCSR(int index) noexcept;
 
             void    operator=(const SubspaceL1& obj) = delete;
@@ -527,8 +527,8 @@ namespace Jasse {
         bool    CheckBound(int index) const noexcept;
 
         void    SetCSRs(std::initializer_list<const RVCSRDefinition> list) noexcept;
-        void    SetCSR(const RVCSRDefinition definition) noexcept;
-        void    SetCSR(int address, const RVCSRAllocator allocator) noexcept;
+        RVCSR*  SetCSR(const RVCSRDefinition definition) noexcept;
+        RVCSR*  SetCSR(int address, const RVCSRAllocator allocator) noexcept;
         RVCSR*  GetCSR(int address) const noexcept;
         
         RVCSR*  RequireCSR(int address, const char* hint_name = nullptr) const;
@@ -636,9 +636,9 @@ namespace Jasse {
         delete[] csrs;
     }
 
-    inline void RVCSRSpace::SubspaceL2::SetCSR(int index, const RVCSRAllocator allocator) noexcept
+    inline RVCSR* RVCSRSpace::SubspaceL2::SetCSR(int index, const RVCSRAllocator allocator) noexcept
     {
-        csrs[index & 0x00F] = allocator();
+        return (csrs[index & 0x00F] = allocator());
     }
 
     inline RVCSR* RVCSRSpace::SubspaceL2::GetCSR(int index) noexcept
@@ -677,14 +677,14 @@ namespace Jasse {
         delete[] subspaces;
     }
 
-    inline void RVCSRSpace::SubspaceL1::SetCSR(int index, const RVCSRAllocator allocator) noexcept
+    inline RVCSR* RVCSRSpace::SubspaceL1::SetCSR(int index, const RVCSRAllocator allocator) noexcept
     {
         int indexL1 = (index & 0x0F0) >> 4;
 
         if (!subspaces[indexL1])
             subspaces[indexL1] = new SubspaceL2();
 
-        subspaces[indexL1]->SetCSR(index, allocator);
+        return subspaces[indexL1]->SetCSR(index, allocator);
     }
 
     inline RVCSR* RVCSRSpace::SubspaceL1::GetCSR(int index) noexcept
@@ -745,19 +745,19 @@ namespace Jasse {
             SetCSR(*iter);
     }
 
-    inline void RVCSRSpace::SetCSR(const RVCSRDefinition definition) noexcept
+    inline RVCSR* RVCSRSpace::SetCSR(const RVCSRDefinition definition) noexcept
     {
-        SetCSR(definition.address, definition.allocator);
+        return SetCSR(definition.address, definition.allocator);
     }
 
-    void RVCSRSpace::SetCSR(int address, const RVCSRAllocator allocator) noexcept
+    RVCSR* RVCSRSpace::SetCSR(int address, const RVCSRAllocator allocator) noexcept
     {
         int index = (address & 0xF00) >> 8;
 
         if (!subspaces[index])
             subspaces[index] = new SubspaceL1();
 
-        subspaces[index]->SetCSR(address, allocator);
+        return subspaces[index]->SetCSR(address, allocator);
     }
 
     RVCSR* RVCSRSpace::GetCSR(int address) const noexcept

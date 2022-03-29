@@ -13,6 +13,7 @@
 #include <list>
 #include <initializer_list>
 #include <memory>
+#include <algorithm>
 
 #include "riscvdef.hpp"
 #include "riscvmem.hpp"
@@ -42,6 +43,8 @@ namespace Jasse {
 
         TArch   operator[](int address) const;
         TArch&  operator[](int address);
+
+        void    operator=(const RVGeneralRegisters<TArch>& obj);
     };
 
     // RISC-V General Registers container of XLEN=32
@@ -343,7 +346,6 @@ namespace Jasse {
 
         RVDecoderCollection             GetDecoders() noexcept;
         const RVDecoderCollection&      GetDecoders() const noexcept;
-        void                            SetDecoders(const RVDecoderCollection& decoders) noexcept;
 
         RVArchitectural&                GetArch() noexcept;
         const RVArchitectural&          GetArch() const noexcept;
@@ -355,34 +357,49 @@ namespace Jasse {
 
     class RVInstance::Builder {
     private:
-        XLen                xlen;
-        pc_t                startup_pc;
+        XLen                    xlen;
+        pc_t                    startup_pc;
 
-        RVMemoryInterface*  _MI;
+        RVMemoryInterface*      _MI;
             
-        RVCSRSpace          _CSR;        // inner-constructed
+        RVCSRSpace              _CSR;        // inner-constructed
 
-        RVDecoderCollection _decoders;   // inner-constructed
+        RVDecoderCollection     _decoders;   // inner-constructed
+
+        RVGeneralRegisters64    _GR;         // inner-constructed, transient
         
     public:
         Builder() noexcept;
         ~Builder() noexcept;
 
-        Builder&        XLEN(XLen xlen) noexcept;
+        Builder&                    XLEN(XLen xlen) noexcept;
 
-        Builder&        StartupPC(pc_t pc) noexcept;
-        Builder&        StartupPC32(arch32_t pc) noexcept;
-        Builder&        StartupPC64(arch64_t pc) noexcept;
+        Builder&                    StartupPC(pc_t pc) noexcept;
+        Builder&                    StartupPC32(arch32_t pc) noexcept;
+        Builder&                    StartupPC64(arch64_t pc) noexcept;
 
-        Builder&        Decoder(const RVDecoder* decoder) noexcept;
-        Builder&        Decoder(std::initializer_list<const RVDecoder*> decoders) noexcept;
+        Builder&                    GR32(int address, arch32_t init_value) noexcept;
+        Builder&                    GR64(int address, arch64_t init_value) noexcept;
 
-        Builder&        MI(RVMemoryInterface* MI) noexcept;
+        Builder&                    Decoder(const RVDecoder* decoder) noexcept;
+        Builder&                    Decoder(std::initializer_list<const RVDecoder*> decoders) noexcept;
 
-        Builder&        CSR(const RVCSRDefinition& CSR) noexcept;
-        Builder&        CSR(std::initializer_list<const RVCSRDefinition> CSRs) noexcept;
+        Builder&                    MI(RVMemoryInterface* MI) noexcept;
 
-        RVInstance*     Build() const noexcept;
+        Builder&                    CSR(const RVCSRDefinition& CSR) noexcept;
+        Builder&                    CSR(const RVCSRDefinition& CSR, csr_t init_value) noexcept;
+        Builder&                    CSR(std::initializer_list<const RVCSRDefinition> CSRs) noexcept;
+
+        arch32_t&                   GR32(int address) noexcept;
+        arch32_t                    GR32(int address) const noexcept;
+        arch64_t&                   GR64(int address) noexcept;
+        arch64_t                    GR64(int address) const noexcept;
+        RVCSRSpace&                 CSR() noexcept;
+        const RVCSRSpace&           CSR() const noexcept;
+        RVDecoderCollection&        Decoder() noexcept;
+        const RVDecoderCollection&  Decoder() const noexcept;
+
+        RVInstance*             Build() const noexcept;
     };
 }
 
@@ -448,6 +465,12 @@ namespace Jasse {
     TArch& RVGeneralRegisters<TArch>::operator[](int address)
     {
         return !address ? (registers[address] = TArch()) : registers[address];
+    }
+
+    template<class TArch>
+    void RVGeneralRegisters<TArch>::operator=(const RVGeneralRegisters<TArch>& obj)
+    {
+        std::copy(obj.registers, obj.registers + SIZE, registers);
     }
 }
 
@@ -1038,14 +1061,16 @@ namespace Jasse {
 // Implementation of: class RVInstance::Builder
 namespace Jasse {
     /*
-    XLen                xlen;
-    pc_t                startup_pc;
+    XLen                    xlen;
+    pc_t                    startup_pc;
 
-    RVMemoryInterface*  _MI;
+    RVMemoryInterface*      _MI;
             
-    RVCSRSpace          _CSR;        // inner-constructed
+    RVCSRSpace              _CSR;        // inner-constructed
 
-    RVDecoderCollection _decoders;   // inner-constructed
+    RVDecoderCollection     _decoders;   // inner-constructed
+
+    RVGeneralRegisters64    _GR;
     */
 
     RVInstance::Builder::Builder() noexcept
@@ -1083,6 +1108,18 @@ namespace Jasse {
         return *this;
     }
 
+    RVInstance::Builder& RVInstance::Builder::GR32(int address, arch32_t init_value) noexcept
+    {
+        this->_GR[address] = (arch64_t)init_value;
+        return *this;
+    }
+
+    RVInstance::Builder& RVInstance::Builder::GR64(int address, arch64_t init_value) noexcept
+    {
+        this->_GR[address] = init_value;
+        return *this;
+    }
+
     RVInstance::Builder& RVInstance::Builder::Decoder(const RVDecoder* decoder) noexcept
     {
         this->_decoders.Add(decoder);
@@ -1108,10 +1145,56 @@ namespace Jasse {
         return *this;
     }
 
+    RVInstance::Builder& RVInstance::Builder::CSR(const RVCSRDefinition& CSR, csr_t init_value) noexcept
+    {
+        this->_CSR.SetCSR(CSR)->SetValue(init_value);
+        return *this;
+    }
+
     RVInstance::Builder& RVInstance::Builder::CSR(std::initializer_list<const RVCSRDefinition> CSRs) noexcept
     {
         this->_CSR.SetCSRs(CSRs);
         return *this;
+    }
+
+    arch32_t& RVInstance::Builder::GR32(int address) noexcept
+    {
+        return (arch32_t&)_GR[address];
+    }
+
+    arch32_t RVInstance::Builder::GR32(int address) const noexcept
+    {
+        return (arch32_t)_GR[address];
+    }
+
+    arch64_t& RVInstance::Builder::GR64(int address) noexcept
+    {
+        return _GR[address];
+    }
+
+    arch64_t RVInstance::Builder::GR64(int address) const noexcept
+    {
+        return _GR[address];
+    }
+
+    RVCSRSpace& RVInstance::Builder::CSR() noexcept
+    {
+        return _CSR;
+    }
+
+    const RVCSRSpace& RVInstance::Builder::CSR() const noexcept
+    {
+        return _CSR;
+    }
+
+    RVDecoderCollection& RVInstance::Builder::Decoder() noexcept
+    {
+        return _decoders;
+    }
+
+    const RVDecoderCollection& RVInstance::Builder::Decoder() const noexcept
+    {
+        return _decoders;
     }
 
     RVInstance* RVInstance::Builder::Build() const noexcept
@@ -1122,6 +1205,21 @@ namespace Jasse {
             RVArchitectural(xlen, _CSR, _MI));
 
         instance->arch.PC().pc64 = startup_pc.pc64;
+        
+        switch (xlen)
+        {
+            case XLEN32:
+                for (int i = 0; i < instance->arch.GR32().GetSize(); i++)
+                    instance->arch.GR32()[i] = (arch32_t)_GR[i];
+                break;
+
+            case XLEN64:
+                instance->arch.GR64() = _GR;
+                break;
+
+            default:
+                break;
+        }
 
         return instance;
     }
