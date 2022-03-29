@@ -77,7 +77,7 @@ namespace Jasse {
         // only M-mode supported currently
 
         // Write 'mepc' CSR
-        arch.CSR()->RequireCSR(CSR_mepc, "mepc")
+        arch.CSR().RequireCSR(CSR_mepc, "mepc")
             ->SetValue(arch.PC().pc64); // always zero-extended in XLEN=32, actually doesn't matter
         
 
@@ -95,12 +95,12 @@ namespace Jasse {
             SET_CSR_MXFIELD(mcause, CSR_mcause_FIELD_EXCEPTION_CODE, cause, MX64);
         }
 
-        arch.CSR()->RequireCSR(CSR_mcause, "mcause")
+        arch.CSR().RequireCSR(CSR_mcause, "mcause")
             ->SetValue(mcause);
         
 
         // Write 'mstatus' CSR
-        RVCSR* p_mstatus = arch.CSR()->RequireCSR(CSR_mstatus, "mstatus");
+        RVCSR* p_mstatus = arch.CSR().RequireCSR(CSR_mstatus, "mstatus");
 
         csr_t mstatus = p_mstatus->GetValue(); // read 'mstatus'
 
@@ -117,7 +117,7 @@ namespace Jasse {
 
 
         // Write PC
-        csr_t mtvec = arch.CSR()->RequireCSR(CSR_mtvec, "mtvec")->GetValue(); // read 'mtvec'
+        csr_t mtvec = arch.CSR().RequireCSR(CSR_mtvec, "mtvec")->GetValue(); // read 'mtvec'
 
         int mode = GET_CSR_FIELD(mtvec, CSR_mtvec_FIELD_MODE);
         if (mode == CSR_mtvec_FIELD_MODE_DEF_VECTORED && type == TRAP_INTERRUPT) // vectored interrupt trap
@@ -141,7 +141,7 @@ namespace Jasse {
         // only M-mode supported currently
 
         // Write 'mstatus' CSR
-        RVCSR* p_mstatus  = arch.CSR()->RequireCSR(CSR_mstatus, "mstatus");
+        RVCSR* p_mstatus  = arch.CSR().RequireCSR(CSR_mstatus, "mstatus");
 
         csr_t mstatus = p_mstatus->GetValue(); // read 'mstatus'
 
@@ -162,7 +162,7 @@ namespace Jasse {
 
 
         // Write PC
-        csr_t mepc = arch.CSR()->RequireCSR(CSR_mepc, "mepc")->GetValue();
+        csr_t mepc = arch.CSR().RequireCSR(CSR_mepc, "mepc")->GetValue();
 
         if (arch.XLEN() == XLEN32) // XLEN=32
             arch.SetPC32((uint32_t)mepc);

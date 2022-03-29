@@ -533,7 +533,7 @@ namespace Jasse {
         
         RVCSR*  RequireCSR(int address, const char* hint_name = nullptr) const;
 
-        void    operator=(const RVCSRSpace& obj) = delete;
+        void    operator=(const RVCSRSpace& obj);
     };
 }
 
@@ -794,6 +794,20 @@ namespace Jasse {
         }
         
         return csr; 
+    }
+
+    void RVCSRSpace::operator=(const RVCSRSpace& obj)
+    {
+        for (int i = 0; i < __RVCSRSPACE_ARR_SIZE; i++)
+        {
+            if (subspaces[i])
+                delete subspaces[i];
+
+            if (obj.subspaces[i])
+                subspaces[i] = new SubspaceL1(*obj.subspaces[i]);
+            else
+                subspaces[i] = nullptr;
+        }
     }
 }
 

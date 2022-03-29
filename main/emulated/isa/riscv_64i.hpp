@@ -451,7 +451,7 @@ namespace Jasse {
         //          behaviour, not necessary according to privileged specification.
         //          If this action is not included in your processor or implementation, you
         //          could disable this action by "commenting" this part of code.
-        RVCSR* mtval = arch.CSR()->GetCSR(CSR_mtval);
+        RVCSR* mtval = arch.CSR().GetCSR(CSR_mtval);
 
         if (mtval)
             mtval->SetValue(address);
