@@ -65,14 +65,14 @@ namespace Jasse {
     // * Notice: Only PC and necessary CSRs (excluding 'mtval' .etc) are manipulated in this
     //           Trap-Procedure. Other software-defined or EEI-defined CSR/General Registers
     //           actions should be done out of this Trap-Procedure.
-    void TrapEnter  (RVArchitectural& arch, RVTrapType type, RVTrapCause cause);
-    void TrapReturn (RVArchitectural& arch);
+    void TrapEnter  (RVArchitectural& arch, RVTrapType type, RVTrapCause cause) noexcept(false);
+    void TrapReturn (RVArchitectural& arch) noexcept(false);
 }
 
 
 namespace Jasse {
 
-    void TrapEnter(RVArchitectural& arch, RVTrapType type, RVTrapCause cause)
+    void TrapEnter(RVArchitectural& arch, RVTrapType type, RVTrapCause cause) noexcept(false)
     {
         // only M-mode supported currently
 
@@ -136,7 +136,7 @@ namespace Jasse {
         }
     }
 
-    void TrapReturn(RVArchitectural& arch)
+    void TrapReturn(RVArchitectural& arch) noexcept(false)
     {
         // only M-mode supported currently
 
