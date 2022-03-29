@@ -70,12 +70,13 @@ namespace Jasse {
 
         RVMemoryInterface*      _MI;
 
-        RVCSRSpace*             _CSR;
+        RVCSRSpace              _CSR;
 
         // TODO ... More architectural states could be appended here ...
 
     public:
-        RVArchitectural(XLen XLEN, RVMemoryInterface* MI, RVCSRSpace* CSR);
+        RVArchitectural() = delete;
+        RVArchitectural(XLen XLEN, const RVCSRSpace& CSRs, RVMemoryInterface* MI);
         RVArchitectural(const RVArchitectural& obj);
         ~RVArchitectural();
 
@@ -87,7 +88,7 @@ namespace Jasse {
         void                            SetPC64(arch64_t pc);
 
         void                            SetMI(RVMemoryInterface* MI);
-        void                            SetCSR(RVCSRSpace* CSR);
+        void                            SetCSR(const RVCSRSpace& CSR);
 
         bool                            IsGR32() const;
         bool                            IsGR64() const;
@@ -100,8 +101,8 @@ namespace Jasse {
         const RVMemoryInterface*        MI() const;
         RVMemoryInterface*              MI();
 
-        const RVCSRSpace*               CSR() const;
-        RVCSRSpace*                     CSR();
+        const RVCSRSpace&               CSR() const;
+        RVCSRSpace&                     CSR();
 
         // TODO ... More architectural states could be appended here ...
     };
@@ -328,58 +329,60 @@ namespace Jasse {
         class Builder;
 
     private:
-        RVDecoderCollection                 decoders;
+        RVDecoderCollection     decoders;
 
-        std::shared_ptr<RVArchitectural>    arch;
-        std::shared_ptr<RVMemoryInterface>  MI;
-        std::shared_ptr<RVCSRSpace>         CSR;
+        RVArchitectural         arch;
 
     public:
-        RVInstance(const RVDecoderCollection&           decoders,
-                   std::shared_ptr<RVArchitectural>     arch,
-                   std::shared_ptr<RVMemoryInterface>   MI,
-                   std::shared_ptr<RVCSRSpace>          CSR);
+        RVInstance(const RVDecoderCollection&   decoders,
+                   RVArchitectural&&            arch) noexcept;
 
         RVInstance() = delete;
-        RVInstance(const RVInstance& obj) = delete;
-        ~RVInstance();
+        RVInstance(const RVInstance& obj) noexcept;
+        ~RVInstance() noexcept;
 
-        // TODO
+        RVDecoderCollection             GetDecoders() noexcept;
+        const RVDecoderCollection&      GetDecoders() const noexcept;
+        void                            SetDecoders(const RVDecoderCollection& decoders) noexcept;
+
+        RVArchitectural&                GetArch() noexcept;
+        const RVArchitectural&          GetArch() const noexcept;
+
+        // TODO functional operations
 
         void    operator=(const RVInstance& obj) = delete;
     };
 
     class RVInstance::Builder {
     private:
-        XLen                                xlen;
-        pc_t                                startup_pc;
+        XLen                xlen;
+        pc_t                startup_pc;
 
-        std::shared_ptr<RVMemoryInterface>  _MI;
+        RVMemoryInterface*  _MI;
             
-        RVCSRSpace                          _CSR;        // inner-constructed
+        RVCSRSpace          _CSR;        // inner-constructed
 
-        RVDecoderCollection                 _decoders;   // inner-constructed
+        RVDecoderCollection _decoders;   // inner-constructed
         
     public:
-        Builder();
-        ~Builder();
+        Builder() noexcept;
+        ~Builder() noexcept;
 
-        Builder&        XLEN(XLen xlen);
+        Builder&        XLEN(XLen xlen) noexcept;
 
-        Builder&        StartupPC(pc_t pc);
-        Builder&        StartupPC32(arch32_t pc);
-        Builder&        StartupPC64(arch64_t pc);
+        Builder&        StartupPC(pc_t pc) noexcept;
+        Builder&        StartupPC32(arch32_t pc) noexcept;
+        Builder&        StartupPC64(arch64_t pc) noexcept;
 
-        Builder&        Decoder(const RVDecoder* decoder);
-        Builder&        Decoder(std::initializer_list<const RVDecoder*> decoders);
+        Builder&        Decoder(const RVDecoder* decoder) noexcept;
+        Builder&        Decoder(std::initializer_list<const RVDecoder*> decoders) noexcept;
 
-        Builder&        MI(RVMemoryInterface*&& MI);
-        Builder&        MI(std::shared_ptr<RVMemoryInterface> MI);
+        Builder&        MI(RVMemoryInterface* MI) noexcept;
 
-        Builder&        CSR(const RVCSRDefinition& CSR);
-        Builder&        CSR(std::initializer_list<const RVCSRDefinition> CSRs);
+        Builder&        CSR(const RVCSRDefinition& CSR) noexcept;
+        Builder&        CSR(std::initializer_list<const RVCSRDefinition> CSRs) noexcept;
 
-        RVInstance*     Build() const;
+        RVInstance*     Build() const noexcept;
     };
 }
 
@@ -461,13 +464,15 @@ namespace Jasse {
     RVGeneralRegisters64*   _GR64;
 
     RVMemoryInterface*      _MI;
+
+    RVCSRSpace              _CSR;
     */
 
-    RVArchitectural::RVArchitectural(XLen XLEN, RVMemoryInterface* MI, RVCSRSpace* CSR)
+    RVArchitectural::RVArchitectural(XLen XLEN, const RVCSRSpace& CSRs, RVMemoryInterface* MI)
         : _XLEN (XLEN)
         , _PC   (pc_t())
         , _MI   (MI)
-        , _CSR  (CSR)
+        , _CSR  (CSRs)
     {
         switch (XLEN)
         {
@@ -542,7 +547,7 @@ namespace Jasse {
         _MI = MI;
     }
 
-    inline void RVArchitectural::SetCSR(RVCSRSpace* CSR)
+    inline void RVArchitectural::SetCSR(const RVCSRSpace& CSR)
     {
         _CSR = CSR;
     }
@@ -599,12 +604,12 @@ namespace Jasse {
         return _MI;
     }
 
-    inline const RVCSRSpace* RVArchitectural::CSR() const
+    inline const RVCSRSpace& RVArchitectural::CSR() const
     {
         return _CSR;
     }
 
-    inline RVCSRSpace* RVArchitectural::CSR()
+    inline RVCSRSpace& RVArchitectural::CSR()
     {
         return _CSR;
     }
@@ -1026,23 +1031,24 @@ namespace Jasse {
 // Implementation of: class RVInstance
 namespace Jasse {
 
+    // TODO
 }
 
 
 // Implementation of: class RVInstance::Builder
 namespace Jasse {
     /*
-    XLen                                xlen;
-    pc_t                                startup_pc;
+    XLen                xlen;
+    pc_t                startup_pc;
 
-    std::shared_ptr<RVMemoryInterface>  MI;
+    RVMemoryInterface*  _MI;
             
-    RVCSRSpace                          CSR;        // inner-constructed
+    RVCSRSpace          _CSR;        // inner-constructed
 
-    RVDecoderCollection                 decoders;   // inner-constructed
+    RVDecoderCollection _decoders;   // inner-constructed
     */
 
-    RVInstance::Builder::Builder()
+    RVInstance::Builder::Builder() noexcept
         : xlen          (XLEN64)
         , startup_pc    ({ 0 })
         , _MI           ()
@@ -1050,78 +1056,73 @@ namespace Jasse {
         , _decoders     ()
     { }
 
-    RVInstance::Builder::~Builder()
+    RVInstance::Builder::~Builder() noexcept
     { }
 
-    RVInstance::Builder& RVInstance::Builder::XLEN(XLen xlen)
+    RVInstance::Builder& RVInstance::Builder::XLEN(XLen xlen) noexcept
     {
         this->xlen = xlen;
         return *this;
     }
 
-    RVInstance::Builder& RVInstance::Builder::StartupPC(pc_t pc)
+    RVInstance::Builder& RVInstance::Builder::StartupPC(pc_t pc) noexcept
     {
         this->startup_pc = pc;
         return *this;
     }
 
-    RVInstance::Builder& RVInstance::Builder::StartupPC32(arch32_t pc32)
+    RVInstance::Builder& RVInstance::Builder::StartupPC32(arch32_t pc32) noexcept
     {
         this->startup_pc.pc32 = pc32;
         return *this;
     }
 
-    RVInstance::Builder& RVInstance::Builder::StartupPC64(arch64_t pc64)
+    RVInstance::Builder& RVInstance::Builder::StartupPC64(arch64_t pc64) noexcept
     {
         this->startup_pc.pc64 = pc64;
         return *this;
     }
 
-    RVInstance::Builder& RVInstance::Builder::Decoder(const RVDecoder* decoder)
+    RVInstance::Builder& RVInstance::Builder::Decoder(const RVDecoder* decoder) noexcept
     {
         this->_decoders.Add(decoder);
         return *this;
     }
 
-    RVInstance::Builder& RVInstance::Builder::Decoder(std::initializer_list<const RVDecoder*> decoders)
+    RVInstance::Builder& RVInstance::Builder::Decoder(std::initializer_list<const RVDecoder*> decoders) noexcept
     {
         for (auto iter = decoders.begin(); iter != decoders.end(); iter++)
             this->_decoders.Add(*iter);
         return *this;
     }
 
-    RVInstance::Builder& RVInstance::Builder::MI(RVMemoryInterface*&& MI)
-    {
-        this->_MI = std::shared_ptr<RVMemoryInterface>(MI);
-        return *this;
-    }
-
-    RVInstance::Builder& RVInstance::Builder::MI(std::shared_ptr<RVMemoryInterface> MI)
+    RVInstance::Builder& RVInstance::Builder::MI(RVMemoryInterface* MI) noexcept
     {
         this->_MI = MI;
         return *this;
     }
 
-    RVInstance::Builder& RVInstance::Builder::CSR(const RVCSRDefinition& CSR)
+    RVInstance::Builder& RVInstance::Builder::CSR(const RVCSRDefinition& CSR) noexcept
     {
         this->_CSR.SetCSR(CSR);
         return *this;
     }
 
-    RVInstance::Builder& RVInstance::Builder::CSR(std::initializer_list<const RVCSRDefinition> CSRs)
+    RVInstance::Builder& RVInstance::Builder::CSR(std::initializer_list<const RVCSRDefinition> CSRs) noexcept
     {
         this->_CSR.SetCSRs(CSRs);
         return *this;
     }
 
-    RVInstance* RVInstance::Builder::Build() const
+    RVInstance* RVInstance::Builder::Build() const noexcept
     {
-        RVCSRSpace* CSRs = new RVCSRSpace(_CSR);
-
+        // copy-on-build
         RVInstance* instance = new RVInstance(
-            _decoders, // copy-on-build
-            std::shared_ptr<RVArchitectural>    (new RVArchitectural(xlen, _MI.get(), CSRs)),
-            std::shared_ptr<RVMemoryInterface>  (_MI),
-            std::shared_ptr<RVCSRSpace>         (CSRs));
+            _decoders,
+            RVArchitectural(xlen, _CSR, _MI));
+
+        instance->arch.PC().pc64 = startup_pc.pc64;
+
+        return instance;
     }
 }
