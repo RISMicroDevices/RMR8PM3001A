@@ -354,32 +354,32 @@ namespace Jasse {
         XLen                                xlen;
         pc_t                                startup_pc;
 
-        std::shared_ptr<RVMemoryInterface>  MI;
+        std::shared_ptr<RVMemoryInterface>  _MI;
             
-        RVCSRSpace                          CSR;        // inner-constructed
+        RVCSRSpace                          _CSR;        // inner-constructed
 
-        RVDecoderCollection                 decoders;   // inner-constructed
+        RVDecoderCollection                 _decoders;   // inner-constructed
         
     public:
         Builder();
         ~Builder();
 
-        Builder&                        XLEN(XLen xlen);
+        Builder&        XLEN(XLen xlen);
 
-        Builder&                        StartupPC(pc_t pc);
-        Builder&                        StartupPC32(arch32_t pc);
-        Builder&                        StartupPC64(arch64_t pc);
+        Builder&        StartupPC(pc_t pc);
+        Builder&        StartupPC32(arch32_t pc);
+        Builder&        StartupPC64(arch64_t pc);
 
-        Builder&                        Decoder(const RVDecoder* decoder);
-        Builder&                        Decoder(std::initializer_list<const RVDecoder*> decoders);
+        Builder&        Decoder(const RVDecoder* decoder);
+        Builder&        Decoder(std::initializer_list<const RVDecoder*> decoders);
 
-        Builder&                        MI(RVMemoryInterface*&& MI);
-        Builder&                        MI(std::shared_ptr<RVMemoryInterface> MI);
+        Builder&        MI(RVMemoryInterface*&& MI);
+        Builder&        MI(std::shared_ptr<RVMemoryInterface> MI);
 
-        Builder&                        CSR(const RVCSRDefinition& CSR);
-        Builder&                        CSR(std::initializer_list<RVCSRDefinition> CSRs);
+        Builder&        CSR(const RVCSRDefinition& CSR);
+        Builder&        CSR(std::initializer_list<const RVCSRDefinition> CSRs);
 
-        std::shared_ptr<RVInstance>     Build() const;
+        RVInstance*     Build() const;
     };
 }
 
@@ -1022,3 +1022,106 @@ namespace Jasse {
     }
 }
 
+
+// Implementation of: class RVInstance
+namespace Jasse {
+
+}
+
+
+// Implementation of: class RVInstance::Builder
+namespace Jasse {
+    /*
+    XLen                                xlen;
+    pc_t                                startup_pc;
+
+    std::shared_ptr<RVMemoryInterface>  MI;
+            
+    RVCSRSpace                          CSR;        // inner-constructed
+
+    RVDecoderCollection                 decoders;   // inner-constructed
+    */
+
+    RVInstance::Builder::Builder()
+        : xlen          (XLEN64)
+        , startup_pc    ({ 0 })
+        , _MI           ()
+        , _CSR          ()
+        , _decoders     ()
+    { }
+
+    RVInstance::Builder::~Builder()
+    { }
+
+    RVInstance::Builder& RVInstance::Builder::XLEN(XLen xlen)
+    {
+        this->xlen = xlen;
+        return *this;
+    }
+
+    RVInstance::Builder& RVInstance::Builder::StartupPC(pc_t pc)
+    {
+        this->startup_pc = pc;
+        return *this;
+    }
+
+    RVInstance::Builder& RVInstance::Builder::StartupPC32(arch32_t pc32)
+    {
+        this->startup_pc.pc32 = pc32;
+        return *this;
+    }
+
+    RVInstance::Builder& RVInstance::Builder::StartupPC64(arch64_t pc64)
+    {
+        this->startup_pc.pc64 = pc64;
+        return *this;
+    }
+
+    RVInstance::Builder& RVInstance::Builder::Decoder(const RVDecoder* decoder)
+    {
+        this->_decoders.Add(decoder);
+        return *this;
+    }
+
+    RVInstance::Builder& RVInstance::Builder::Decoder(std::initializer_list<const RVDecoder*> decoders)
+    {
+        for (auto iter = decoders.begin(); iter != decoders.end(); iter++)
+            this->_decoders.Add(*iter);
+        return *this;
+    }
+
+    RVInstance::Builder& RVInstance::Builder::MI(RVMemoryInterface*&& MI)
+    {
+        this->_MI = std::shared_ptr<RVMemoryInterface>(MI);
+        return *this;
+    }
+
+    RVInstance::Builder& RVInstance::Builder::MI(std::shared_ptr<RVMemoryInterface> MI)
+    {
+        this->_MI = MI;
+        return *this;
+    }
+
+    RVInstance::Builder& RVInstance::Builder::CSR(const RVCSRDefinition& CSR)
+    {
+        this->_CSR.SetCSR(CSR);
+        return *this;
+    }
+
+    RVInstance::Builder& RVInstance::Builder::CSR(std::initializer_list<const RVCSRDefinition> CSRs)
+    {
+        this->_CSR.SetCSRs(CSRs);
+        return *this;
+    }
+
+    RVInstance* RVInstance::Builder::Build() const
+    {
+        RVCSRSpace* CSRs = new RVCSRSpace(_CSR);
+
+        RVInstance* instance = new RVInstance(
+            _decoders, // copy-on-build
+            std::shared_ptr<RVArchitectural>    (new RVArchitectural(xlen, _MI.get(), CSRs)),
+            std::shared_ptr<RVMemoryInterface>  (_MI),
+            std::shared_ptr<RVCSRSpace>         (CSRs));
+    }
+}
