@@ -15,6 +15,8 @@
 #include <memory>
 #include <algorithm>
 
+#include "jasse.hpp"
+
 #include "riscvdef.hpp"
 #include "riscvmem.hpp"
 #include "riscvcsr.hpp"
@@ -144,6 +146,18 @@ namespace Jasse {
         // @see Jasse::TrapReturn (in header "riscvexcept.hpp")
         EXEC_TRAP_RETURN,
 
+        // Fetch Access Fault. *EEI-defined*
+        // MOP_ACCESS_FAULT when fetching instruction by PC from Memory Interface.
+        // This status SHOULDN'T be produced in any execution procedure.
+        // The way of handling this status (Raising an exception, or .etc) is EEI-defined.
+        EXEC_FETCH_ACCESS_FAULT,
+
+        // Fetch Address Misaligned. *EEI-defined*
+        // MOP_ADDRESS_MISALIGNED when fetching instruction by PC from Memory Interface.
+        // This status SHOULDN'T be produced in any execution procedure.
+        // The way of handling this status (Raising an exception, or .etc) is EEI-defined.
+        EXEC_FETCH_ADDRESS_MISALIGNED,
+
         // WFI. Wait-For-Interrupt. *EEI-defined*
         // WFI function is implemented in EEI. Interrupt-related procedures were not
         // necessary in instruction execution procedure. 
@@ -153,7 +167,14 @@ namespace Jasse {
         // Not Implemented. *EEI-defined*
         // Instruction codepoint exists, but the execution procedure not implemented.
         // The way of handling this status (Raising an exception, or .etc) is EEI-defined.
-        EXEC_NOT_IMPLEMENTED
+        EXEC_NOT_IMPLEMENTED,
+
+        // Not Decoded. (Not implemented in codepoint & decoders). *EEI-defined*
+        // Instruction codepoint doesn't exist. This usually indicates that an instruction
+        // was properly fetched but it was illegal.
+        // This status SHOULDN'T be produced in any execution procedure.
+        // The way of handling this status (Raising an exception, or .etc) is EEI-defined.
+        EXEC_NOT_DECODED
     } RVExecStatus;
 
 
@@ -263,7 +284,7 @@ namespace Jasse {
         void                        SetTextualizer(RVCodepoint::Textualizer textualizer);
         void                        SetExecutor(RVCodepoint::Executor executor);
 
-        void                        Execute(RVArchitectural& arch) const;
+        RVExecStatus                Execute(RVArchitectural& arch) const;
         std::string                 ToString() const;
     };
 
@@ -325,6 +346,20 @@ namespace Jasse {
         bool                Decode(insnraw_t insnraw, RVInstruction& insn) const;
     };
 
+    
+    //
+    class RVInstance;
+
+    // RISC-V Instance Exception (Special Exec Status) Handler Status
+    typedef enum {
+        EEI_BYPASS = 0,
+        EEI_HANDLED
+    } RVEEIStatus;
+
+    // RISC-V Instance Exception (Special Exec Status) Handler # EEI-defined interface
+    // *NOTICE: RVInstruction* parameter might be NULL, depending on whether the instruction
+    //          was properly fetched or decoded.
+    typedef     RVEEIStatus     (*RVExecEEIHandler)(RVInstance&, RVExecStatus, RVInstruction*);
 
     // RISC-V Instance
     class RVInstance {
@@ -336,21 +371,28 @@ namespace Jasse {
 
         RVArchitectural         arch;
 
+        RVExecEEIHandler        exec_handler;
+
     public:
         RVInstance(const RVDecoderCollection&   decoders,
-                   RVArchitectural&&            arch) noexcept;
+                   RVArchitectural&&            arch,
+                   RVExecEEIHandler             exec_handler) noexcept;
 
         RVInstance() = delete;
         RVInstance(const RVInstance& obj) noexcept;
         ~RVInstance() noexcept;
 
-        RVDecoderCollection             GetDecoders() noexcept;
+        RVDecoderCollection&            GetDecoders() noexcept;
         const RVDecoderCollection&      GetDecoders() const noexcept;
 
         RVArchitectural&                GetArch() noexcept;
         const RVArchitectural&          GetArch() const noexcept;
 
-        // TODO functional operations
+        RVExecEEIHandler&               GetExecEEI() noexcept;
+        RVExecEEIHandler                GetExecEEI() const noexcept;
+        void                            SetExecEEI(RVExecEEIHandler exec_handler) noexcept;
+
+        RVExecStatus                    Eval();
 
         void    operator=(const RVInstance& obj) = delete;
     };
@@ -367,6 +409,8 @@ namespace Jasse {
         RVDecoderCollection     _decoders;   // inner-constructed
 
         RVGeneralRegisters64    _GR;         // inner-constructed, transient
+
+        RVExecEEIHandler        exec_handler;
         
     public:
         Builder() noexcept;
@@ -390,6 +434,8 @@ namespace Jasse {
         Builder&                    CSR(const RVCSRDefinition& CSR, csr_t init_value) noexcept;
         Builder&                    CSR(std::initializer_list<const RVCSRDefinition> CSRs) noexcept;
 
+        Builder&                    ExecEEI(RVExecEEIHandler exec_handler) noexcept;
+
         arch32_t&                   GR32(int address) noexcept;
         arch32_t                    GR32(int address) const noexcept;
         arch64_t&                   GR64(int address) noexcept;
@@ -398,8 +444,10 @@ namespace Jasse {
         const RVCSRSpace&           CSR() const noexcept;
         RVDecoderCollection&        Decoder() noexcept;
         const RVDecoderCollection&  Decoder() const noexcept;
+        RVExecEEIHandler&           ExecEEI() noexcept;
+        RVExecEEIHandler            ExecEEI() const noexcept;
 
-        RVInstance*             Build() const noexcept;
+        RVInstance*                 Build() const noexcept;
     };
 }
 
@@ -875,9 +923,9 @@ namespace Jasse {
         trait.SetExecutor(executor);
     }
 
-    inline void RVInstruction::Execute(RVArchitectural& arch) const
+    inline RVExecStatus RVInstruction::Execute(RVArchitectural& arch) const
     {
-        GetExecutor()(*this, arch);
+        return GetExecutor()(*this, arch);
     }
 
     inline std::string RVInstruction::ToString() const
@@ -1044,7 +1092,10 @@ namespace Jasse {
         std::list<const RVDecoder*>::const_iterator iter = decoders.begin();
         for (; iter != decoders.end(); iter++)
             if ((*iter)->Decode(insnraw, insn))
+            {
+                insn.SetRaw(insnraw);
                 return true;
+            }
 
         return false;
     }
@@ -1053,8 +1104,141 @@ namespace Jasse {
 
 // Implementation of: class RVInstance
 namespace Jasse {
+    /*
+    RVDecoderCollection     decoders;
 
-    // TODO
+    RVArchitectural         arch;
+
+    RVExecEEIHandler        exec_handler;
+    */
+
+    RVInstance::RVInstance(const RVDecoderCollection&   decoders,
+                           RVArchitectural&&            arch,
+                           RVExecEEIHandler             exec_handler) noexcept
+        : decoders      (decoders)
+        , arch          (arch)
+        , exec_handler  (exec_handler)
+    { }
+
+    RVInstance::RVInstance(const RVInstance& obj) noexcept
+        : decoders      (obj.decoders)
+        , arch          (obj.arch)
+        , exec_handler  (obj.exec_handler)
+    { }
+
+    RVInstance::~RVInstance() noexcept
+    { }
+
+    inline RVDecoderCollection& RVInstance::GetDecoders() noexcept
+    {
+        return decoders;
+    }
+
+    inline const RVDecoderCollection& RVInstance::GetDecoders() const noexcept
+    {
+        return decoders;
+    }
+
+    inline RVArchitectural& RVInstance::GetArch() noexcept
+    {
+        return arch;
+    }
+
+    inline const RVArchitectural& RVInstance::GetArch() const noexcept
+    {
+        return arch;
+    }
+
+    inline RVExecEEIHandler& RVInstance::GetExecEEI() noexcept
+    {
+        return exec_handler;
+    }
+
+    inline RVExecEEIHandler RVInstance::GetExecEEI() const noexcept
+    {
+        return exec_handler;
+    }
+
+    inline void RVInstance::SetExecEEI(RVExecEEIHandler exec_handler) noexcept
+    {
+        this->exec_handler = exec_handler;
+    }
+
+    RVExecStatus RVInstance::Eval()
+    {
+        // TODO interrupt inception
+
+        // instruction fetch
+        data_t fetched;
+        RVMOPStatus mopstatus;
+
+        if (arch.XLEN() == XLEN32) // XLEN=32
+            mopstatus = arch.MI()->Read(arch.PC().pc32, MOPW_WORD, &fetched);
+        else // XLEN=64
+            mopstatus = arch.MI()->Read(arch.PC().pc64, MOPW_WORD, &fetched);
+
+        if (mopstatus != MOP_SUCCESS)
+        {
+            RVExecStatus rstatus;
+
+            switch (mopstatus)
+            {
+                case MOP_ACCESS_FAULT:
+                    rstatus = EXEC_FETCH_ACCESS_FAULT;
+                    break;
+
+                case MOP_ADDRESS_MISALIGNED:
+                    rstatus = EXEC_FETCH_ADDRESS_MISALIGNED;
+                    break;
+
+                default:
+                    SHOULD_NOT_REACH_HERE;
+            }
+
+            if (exec_handler)
+                exec_handler(*this, rstatus, nullptr);
+
+            return rstatus;
+        }
+
+        // instruction decode
+        RVInstruction decoded;
+
+        if (!decoders.Decode(fetched.data32, decoded))
+        {
+            if (exec_handler)
+                exec_handler(*this, EXEC_NOT_DECODED, nullptr);
+
+            return EXEC_NOT_DECODED;
+        }
+
+        // execution
+        RVExecStatus exec_status = decoded.Execute(arch);
+        RVEEIStatus  eei_status  = EEI_BYPASS;
+
+        // - note: @see RVExecStatus
+        ASSERT(exec_status != EXEC_FETCH_ACCESS_FAULT);
+        ASSERT(exec_status != EXEC_FETCH_ADDRESS_MISALIGNED);
+        ASSERT(exec_status != EXEC_NOT_DECODED);
+
+        if (exec_handler)
+            eei_status = exec_handler(*this, exec_status, &decoded);
+
+        if (eei_status == EEI_BYPASS)
+        {
+            if (exec_status == EXEC_SEQUENTIAL)
+            {
+                if (arch.XLEN() == XLEN32) // XLEN=32
+                    arch.SetPC32(arch.PC().pc32 + 4);
+                else // XLEN=64
+                    arch.SetPC64(arch.PC().pc64 + 4);
+            }
+
+            // ...
+        }
+
+        return exec_status;
+    }
 }
 
 
@@ -1071,6 +1255,8 @@ namespace Jasse {
     RVDecoderCollection     _decoders;   // inner-constructed
 
     RVGeneralRegisters64    _GR;
+
+
     */
 
     RVInstance::Builder::Builder() noexcept
@@ -1079,122 +1265,139 @@ namespace Jasse {
         , _MI           ()
         , _CSR          ()
         , _decoders     ()
+        , exec_handler  (nullptr)
     { }
 
     RVInstance::Builder::~Builder() noexcept
     { }
 
-    RVInstance::Builder& RVInstance::Builder::XLEN(XLen xlen) noexcept
+    inline RVInstance::Builder& RVInstance::Builder::XLEN(XLen xlen) noexcept
     {
         this->xlen = xlen;
         return *this;
     }
 
-    RVInstance::Builder& RVInstance::Builder::StartupPC(pc_t pc) noexcept
+    inline RVInstance::Builder& RVInstance::Builder::StartupPC(pc_t pc) noexcept
     {
         this->startup_pc = pc;
         return *this;
     }
 
-    RVInstance::Builder& RVInstance::Builder::StartupPC32(arch32_t pc32) noexcept
+    inline RVInstance::Builder& RVInstance::Builder::StartupPC32(arch32_t pc32) noexcept
     {
         this->startup_pc.pc32 = pc32;
         return *this;
     }
 
-    RVInstance::Builder& RVInstance::Builder::StartupPC64(arch64_t pc64) noexcept
+    inline RVInstance::Builder& RVInstance::Builder::StartupPC64(arch64_t pc64) noexcept
     {
         this->startup_pc.pc64 = pc64;
         return *this;
     }
 
-    RVInstance::Builder& RVInstance::Builder::GR32(int address, arch32_t init_value) noexcept
+    inline RVInstance::Builder& RVInstance::Builder::GR32(int address, arch32_t init_value) noexcept
     {
         this->_GR[address] = (arch64_t)init_value;
         return *this;
     }
 
-    RVInstance::Builder& RVInstance::Builder::GR64(int address, arch64_t init_value) noexcept
+    inline RVInstance::Builder& RVInstance::Builder::GR64(int address, arch64_t init_value) noexcept
     {
         this->_GR[address] = init_value;
         return *this;
     }
 
-    RVInstance::Builder& RVInstance::Builder::Decoder(const RVDecoder* decoder) noexcept
+    inline RVInstance::Builder& RVInstance::Builder::Decoder(const RVDecoder* decoder) noexcept
     {
         this->_decoders.Add(decoder);
         return *this;
     }
 
-    RVInstance::Builder& RVInstance::Builder::Decoder(std::initializer_list<const RVDecoder*> decoders) noexcept
+    inline RVInstance::Builder& RVInstance::Builder::Decoder(std::initializer_list<const RVDecoder*> decoders) noexcept
     {
         for (auto iter = decoders.begin(); iter != decoders.end(); iter++)
             this->_decoders.Add(*iter);
         return *this;
     }
 
-    RVInstance::Builder& RVInstance::Builder::MI(RVMemoryInterface* MI) noexcept
+    inline RVInstance::Builder& RVInstance::Builder::MI(RVMemoryInterface* MI) noexcept
     {
         this->_MI = MI;
         return *this;
     }
 
-    RVInstance::Builder& RVInstance::Builder::CSR(const RVCSRDefinition& CSR) noexcept
+    inline RVInstance::Builder& RVInstance::Builder::CSR(const RVCSRDefinition& CSR) noexcept
     {
         this->_CSR.SetCSR(CSR);
         return *this;
     }
 
-    RVInstance::Builder& RVInstance::Builder::CSR(const RVCSRDefinition& CSR, csr_t init_value) noexcept
+    inline RVInstance::Builder& RVInstance::Builder::CSR(const RVCSRDefinition& CSR, csr_t init_value) noexcept
     {
         this->_CSR.SetCSR(CSR)->SetValue(init_value);
         return *this;
     }
 
-    RVInstance::Builder& RVInstance::Builder::CSR(std::initializer_list<const RVCSRDefinition> CSRs) noexcept
+    inline RVInstance::Builder& RVInstance::Builder::CSR(std::initializer_list<const RVCSRDefinition> CSRs) noexcept
     {
         this->_CSR.SetCSRs(CSRs);
         return *this;
     }
 
-    arch32_t& RVInstance::Builder::GR32(int address) noexcept
+    inline RVInstance::Builder& RVInstance::Builder::ExecEEI(RVExecEEIHandler exec_handler) noexcept
+    {
+        this->exec_handler = exec_handler;
+        return *this;
+    }
+
+    inline arch32_t& RVInstance::Builder::GR32(int address) noexcept
     {
         return (arch32_t&)_GR[address];
     }
 
-    arch32_t RVInstance::Builder::GR32(int address) const noexcept
+    inline arch32_t RVInstance::Builder::GR32(int address) const noexcept
     {
         return (arch32_t)_GR[address];
     }
 
-    arch64_t& RVInstance::Builder::GR64(int address) noexcept
+    inline arch64_t& RVInstance::Builder::GR64(int address) noexcept
     {
         return _GR[address];
     }
 
-    arch64_t RVInstance::Builder::GR64(int address) const noexcept
+    inline arch64_t RVInstance::Builder::GR64(int address) const noexcept
     {
         return _GR[address];
     }
 
-    RVCSRSpace& RVInstance::Builder::CSR() noexcept
+    inline RVCSRSpace& RVInstance::Builder::CSR() noexcept
     {
         return _CSR;
     }
 
-    const RVCSRSpace& RVInstance::Builder::CSR() const noexcept
+    inline const RVCSRSpace& RVInstance::Builder::CSR() const noexcept
     {
         return _CSR;
     }
 
-    RVDecoderCollection& RVInstance::Builder::Decoder() noexcept
+    inline RVDecoderCollection& RVInstance::Builder::Decoder() noexcept
     {
         return _decoders;
     }
 
-    const RVDecoderCollection& RVInstance::Builder::Decoder() const noexcept
+    inline const RVDecoderCollection& RVInstance::Builder::Decoder() const noexcept
     {
         return _decoders;
+    }
+
+    inline RVExecEEIHandler& RVInstance::Builder::ExecEEI() noexcept
+    {
+        return exec_handler;
+    }
+
+    inline RVExecEEIHandler RVInstance::Builder::ExecEEI() const noexcept
+    {
+        return exec_handler;
     }
 
     RVInstance* RVInstance::Builder::Build() const noexcept
@@ -1202,7 +1405,8 @@ namespace Jasse {
         // copy-on-build
         RVInstance* instance = new RVInstance(
             _decoders,
-            RVArchitectural(xlen, _CSR, _MI));
+            RVArchitectural(xlen, _CSR, _MI),
+            exec_handler);
 
         instance->arch.PC().pc64 = startup_pc.pc64;
         
