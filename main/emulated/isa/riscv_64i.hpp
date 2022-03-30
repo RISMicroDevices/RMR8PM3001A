@@ -475,7 +475,7 @@ namespace Jasse {
                 break;
 
             default:
-                ; // SHOULD_NOT_REACH_HERE()
+                SHOULD_NOT_REACH_HERE;
         }
 
         __RV64I_MEMORYIO_EXCEPTION(insn, arch, cause, address);
@@ -644,7 +644,7 @@ namespace Jasse {
                 break;
 
             default:
-                ; // SHOULD_NOT_REACH_HERE()
+                SHOULD_NOT_REACH_HERE;
         }
 
         __RV64I_MEMORYIO_EXCEPTION(insn, arch, cause, address);
