@@ -6,6 +6,11 @@
 //
 
 #include <cstdint>
+#include <algorithm>
+
+#include "intmem.h"
+
+#include "riscvdef.hpp"
 
 
 namespace Jasse {
@@ -24,12 +29,16 @@ namespace Jasse {
     } RVMOPStatus;
 
     // RISC-V Memory Opeation Width
-    typedef     uint64_t        RVMOPWidth;
+    typedef struct {
+        uint64_t    mask;
+        uint32_t    alignment;
+        uint32_t    length;
+    } RVMOPWidth;
 
-    static constexpr RVMOPWidth MOPW_BYTE           = 0x00000000000000FFUL;
-    static constexpr RVMOPWidth MOPW_HALF_WORD      = 0x000000000000FFFFUL;
-    static constexpr RVMOPWidth MOPW_WORD           = 0x00000000FFFFFFFFUL;
-    static constexpr RVMOPWidth MOPW_DOUBLE_WORD    = 0xFFFFFFFFFFFFFFFFUL;
+    static constexpr RVMOPWidth MOPW_BYTE           = { 0x00000000000000FFUL, 0x00U, 1 };
+    static constexpr RVMOPWidth MOPW_HALF_WORD      = { 0x000000000000FFFFUL, 0x01U, 2 };
+    static constexpr RVMOPWidth MOPW_WORD           = { 0x00000000FFFFFFFFUL, 0x03U, 4 };
+    static constexpr RVMOPWidth MOPW_DOUBLE_WORD    = { 0xFFFFFFFFFFFFFFFFUL, 0x07U, 8 };
 
     // Type definition of RISC-V Memory Data
     typedef union {
@@ -45,4 +54,92 @@ namespace Jasse {
         virtual RVMOPStatus     Read (addr_t address, RVMOPWidth width, data_t* dst) = 0;
         virtual RVMOPStatus     Write(addr_t address, RVMOPWidth width, data_t  src) = 0;
     };
+
+
+
+    // Simple Linear Memory Instance
+    class SimpleLinearMemory : public RVMemoryInterface {
+    private:
+        const size_t    size;
+        arch64_t*       heap;
+
+    public:
+        SimpleLinearMemory(size_t size);
+        SimpleLinearMemory(const SimpleLinearMemory& obj);
+        ~SimpleLinearMemory();
+
+        arch64_t*           GetHeap();
+        const arch64_t*     GetHeap() const;
+        size_t              GetSize() const;
+        size_t              GetCapacity() const;
+
+        virtual RVMOPStatus Read(addr_t address, RVMOPWidth width, data_t* dst) override;
+        virtual RVMOPStatus Write(addr_t address, RVMOPWidth width, data_t src) override;
+    };
 }
+
+
+
+// Implementation of: class SimpleLinearMemory
+namespace Jasse {
+    /*
+    arch32_t*       heap;
+    const size_t    size;
+    */
+
+    SimpleLinearMemory::SimpleLinearMemory(size_t size)
+        : size  (size)
+        , heap  (new arch64_t[size]())
+    { }
+
+    SimpleLinearMemory::SimpleLinearMemory(const SimpleLinearMemory& obj)
+        : size  (obj.size)
+        , heap  (new arch64_t[obj.size])
+    { 
+        std::copy(obj.heap, obj.heap + obj.size, heap);
+    }
+
+    SimpleLinearMemory::~SimpleLinearMemory()
+    {
+        delete[] heap;
+    }
+
+    inline arch64_t* SimpleLinearMemory::GetHeap()
+    {
+        return heap;
+    }
+
+    inline const arch64_t* SimpleLinearMemory::GetHeap() const
+    {
+        return heap;
+    }
+
+    inline size_t SimpleLinearMemory::GetSize() const
+    {
+        return size;
+    }
+
+    inline size_t SimpleLinearMemory::GetCapacity() const
+    {
+        return size << 3;
+    }
+
+    RVMOPStatus SimpleLinearMemory::Read(addr_t address, RVMOPWidth width, data_t* dst)
+    {
+        // !! little-endian system only !!
+
+        if (address + width.length > GetCapacity()) // address out of range
+            return MOP_ACCESS_FAULT;
+
+        uint8_t* addr = ((uint8_t*) heap) + address;
+
+        if (!(address & width.alignment)) // aligned
+            dst->data64 = width.mask & intmem::load_le((arch64_t*) addr);
+        else // unaligned
+            dst->data64 = width.mask & intmem::loadu_le<arch64_t>(addr);
+
+        return MOP_SUCCESS;
+    }
+
+}
+
