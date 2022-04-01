@@ -32,6 +32,16 @@ namespace Jasse {
 }
 
 
+// Integral extending
+#define SEXT_W(expr)    ((uint64_t) ((int32_t) (expr)))
+#define SEXT_H(expr)    ((uint64_t) ((int16_t) (expr)))
+#define SEXT_B(expr)    ((uint64_t) ((int8_t)  (expr)))
+
+#define ZEXT_W(expr)    ((uint64_t) ((uint32_t) (expr)))
+#define ZEXT_H(expr)    ((uint64_t) ((uint16_t) (expr)))
+#define ZEXT_B(expr)    ((uint64_t) ((uint8_t)  (expr)))
+
+
 // Standard operand format
 #define GET_OPERAND(insn, mask, offset) \
     ((insn & mask) >> offset)

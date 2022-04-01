@@ -8,25 +8,6 @@
 #include "riscv.hpp"
 
 
-#define SEXT_W(expr) \
-    ((uint64_t)((int32_t)(expr)))
-
-#define SEXT_H(expr) \
-    ((uint64_t)((int16_t)(expr)))
-
-#define SEXT_B(expr) \
-    ((uint64_t)((int8_t)(expr)))
-
-#define ZEXT_W(expr) \
-    ((uint64_t)((uint32_t)(expr)))
-
-#define ZEXT_H(expr) \
-    ((uint64_t)((uint16_t)(expr)))
-
-#define ZEXT_B(expr) \
-    ((uint64_t)((uint8_t)(expr)))
-
-
 #define IMM64_SEXT_W(imm) \
     (imm.imm64 = SEXT_W(imm.imm32), imm)
 
