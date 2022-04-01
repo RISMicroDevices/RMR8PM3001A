@@ -6,6 +6,7 @@
 //
 
 #include <cstdint>
+#include <cstring>
 #include <algorithm>
 
 #include "intmem.h"
@@ -131,15 +132,27 @@ namespace Jasse {
         if (address + width.length > GetCapacity()) // address out of range
             return MOP_ACCESS_FAULT;
 
-        uint8_t* addr = ((uint8_t*) heap) + address;
+        if (width.length > 8) // unsupported access length
+            return MOP_ACCESS_FAULT;
 
-        if (!(address & width.alignment)) // aligned
-            dst->data64 = width.mask & intmem::load_le((arch64_t*) addr);
-        else // unaligned
-            dst->data64 = width.mask & intmem::loadu_le<arch64_t>(addr);
+        memcpy(&dst, ((uint8_t*) heap) + address, width.length);
 
         return MOP_SUCCESS;
     }
 
+    RVMOPStatus SimpleLinearMemory::Write(addr_t address, RVMOPWidth width, data_t src)
+    {
+        // !! little-endian system only !!
+
+        if (address + width.length > GetCapacity()) // address out of range
+            return MOP_ACCESS_FAULT;
+
+        if (width.length > 8) // unsupported access length
+            return MOP_ACCESS_FAULT;
+
+        memcpy(((uint8_t*) heap) + address, &src, width.length);
+
+        return MOP_SUCCESS;
+    }
 }
 
