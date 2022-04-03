@@ -103,6 +103,14 @@ namespace Jasse {
         const RVGeneralRegisters64&     GR64() const;
         RVGeneralRegisters64&           GR64();
 
+        arch64_t                        GetGRx64Zext(int addr) const;
+        arch64_t                        GetGRx64Sext(int addr) const;
+        arch32_t                        GetGRx32(int addr) const;
+
+        void                            SetGRx64(int addr, arch64_t val64);
+        void                            SetGRx32Zext(int addr, arch32_t val32);
+        void                            SetGRx32Sext(int addr, arch32_t val32);
+
         const RVMemoryInterface*        MI() const;
         RVMemoryInterface*              MI();
 
@@ -663,6 +671,78 @@ namespace Jasse {
             throw std::logic_error("non-GR64 arch");
         
         return *_GR64;
+    }
+
+    // *NOTICE: Get 64-bit value from General Register.
+    //          If XLEN is less than 64, the value read is zero-extended,
+    //          and wouldn't raise any exception.
+    inline arch64_t RVArchitectural::GetGRx64Zext(int addr) const
+    {
+        if (_GR64)
+            return _GR64->Get(addr);
+        else if (_GR32)
+            return ZEXT_W(_GR32->Get(addr));
+        else
+            return 0;
+    }
+
+    // *NOTICE: Get 64-bit value from General Register.
+    //          If XLEN is less than 64, the value read is sign-extended,
+    //          and wouldn't raise any exception.
+    inline arch64_t RVArchitectural::GetGRx64Sext(int addr) const
+    {
+        if (_GR64)
+            return _GR64->Get(addr);
+        else if (_GR32)
+            return SEXT_W(_GR32->Get(addr));
+        else
+            return 0;
+    }
+
+    // *NOTICE: Get 32-bit value from General Register.
+    //          If XLEN is greater than 32, the value read is truncated,
+    //          and wouldn't raise any exception.
+    inline arch32_t RVArchitectural::GetGRx32(int addr) const
+    {
+        if (_GR64)
+            return (arch32_t) _GR64->Get(addr);
+        else if (_GR32)
+            return _GR32->Get(addr);
+        else
+            return 0;
+    }
+
+    // *NOTICE: Set General Register with 64-bit value.
+    //          If XLEN is less than 64, the value passed through is truncated,
+    //          and wouldn't raise any exception.
+    inline void RVArchitectural::SetGRx64(int addr, arch64_t val64)
+    {
+        if (_GR64)
+            _GR64->Set(addr, val64);
+        else if (_GR32)
+            _GR32->Set(addr, (arch32_t) val64); // truncate
+    }
+
+    // *NOTICE: Set General Register with 32-bit value.
+    //          If XLEN is greater than 32, the value passed through is zero-extended,
+    //          and wouldn't raise any exception.
+    inline void RVArchitectural::SetGRx32Zext(int addr, arch32_t val32)
+    {
+        if (_GR64)
+            _GR64->Set(addr, ZEXT_W(val32));
+        else if (_GR32)
+            _GR32->Set(addr, val32);
+    }
+
+    // *NOTICE: Set General Register with 32-bit value.
+    //          If XLEN is greater than 32, the value passed through is sign-extended,
+    //          and wouldn't raise any exception.
+    inline void RVArchitectural::SetGRx32Sext(int addr, arch32_t val32)
+    {
+        if (_GR64)
+            _GR64->Set(addr, SEXT_W(val32));
+        else if (_GR32)
+            _GR32->Set(addr, val32);
     }
 
     inline const RVMemoryInterface* RVArchitectural::MI() const
