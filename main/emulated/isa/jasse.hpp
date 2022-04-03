@@ -41,4 +41,17 @@
 #else
 #define ASSERT(expr)
 #endif
+
+//
+#define __ASSERTM(msg, file, line, func) \
+    std::ostringstream __should_not_reach_here_oss; \
+    __should_not_reach_here_oss << "ASSERT: " << msg << " - " << __FILENAME(file) << " " << func << ":" << line; \
+    throw std::runtime_error(__should_not_reach_here_oss.str());
+
+#if defined(__JASSE_ASSERTION)
+#define ASSERTM(expr, msg) \
+    if (!(expr)) {__ASSERTM(msg, __FILE__, __LINE__, __FUNCTION__);}
+#else
+#define ASSERTM(expr, msg)
+#endif
     
