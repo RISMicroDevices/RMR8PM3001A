@@ -84,7 +84,7 @@ namespace Jasse {
 // Implementation of: class SimpleLinearMemory
 namespace Jasse {
     /*
-    arch32_t*       heap;
+    arch64_t*       heap;
     const size_t    size;
     */
 
@@ -135,7 +135,7 @@ namespace Jasse {
         if (width.length > 8) // unsupported access length
             return MOP_ACCESS_FAULT;
 
-        memcpy(&dst, ((uint8_t*) heap) + address, width.length);
+        memcpy(dst, ((uint8_t*) heap) + address, width.length);
 
         return MOP_SUCCESS;
     }
@@ -155,4 +155,3 @@ namespace Jasse {
         return MOP_SUCCESS;
     }
 }
-
