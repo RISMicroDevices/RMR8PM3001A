@@ -13,6 +13,8 @@
 #include <initializer_list>
 
 
+#define CSR_ADDRESS_MASK            0xFFF
+
 //
 // Ratified Standard CSRs (based on riscv-privileged-20211203)
 
