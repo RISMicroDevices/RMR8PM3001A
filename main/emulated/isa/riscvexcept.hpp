@@ -65,26 +65,26 @@ namespace Jasse {
     // * Notice: Only PC and necessary CSRs (excluding 'mtval' .etc) are manipulated in this
     //           Trap-Procedure. Other software-defined or EEI-defined CSR/General Registers
     //           actions should be done out of this Trap-Procedure.
-    void TrapEnter  (RVArchitectural& arch, RVTrapType type, RVTrapCause cause) noexcept(false);
-    void TrapReturn (RVArchitectural& arch) noexcept(false);
+    void TrapEnter  (RVArchitecturalOOC* arch, RVCSRSpace* CSRs, RVTrapType type, RVTrapCause cause) noexcept(false);
+    void TrapReturn (RVArchitecturalOOC* arch, RVCSRSpace* CSRs) noexcept(false);
 }
 
 
 namespace Jasse {
 
-    void TrapEnter(RVArchitectural& arch, RVTrapType type, RVTrapCause cause) noexcept(false)
+    void TrapEnter(RVArchitecturalOOC* arch, RVCSRSpace* CSRs, RVTrapType type, RVTrapCause cause) noexcept(false)
     {
         // only M-mode supported currently
 
         // Write 'mepc' CSR
-        arch.CSR().RequireCSR(CSR_mepc, "mepc")
-            ->SetValue(arch.PC().pc64); // always zero-extended in XLEN=32, actually doesn't matter
+        CSRs->RequireCSR(CSR_mepc, "mepc")
+            ->SetValue(arch->PC().pc64); // always zero-extended in XLEN=32, actually doesn't matter
         
 
         // Write 'mcause' CSR
         csr_t mcause = 0;
 
-        if (arch.XLEN() == XLEN32) // XLEN=32
+        if (arch->XLEN() == XLEN32) // XLEN=32
         {
             SET_CSR_MXFIELD(mcause, CSR_mcause_FIELD_INTERRUPT, (uint32_t)type, MX32);
             SET_CSR_MXFIELD(mcause, CSR_mcause_FIELD_EXCEPTION_CODE, cause, MX32);
@@ -95,12 +95,12 @@ namespace Jasse {
             SET_CSR_MXFIELD(mcause, CSR_mcause_FIELD_EXCEPTION_CODE, cause, MX64);
         }
 
-        arch.CSR().RequireCSR(CSR_mcause, "mcause")
+        CSRs->RequireCSR(CSR_mcause, "mcause")
             ->SetValue(mcause);
         
 
         // Write 'mstatus' CSR
-        RVCSR* p_mstatus = arch.CSR().RequireCSR(CSR_mstatus, "mstatus");
+        RVCSR* p_mstatus = CSRs->RequireCSR(CSR_mstatus, "mstatus");
 
         csr_t mstatus = p_mstatus->GetValue(); // read 'mstatus'
 
@@ -117,31 +117,31 @@ namespace Jasse {
 
 
         // Write PC
-        csr_t mtvec = arch.CSR().RequireCSR(CSR_mtvec, "mtvec")->GetValue(); // read 'mtvec'
+        csr_t mtvec = CSRs->RequireCSR(CSR_mtvec, "mtvec")->GetValue(); // read 'mtvec'
 
         int mode = GET_CSR_FIELD(mtvec, CSR_mtvec_FIELD_MODE);
         if (mode == CSR_mtvec_FIELD_MODE_DEF_VECTORED && type == TRAP_INTERRUPT) // vectored interrupt trap
         {
-            if (arch.XLEN() == XLEN32) // XLEN=32
-                arch.SetPC32(GET_CSR_MXFIELD(mtvec, CSR_mtvec_FIELD_BASE, MX32) + (cause << 2));
+            if (arch->XLEN() == XLEN32) // XLEN=32
+                arch->SetPC32(GET_CSR_MXFIELD(mtvec, CSR_mtvec_FIELD_BASE, MX32) + (cause << 2));
             else // XLEN=64
-                arch.SetPC64(GET_CSR_MXFIELD(mtvec, CSR_mtvec_FIELD_BASE, MX64) + (cause << 2));
+                arch->SetPC64(GET_CSR_MXFIELD(mtvec, CSR_mtvec_FIELD_BASE, MX64) + (cause << 2));
         }
         else
         {
-            if (arch.XLEN() == XLEN32) // XLEN=32
-                arch.SetPC32(GET_CSR_MXFIELD(mtvec, CSR_mtvec_FIELD_BASE, MX32));
+            if (arch->XLEN() == XLEN32) // XLEN=32
+                arch->SetPC32(GET_CSR_MXFIELD(mtvec, CSR_mtvec_FIELD_BASE, MX32));
             else // XLEN=64
-                arch.SetPC64(GET_CSR_MXFIELD(mtvec, CSR_mtvec_FIELD_BASE, MX64));
+                arch->SetPC64(GET_CSR_MXFIELD(mtvec, CSR_mtvec_FIELD_BASE, MX64));
         }
     }
 
-    void TrapReturn(RVArchitectural& arch) noexcept(false)
+    void TrapReturn(RVArchitecturalOOC* arch, RVCSRSpace* CSRs) noexcept(false)
     {
         // only M-mode supported currently
 
         // Write 'mstatus' CSR
-        RVCSR* p_mstatus  = arch.CSR().RequireCSR(CSR_mstatus, "mstatus");
+        RVCSR* p_mstatus  = CSRs->RequireCSR(CSR_mstatus, "mstatus");
 
         csr_t mstatus = p_mstatus->GetValue(); // read 'mstatus'
 
@@ -162,12 +162,12 @@ namespace Jasse {
 
 
         // Write PC
-        csr_t mepc = arch.CSR().RequireCSR(CSR_mepc, "mepc")->GetValue();
+        csr_t mepc = CSRs->RequireCSR(CSR_mepc, "mepc")->GetValue();
 
-        if (arch.XLEN() == XLEN32) // XLEN=32
-            arch.SetPC32((uint32_t)mepc);
+        if (arch->XLEN() == XLEN32) // XLEN=32
+            arch->SetPC32((uint32_t)mepc);
         else
-            arch.SetPC64(mepc);
+            arch->SetPC64(mepc);
     }
 }
 
