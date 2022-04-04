@@ -564,7 +564,7 @@ namespace Jasse {
         _PC = pc;
     }
 
-    void RVArchitectural::SetPC32(arch32_t pc) noexcept
+    void RVArchitectural::SetPC32(arch32_t pc)
     {
         if (_XLEN != XLEN32)
             throw std::logic_error("set 32-bit PC in non-32-XLEN arch");
@@ -572,7 +572,7 @@ namespace Jasse {
         _PC.pc32 = pc;
     }
 
-    void RVArchitectural::SetPC64(arch64_t pc) noexcept
+    void RVArchitectural::SetPC64(arch64_t pc)
     {
         if (_XLEN != XLEN64)
             throw std::logic_error("set 64-bit PC in non-64-XLEN arch");
