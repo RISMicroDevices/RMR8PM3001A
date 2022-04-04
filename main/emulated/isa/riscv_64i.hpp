@@ -69,313 +69,315 @@
 // executors
 namespace Jasse {
 
+#define RV64I_EXECUTOR_PARAMS       const RVInstruction& insn, RVArchitecturalOOC* arch, RVMemoryInterface* MI, RVCSRSpace* CSRs
+
     // ADDI
-    RVExecStatus RV64IExecutor_ADDI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_ADDI(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()] 
-            = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
+        arch->GR64()->Set(insn.GetRD(),
+            arch->GR64()->Get(insn.GetRS1()) + insn.GetImmediate().imm64);
         
         return EXEC_SEQUENTIAL;
     }
 
     // SLTI
-    RVExecStatus RV64IExecutor_SLTI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SLTI(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = (int64_t)arch.GR64()[insn.GetRS1()] < (int64_t)insn.GetImmediate().imm64;
+        arch->GR64()->Set(insn.GetRD(),
+            (int64_t)arch->GR64()->Get(insn.GetRS1()) < (int64_t)insn.GetImmediate().imm64);
 
         return EXEC_SEQUENTIAL;
     }
 
     // SLTIU
-    RVExecStatus RV64IExecutor_SLTIU(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SLTIU(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = (uint64_t)arch.GR64()[insn.GetRS1()] < (uint64_t)insn.GetImmediate().imm64;
+        arch->GR64()->Set(insn.GetRD(),
+            (uint64_t)arch->GR64()->Get(insn.GetRS1()) < (uint64_t)insn.GetImmediate().imm64);
 
         return EXEC_SEQUENTIAL;
     }
 
     // ANDI
-    RVExecStatus RV64IExecutor_ANDI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_ANDI(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = arch.GR64()[insn.GetRS1()] & insn.GetImmediate().imm64;
+        arch->GR64()->Set(insn.GetRD(),
+            arch->GR64()->Get(insn.GetRS1()) & insn.GetImmediate().imm64);
 
         return EXEC_SEQUENTIAL;
     }
 
     // ORI
-    RVExecStatus RV64IExecutor_ORI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_ORI(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = arch.GR64()[insn.GetRS1()] | insn.GetImmediate().imm64;
+        arch->GR64()->Set(insn.GetRD(),
+            arch->GR64()->Get(insn.GetRS1()) | insn.GetImmediate().imm64);
 
         return EXEC_SEQUENTIAL;
     }
 
     // XORI
-    RVExecStatus RV64IExecutor_XORI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_XORI(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = arch.GR64()[insn.GetRS1()] ^ insn.GetImmediate().imm64;
+        arch->GR64()->Set(insn.GetRD(),
+            arch->GR64()->Get(insn.GetRS1()) ^ insn.GetImmediate().imm64);
 
         return EXEC_SEQUENTIAL;
     }
 
     
     // SLLI
-    RVExecStatus RV64IExecutor_SLLI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SLLI(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = arch.GR64()[insn.GetRS1()] << GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT6);
+        arch->GR64()->Set(insn.GetRD(),
+            arch->GR64()->Get(insn.GetRS1()) << GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT6));
         
         return EXEC_SEQUENTIAL;
     }
 
     // SRLI
-    RVExecStatus RV64IExecutor_SRLI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SRLI(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = (uint64_t)arch.GR64()[insn.GetRS1()] >> GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT6);
+        arch->GR64()->Set(insn.GetRD(),
+            (uint64_t)arch->GR64()->Get(insn.GetRS1()) >> GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT6));
 
         return EXEC_SEQUENTIAL;
     }
 
     // SRAI
-    RVExecStatus RV64IExecutor_SRAI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SRAI(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = (int64_t)arch.GR64()[insn.GetRS1()] >> GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT6);
+        arch->GR64()->Set(insn.GetRD(),
+            (int64_t)arch->GR64()->Get(insn.GetRS1()) >> GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT6));
 
         return EXEC_SEQUENTIAL;
     }
 
 
     // ADDIW
-    RVExecStatus RV64IExecutor_ADDIW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_ADDIW(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm32);
+        arch->GR64()->Set(insn.GetRD(),
+            SEXT_W((uint32_t)arch->GR64()->Get(insn.GetRS1()) + insn.GetImmediate().imm32));
 
         return EXEC_SEQUENTIAL;
     }
 
     // SLLIW
-    RVExecStatus RV64IExecutor_SLLIW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SLLIW(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] << GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT5));
+        arch->GR64()->Set(insn.GetRD(),
+            SEXT_W((uint32_t)arch->GR64()->Get(insn.GetRS1()) << GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT5)));
 
         return EXEC_SEQUENTIAL;
     }
 
     // SRLIW
-    RVExecStatus RV64IExecutor_SRLIW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SRLIW(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] >> GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT5));
+        arch->GR64()->Set(insn.GetRD(),
+            SEXT_W((uint32_t)arch->GR64()->Get(insn.GetRS1()) >> GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT5)));
 
         return EXEC_SEQUENTIAL;
     }
 
     // SRAIW
-    RVExecStatus RV64IExecutor_SRAIW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SRAIW(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = SEXT_W((int32_t)arch.GR64()[insn.GetRS1()] >> GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT5));
+        arch->GR64()->Set(insn.GetRD(),
+            SEXT_W((int32_t)arch->GR64()->Get(insn.GetRS1()) >> GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_SHAMT5)));
 
         return EXEC_SEQUENTIAL;
     }
 
 
     // ADD
-    RVExecStatus RV64IExecutor_ADD(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_ADD(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = arch.GR64()[insn.GetRS1()] + arch.GR64()[insn.GetRS2()];
+        arch->GR64()->Set(insn.GetRD(),
+            arch->GR64()->Get(insn.GetRS1()) + arch->GR64()->Get(insn.GetRS2()));
 
         return EXEC_SEQUENTIAL;
     }
 
     // SUB
-    RVExecStatus RV64IExecutor_SUB(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SUB(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = arch.GR64()[insn.GetRS1()] - arch.GR64()[insn.GetRS2()];
+        arch->GR64()->Set(insn.GetRD(),
+            arch->GR64()->Get(insn.GetRS1()) - arch->GR64()->Get(insn.GetRS2()));
 
         return EXEC_SEQUENTIAL;
     }
 
     // SLT
-    RVExecStatus RV64IExecutor_SLT(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SLT(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = (int64_t)arch.GR64()[insn.GetRS1()] < (int64_t)arch.GR64()[insn.GetRS2()];
+        arch->GR64()->Set(insn.GetRD(),
+            (int64_t)arch->GR64()->Get(insn.GetRS1()) < (int64_t)arch->GR64()->Get(insn.GetRS2()));
 
         return EXEC_SEQUENTIAL;
     }
 
     // SLTU
-    RVExecStatus RV64IExecutor_SLTU(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SLTU(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = (uint64_t)arch.GR64()[insn.GetRS1()] < (uint64_t)arch.GR64()[insn.GetRS2()];
+        arch->GR64()->Set(insn.GetRD(),
+            (uint64_t)arch->GR64()->Get(insn.GetRS1()) < (uint64_t)arch->GR64()->Get(insn.GetRS2()));
 
         return EXEC_SEQUENTIAL;
     }
 
     // AND
-    RVExecStatus RV64IExecutor_AND(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_AND(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = arch.GR64()[insn.GetRS1()] & arch.GR64()[insn.GetRS2()];
+        arch->GR64()->Set(insn.GetRD(),
+            arch->GR64()->Get(insn.GetRS1()) & arch->GR64()->Get(insn.GetRS2()));
 
         return EXEC_SEQUENTIAL;
     }
 
     // OR
-    RVExecStatus RV64IExecutor_OR(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_OR(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = arch.GR64()[insn.GetRS1()] | arch.GR64()[insn.GetRS2()];
+        arch->GR64()->Set(insn.GetRD(),
+            arch->GR64()->Get(insn.GetRS1()) | arch->GR64()->Get(insn.GetRS2()));
 
         return EXEC_SEQUENTIAL;
     }
 
     // XOR
-    RVExecStatus RV64IExecutor_XOR(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_XOR(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = arch.GR64()[insn.GetRS1()] ^ arch.GR64()[insn.GetRS2()];
+        arch->GR64()->Set(insn.GetRD(),
+            arch->GR64()->Get(insn.GetRS1()) ^ arch->GR64()->Get(insn.GetRS2()));
 
         return EXEC_SEQUENTIAL;
     }
 
     // SLL
-    RVExecStatus RV64IExecutor_SLL(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SLL(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = arch.GR64()[insn.GetRS1()] << (arch.GR64()[insn.GetRS2()] & 0x003F);
+        arch->GR64()->Set(insn.GetRD(),
+            arch->GR64()->Get(insn.GetRS1()) << (arch->GR64()->Get(insn.GetRS2()) & 0x003F));
 
         return EXEC_SEQUENTIAL;
     }
 
     // SRL
-    RVExecStatus RV64IExecutor_SRL(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SRL(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = (uint64_t)arch.GR64()[insn.GetRS1()] >> (arch.GR64()[insn.GetRS2()] & 0x003F);
+        arch->GR64()->Set(insn.GetRD(),
+            (uint64_t)arch->GR64()->Get(insn.GetRS1()) >> (arch->GR64()->Get(insn.GetRS2()) & 0x003F));
 
         return EXEC_SEQUENTIAL;
     }
 
     // SRA
-    RVExecStatus RV64IExecutor_SRA(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SRA(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = (int64_t)arch.GR64()[insn.GetRS1()] >> (arch.GR64()[insn.GetRS2()] & 0x003F);
+        arch->GR64()->Set(insn.GetRD(),
+            (int64_t)arch->GR64()->Get(insn.GetRS1()) >> (arch->GR64()->Get(insn.GetRS2()) & 0x003F));
 
         return EXEC_SEQUENTIAL;
     }
 
 
     // ADDW
-    RVExecStatus RV64IExecutor_ADDW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_ADDW(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] + (uint32_t)arch.GR64()[insn.GetRS2()]);
+        arch->GR64()->Set(insn.GetRD(),
+            SEXT_W((uint32_t)arch->GR64()->Get(insn.GetRS1()) + (uint32_t)arch->GR64()->Get(insn.GetRS2())));
 
         return EXEC_SEQUENTIAL;
     }
 
     // SUBW
-    RVExecStatus RV64IExecutor_SUBW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SUBW(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] - (uint32_t)arch.GR64()[insn.GetRS2()]);
+        arch->GR64()->Set(insn.GetRD(),
+            SEXT_W((uint32_t)arch->GR64()->Get(insn.GetRS1()) - (uint32_t)arch->GR64()->Get(insn.GetRS2())));
 
         return EXEC_SEQUENTIAL;
     }
 
     // SLLW
-    RVExecStatus RV64IExecutor_SLLW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SLLW(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] << (arch.GR64()[insn.GetRS2()] & 0x001F));
+        arch->GR64()->Set(insn.GetRD(),
+            SEXT_W((uint32_t)arch->GR64()->Get(insn.GetRS1()) << (arch->GR64()->Get(insn.GetRS2()) & 0x001F)));
 
         return EXEC_SEQUENTIAL;
     }
 
     // SRLW
-    RVExecStatus RV64IExecutor_SRLW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SRLW(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = SEXT_W((uint32_t)arch.GR64()[insn.GetRS1()] >> (arch.GR64()[insn.GetRS2()] & 0x001F));
+        arch->GR64()->Set(insn.GetRD(),
+            SEXT_W((uint32_t)arch->GR64()->Get(insn.GetRS1()) >> (arch->GR64()->Get(insn.GetRS2()) & 0x001F)));
 
         return EXEC_SEQUENTIAL;
     }
 
     // SRAW
-    RVExecStatus RV64IExecutor_SRAW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SRAW(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = SEXT_W((int32_t)arch.GR64()[insn.GetRS1()] >> (arch.GR64()[insn.GetRS2()] & 0x001F));
+        arch->GR64()->Set(insn.GetRD(),
+            SEXT_W((int32_t)arch->GR64()->Get(insn.GetRS1()) >> (arch->GR64()->Get(insn.GetRS2()) & 0x001F)));
 
         return EXEC_SEQUENTIAL;
     }
 
 
     // LUI
-    RVExecStatus RV64IExecutor_LUI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_LUI(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()] 
-            = insn.GetImmediate().imm64;
+        arch->GR64()->Set(insn.GetRD(), 
+            insn.GetImmediate().imm64);
 
         return EXEC_SEQUENTIAL;
     }
 
     // AUIPC
-    RVExecStatus RV64IExecutor_AUIPC(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_AUIPC(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()] 
-            = insn.GetImmediate().imm64 + arch.PC().pc64;
+        arch->GR64()->Set(insn.GetRD(), 
+            insn.GetImmediate().imm64 + arch->PC().pc64);
 
         return EXEC_SEQUENTIAL;
     }
 
 
     // JAL
-    RVExecStatus RV64IExecutor_JAL(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_JAL(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = arch.PC().pc64 + 4;
+        arch->GR64()->Set(insn.GetRD(),
+            arch->PC().pc64 + 4);
 
-        arch.SetPC64(
-            arch.PC().pc64 + insn.GetImmediate().imm64);
+        arch->SetPC64(
+            arch->PC().pc64 + insn.GetImmediate().imm64);
 
         return EXEC_PC_JUMP;
     }
 
     // JALR
-    RVExecStatus RV64IExecutor_JALR(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_JALR(RV64I_EXECUTOR_PARAMS)
     {
-        arch.GR64()[insn.GetRD()]
-            = arch.PC().pc64 + 4;
+        arch->GR64()->Set(insn.GetRD(),
+            arch->PC().pc64 + 4);
 
-        arch.SetPC64(
-            (arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64) & 0xFFFFFFFFFFFFFFFELU);
+        arch->SetPC64(
+            (arch->GR64()->Get(insn.GetRS1()) + insn.GetImmediate().imm64) & 0xFFFFFFFFFFFFFFFELU);
 
         return EXEC_PC_JUMP;
     }
 
 
     // BEQ
-    RVExecStatus RV64IExecutor_BEQ(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_BEQ(RV64I_EXECUTOR_PARAMS)
     {
-        if (arch.GR64()[insn.GetRS1()] == arch.GR64()[insn.GetRS2()])
+        if (arch->GR64()->Get(insn.GetRS1()) == arch->GR64()->Get(insn.GetRS2()))
         {
-            arch.SetPC64(arch.PC().pc64 + insn.GetImmediate().imm64);
+            arch->SetPC64(arch->PC().pc64 + insn.GetImmediate().imm64);
             return EXEC_PC_JUMP;
         }
         else
@@ -383,11 +385,11 @@ namespace Jasse {
     }
 
     // BNE
-    RVExecStatus RV64IExecutor_BNE(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_BNE(RV64I_EXECUTOR_PARAMS)
     {
-        if (arch.GR64()[insn.GetRS1()] != arch.GR64()[insn.GetRS2()])
+        if (arch->GR64()->Get(insn.GetRS1()) != arch->GR64()->Get(insn.GetRS2()))
         {
-            arch.SetPC64(arch.PC().pc64 + insn.GetImmediate().imm64);
+            arch->SetPC64(arch->PC().pc64 + insn.GetImmediate().imm64);
             return EXEC_PC_JUMP;
         }
         else
@@ -395,11 +397,11 @@ namespace Jasse {
     }
 
     // BLT
-    RVExecStatus RV64IExecutor_BLT(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_BLT(RV64I_EXECUTOR_PARAMS)
     {
-        if ((int64_t)arch.GR64()[insn.GetRS1()] < (int64_t)arch.GR64()[insn.GetRS2()])
+        if ((int64_t)arch->GR64()->Get(insn.GetRS1()) < (int64_t)arch->GR64()->Get(insn.GetRS2()))
         {
-            arch.SetPC64(arch.PC().pc64 + insn.GetImmediate().imm64);
+            arch->SetPC64(arch->PC().pc64 + insn.GetImmediate().imm64);
             return EXEC_PC_JUMP;
         }
         else
@@ -407,11 +409,11 @@ namespace Jasse {
     }
 
     // BLTU
-    RVExecStatus RV64IExecutor_BLTU(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_BLTU(RV64I_EXECUTOR_PARAMS)
     {
-        if ((uint64_t)arch.GR64()[insn.GetRS1()] < (uint64_t)arch.GR64()[insn.GetRS2()])
+        if ((uint64_t)arch->GR64()->Get(insn.GetRS1()) < (uint64_t)arch->GR64()->Get(insn.GetRS2()))
         {
-            arch.SetPC64(arch.PC().pc64 + insn.GetImmediate().imm64);
+            arch->SetPC64(arch->PC().pc64 + insn.GetImmediate().imm64);
             return EXEC_PC_JUMP;
         }
         else
@@ -419,11 +421,11 @@ namespace Jasse {
     }
 
     // BGE
-    RVExecStatus RV64IExecutor_BGE(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_BGE(RV64I_EXECUTOR_PARAMS)
     {
-        if ((int64_t)arch.GR64()[insn.GetRS1()] >= (int64_t)arch.GR64()[insn.GetRS2()])
+        if ((int64_t)arch->GR64()->Get(insn.GetRS1()) >= (int64_t)arch->GR64()->Get(insn.GetRS2()))
         {
-            arch.SetPC64(arch.PC().pc64 + insn.GetImmediate().imm64);
+            arch->SetPC64(arch->PC().pc64 + insn.GetImmediate().imm64);
             return EXEC_PC_JUMP;
         }
         else
@@ -431,11 +433,11 @@ namespace Jasse {
     }
 
     // BGEU
-    RVExecStatus RV64IExecutor_BGEU(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_BGEU(RV64I_EXECUTOR_PARAMS)
     {
-        if ((uint64_t)arch.GR64()[insn.GetRS1()] >= (uint64_t)arch.GR64()[insn.GetRS2()])
+        if ((uint64_t)arch->GR64()->Get(insn.GetRS1()) >= (uint64_t)arch->GR64()->Get(insn.GetRS2()))
         {
-            arch.SetPC64(arch.PC().pc64 + insn.GetImmediate().imm64);
+            arch->SetPC64(arch->PC().pc64 + insn.GetImmediate().imm64);
             return EXEC_PC_JUMP;
         }
         else
@@ -444,23 +446,23 @@ namespace Jasse {
 
 
 
-    inline void __RV64I_MEMORYIO_EXCEPTION(const RVInstruction& insn, RVArchitectural& arch, RVTrapCause cause, addr_t address)
+    inline void __RV64I_MEMORYIO_EXCEPTION(const RVInstruction& insn, RVArchitecturalOOC* arch, RVCSRSpace* CSRs, RVTrapCause cause, addr_t address)
     {
         // Writing into 'mtval'
         // *NOTICE: Action of writing address into 'mtval' is just an implementation-decided
         //          behaviour, not necessary according to privileged specification.
         //          If this action is not included in your processor or implementation, you
         //          could disable this action by "commenting" this part of code.
-        RVCSR* mtval = arch.CSR().GetCSR(CSR_mtval);
+        RVCSR* mtval = CSRs->GetCSR(CSR_mtval);
 
         if (mtval)
             mtval->SetValue(address);
         //
 
-        TrapEnter(arch, TRAP_EXCEPTION, cause);
+        TrapEnter(arch, CSRs, TRAP_EXCEPTION, cause);
     }
 
-    inline void __RV64I_LOAD_EXCEPTION(const RVInstruction& insn, RVArchitectural& arch, RVMOPStatus status, addr_t address)
+    inline void __RV64I_LOAD_EXCEPTION(const RVInstruction& insn, RVArchitecturalOOC* arch, RVCSRSpace* CSRs, RVMOPStatus status, addr_t address)
     {
         RVTrapCause cause;
 
@@ -478,158 +480,158 @@ namespace Jasse {
                 SHOULD_NOT_REACH_HERE;
         }
 
-        __RV64I_MEMORYIO_EXCEPTION(insn, arch, cause, address);
+        __RV64I_MEMORYIO_EXCEPTION(insn, arch, CSRs, cause, address);
     }
 
     // LD
-    RVExecStatus RV64IExecutor_LD(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_LD(RV64I_EXECUTOR_PARAMS)
     {
-        addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
+        addr_t addr = arch->GR64()->Get(insn.GetRS1()) + insn.GetImmediate().imm64;
         data_t data;
 
         RVMOPStatus status 
-            = arch.MI()->Read(addr, MOPW_DOUBLE_WORD, &data);
+            = MI->Read(addr, MOPW_DOUBLE_WORD, &data);
 
         if (status == MOP_SUCCESS)
         {
-            arch.GR64()[insn.GetRD()] = data.data64;
+            arch->GR64()->Set(insn.GetRD(), data.data64);
             return EXEC_SEQUENTIAL;
         }
         else
         {
-            __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
+            __RV64I_LOAD_EXCEPTION(insn, arch, CSRs, status, addr);
             return EXEC_TRAP_ENTER;
         }
     }
 
     // LW
-    RVExecStatus RV64IExecutor_LW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_LW(RV64I_EXECUTOR_PARAMS)
     {
-        addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
+        addr_t addr = arch->GR64()->Get(insn.GetRS1()) + insn.GetImmediate().imm64;
         data_t data;
 
         RVMOPStatus status 
-            = arch.MI()->Read(addr, MOPW_WORD, &data);
+            = MI->Read(addr, MOPW_WORD, &data);
 
         if (status == MOP_SUCCESS)
         {
-            arch.GR64()[insn.GetRD()] = SEXT_W(data.data32);
+            arch->GR64()->Set(insn.GetRD(), SEXT_W(data.data32));
             return EXEC_SEQUENTIAL;
         }
         else
         {
-            __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
+            __RV64I_LOAD_EXCEPTION(insn, arch, CSRs, status, addr);
             return EXEC_TRAP_ENTER;
         }
     }
 
     // LH
-    RVExecStatus RV64IExecutor_LH(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_LH(RV64I_EXECUTOR_PARAMS)
     {
-        addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
+        addr_t addr = arch->GR64()->Get(insn.GetRS1()) + insn.GetImmediate().imm64;
         data_t data;
 
         RVMOPStatus status 
-            = arch.MI()->Read(addr, MOPW_HALF_WORD, &data);
+            = MI->Read(addr, MOPW_HALF_WORD, &data);
 
         if (status == MOP_SUCCESS)
         {
-            arch.GR64()[insn.GetRD()] = SEXT_H(data.data16);
+            arch->GR64()->Set(insn.GetRD(), SEXT_H(data.data16));
             return EXEC_SEQUENTIAL;
         }
         else
         {
-            __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
+            __RV64I_LOAD_EXCEPTION(insn, arch, CSRs, status, addr);
             return EXEC_TRAP_ENTER;
         }
     }
 
     // LB
-    RVExecStatus RV64IExecutor_LB(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_LB(RV64I_EXECUTOR_PARAMS)
     {
-        addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
+        addr_t addr = arch->GR64()->Get(insn.GetRS1()) + insn.GetImmediate().imm64;
         data_t data;
 
         RVMOPStatus status
-            = arch.MI()->Read(addr, MOPW_BYTE, &data);
+            = MI->Read(addr, MOPW_BYTE, &data);
 
         if (status == MOP_SUCCESS)
         {
-            arch.GR64()[insn.GetRD()] = SEXT_B(data.data8);
+            arch->GR64()->Set(insn.GetRD(), SEXT_B(data.data8));
             return EXEC_SEQUENTIAL;
         }
         else
         {
-            __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
+            __RV64I_LOAD_EXCEPTION(insn, arch, CSRs, status, addr);
             return EXEC_TRAP_ENTER;
         }
     }
 
     // LWU
-    RVExecStatus RV64IExecutor_LWU(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_LWU(RV64I_EXECUTOR_PARAMS)
     {
-        addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
+        addr_t addr = arch->GR64()->Get(insn.GetRS1()) + insn.GetImmediate().imm64;
         data_t data;
 
         RVMOPStatus status 
-            = arch.MI()->Read(addr, MOPW_WORD, &data);
+            = MI->Read(addr, MOPW_WORD, &data);
 
         if (status == MOP_SUCCESS)
         {
-            arch.GR64()[insn.GetRD()] = ZEXT_W(data.data32);
+            arch->GR64()->Set(insn.GetRD(), ZEXT_W(data.data32));
             return EXEC_SEQUENTIAL;
         }
         else
         {
-            __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
+            __RV64I_LOAD_EXCEPTION(insn, arch, CSRs, status, addr);
             return EXEC_TRAP_ENTER;
         }
     }
 
     // LHU
-    RVExecStatus RV64IExecutor_LHU(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_LHU(RV64I_EXECUTOR_PARAMS)
     {
-        addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
+        addr_t addr = arch->GR64()->Get(insn.GetRS1()) + insn.GetImmediate().imm64;
         data_t data;
 
         RVMOPStatus status 
-            = arch.MI()->Read(addr, MOPW_HALF_WORD, &data);
+            = MI->Read(addr, MOPW_HALF_WORD, &data);
 
         if (status == MOP_SUCCESS)
         {
-            arch.GR64()[insn.GetRD()] = ZEXT_H(data.data16);
+            arch->GR64()->Set(insn.GetRD(), ZEXT_H(data.data16));
             return EXEC_SEQUENTIAL;
         }
         else
         {
-            __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
+            __RV64I_LOAD_EXCEPTION(insn, arch, CSRs, status, addr);
             return EXEC_TRAP_ENTER;
         }
     }
 
     // LBU
-    RVExecStatus RV64IExecutor_LBU(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_LBU(RV64I_EXECUTOR_PARAMS)
     {
-        addr_t addr = arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
+        addr_t addr = arch->GR64()->Get(insn.GetRS1()) + insn.GetImmediate().imm64;
         data_t data;
 
         RVMOPStatus status
-            = arch.MI()->Read(addr, MOPW_BYTE, &data);
+            = MI->Read(addr, MOPW_BYTE, &data);
 
         if (status == MOP_SUCCESS)
         {
-            arch.GR64()[insn.GetRD()] = ZEXT_B(data.data8);
+            arch->GR64()->Set(insn.GetRD(), ZEXT_B(data.data8));
             return EXEC_SEQUENTIAL;
         }
         else
         {
-            __RV64I_LOAD_EXCEPTION(insn, arch, status, addr);
+            __RV64I_LOAD_EXCEPTION(insn, arch, CSRs, status, addr);
             return EXEC_TRAP_ENTER;
         }
     }
 
 
-    inline void __RV64I_STORE_EXCEPTION(const RVInstruction& insn, RVArchitectural& arch, RVMOPStatus status, addr_t address)
+    inline void __RV64I_STORE_EXCEPTION(const RVInstruction& insn, RVArchitecturalOOC* arch, RVCSRSpace* CSRs, RVMOPStatus status, addr_t address)
     {
         RVTrapCause cause;
 
@@ -647,21 +649,21 @@ namespace Jasse {
                 SHOULD_NOT_REACH_HERE;
         }
 
-        __RV64I_MEMORYIO_EXCEPTION(insn, arch, cause, address);
+        __RV64I_MEMORYIO_EXCEPTION(insn, arch, CSRs, cause, address);
     }
     
     // SD
-    RVExecStatus RV64IExecutor_SD(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SD(RV64I_EXECUTOR_PARAMS)
     {
-        addr_t addr =   arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
-        data_t data = { arch.GR64()[insn.GetRS2()] };
+        addr_t addr =   arch->GR64()->Get(insn.GetRS1()) + insn.GetImmediate().imm64;
+        data_t data = { arch->GR64()->Get(insn.GetRS2()) };
 
         RVMOPStatus status 
-            = arch.MI()->Write(addr, MOPW_DOUBLE_WORD, data);
+            = MI->Write(addr, MOPW_DOUBLE_WORD, data);
 
         if (status != MOP_SUCCESS)
         {
-            __RV64I_STORE_EXCEPTION(insn, arch, status, addr);
+            __RV64I_STORE_EXCEPTION(insn, arch, CSRs, status, addr);
             return EXEC_TRAP_ENTER;
         }
         else
@@ -669,17 +671,17 @@ namespace Jasse {
     }
 
     // SW
-    RVExecStatus RV64IExecutor_SW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SW(RV64I_EXECUTOR_PARAMS)
     {
-        addr_t addr =   arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
-        data_t data = { arch.GR64()[insn.GetRS2()] };
+        addr_t addr =   arch->GR64()->Get(insn.GetRS1()) + insn.GetImmediate().imm64;
+        data_t data = { arch->GR64()->Get(insn.GetRS2()) };
 
         RVMOPStatus status 
-            = arch.MI()->Write(addr, MOPW_WORD, data);
+            = MI->Write(addr, MOPW_WORD, data);
 
         if (status != MOP_SUCCESS)
         {
-            __RV64I_STORE_EXCEPTION(insn, arch, status, addr);
+            __RV64I_STORE_EXCEPTION(insn, arch, CSRs, status, addr);
             return EXEC_TRAP_ENTER;
         }
         else
@@ -687,17 +689,17 @@ namespace Jasse {
     }
 
     // SH
-    RVExecStatus RV64IExecutor_SH(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SH(RV64I_EXECUTOR_PARAMS)
     {
-        addr_t addr =   arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
-        data_t data = { arch.GR64()[insn.GetRS2()] };
+        addr_t addr =   arch->GR64()->Get(insn.GetRS1()) + insn.GetImmediate().imm64;
+        data_t data = { arch->GR64()->Get(insn.GetRS2()) };
 
         RVMOPStatus status
-            = arch.MI()->Write(addr, MOPW_HALF_WORD, data);
+            = MI->Write(addr, MOPW_HALF_WORD, data);
 
         if (status != MOP_SUCCESS)
         {
-            __RV64I_STORE_EXCEPTION(insn, arch, status, addr);
+            __RV64I_STORE_EXCEPTION(insn, arch, CSRs, status, addr);
             return EXEC_TRAP_ENTER;
         }
         else
@@ -705,17 +707,17 @@ namespace Jasse {
     }
 
     // SB
-    RVExecStatus RV64IExecutor_SB(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SB(RV64I_EXECUTOR_PARAMS)
     {
-        addr_t addr =   arch.GR64()[insn.GetRS1()] + insn.GetImmediate().imm64;
-        data_t data = { arch.GR64()[insn.GetRS2()] };
+        addr_t addr =   arch->GR64()->Get(insn.GetRS1()) + insn.GetImmediate().imm64;
+        data_t data = { arch->GR64()->Get(insn.GetRS2()) };
 
         RVMOPStatus status
-            = arch.MI()->Write(addr, MOPW_BYTE, data);
+            = MI->Write(addr, MOPW_BYTE, data);
 
         if (status != MOP_SUCCESS)
         {
-            __RV64I_STORE_EXCEPTION(insn, arch, status, addr);
+            __RV64I_STORE_EXCEPTION(insn, arch, CSRs, status, addr);
             return EXEC_TRAP_ENTER;
         }
         else
@@ -724,7 +726,7 @@ namespace Jasse {
 
 
     // FENCE
-    RVExecStatus RV64IExecutor_FENCE(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_FENCE(RV64I_EXECUTOR_PARAMS)
     {
         // nothing to be done in emulator
 
@@ -733,33 +735,33 @@ namespace Jasse {
 
 
     // ECALL
-    RVExecStatus RV64IExecutor_ECALL(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_ECALL(RV64I_EXECUTOR_PARAMS)
     {
         // only M-mode supported currently
 
-        TrapEnter(arch, TRAP_EXCEPTION, EXCEPTION_ECALL_FROM_M);
+        TrapEnter(arch, CSRs, TRAP_EXCEPTION, EXCEPTION_ECALL_FROM_M);
 
         return EXEC_TRAP_ENTER;
     }
 
     // EBREAK
-    RVExecStatus RV64IExecutor_EBREAK(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_EBREAK(RV64I_EXECUTOR_PARAMS)
     {
-        TrapEnter(arch, TRAP_EXCEPTION, EXCEPTION_BREAKPOINT);
+        TrapEnter(arch, CSRs, TRAP_EXCEPTION, EXCEPTION_BREAKPOINT);
 
         return EXEC_TRAP_ENTER;
     }
 
     // MRET
-    RVExecStatus RV64IExecutor_MRET(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_MRET(RV64I_EXECUTOR_PARAMS)
     {
-        TrapReturn(arch);
+        TrapReturn(arch, CSRs);
 
         return EXEC_TRAP_RETURN;
     }
 
     // SRET
-    RVExecStatus RV64IExecutor_SRET(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_SRET(RV64I_EXECUTOR_PARAMS)
     {
         // TODO to be implemented
 
@@ -767,7 +769,7 @@ namespace Jasse {
     }
 
     // WFI
-    RVExecStatus RV64IExecutor_WFI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RV64IExecutor_WFI(RV64I_EXECUTOR_PARAMS)
     {
         return EXEC_WAIT_FOR_INTERRUPT;
     }
