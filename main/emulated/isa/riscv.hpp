@@ -18,6 +18,7 @@
 #include "jasse.hpp"
 
 #include "riscvdef.hpp"
+#include "riscvooc.hpp"
 #include "riscvmem.hpp"
 #include "riscvcsr.hpp"
 
@@ -26,25 +27,22 @@ namespace Jasse {
     
     // RISC-V General Registers container template
     template<class TArch>
-    class RVGeneralRegisters {
+    class RVGeneralRegisters : public RVGeneralRegisterSetOOC<TArch> {
     private:
         static constexpr int    SIZE    = RV_ARCH_REG_COUNT;
 
         TArch*  registers;
 
     public:
-        RVGeneralRegisters();
-        RVGeneralRegisters(const RVGeneralRegisters<TArch>& obj);
-        ~RVGeneralRegisters();
+        RVGeneralRegisters() noexcept;
+        RVGeneralRegisters(const RVGeneralRegisters<TArch>& obj) noexcept;
+        ~RVGeneralRegisters() noexcept;
 
-        int     GetSize() const;
-        bool    CheckBound(int address) const;
+        virtual int     GetSize() const noexcept override;
+        virtual bool    CheckBound(int address) const noexcept override;
 
-        TArch   Get(int address) const;
-        void    Set(int address, TArch value);
-
-        TArch   operator[](int address) const;
-        TArch&  operator[](int address);
+        virtual TArch   Get(int address) const override;
+        virtual void    Set(int address, TArch value) override;
 
         void    operator=(const RVGeneralRegisters<TArch>& obj);
     };
@@ -56,14 +54,8 @@ namespace Jasse {
     using RVGeneralRegisters64  = RVGeneralRegisters<arch64_t>;
     
 
-    // X-Len Enumeration
-    typedef enum {
-        XLEN32 = 0,
-        XLEN64
-    } XLen;
-
     // RISC-V Architectural State Container
-    class RVArchitectural {
+    class RVArchitectural : public RVArchitecturalOOC {
     private:
         const XLen              _XLEN;
 
@@ -73,49 +65,36 @@ namespace Jasse {
 
         RVGeneralRegisters64*   _GR64;
 
-        RVMemoryInterface*      _MI;
-
-        RVCSRSpace              _CSR;
-
         // TODO ... More architectural states could be appended here ...
 
     public:
         RVArchitectural() = delete;
-        RVArchitectural(XLen XLEN, const RVCSRSpace& CSRs, RVMemoryInterface* MI);
+        RVArchitectural(XLen XLEN);
         RVArchitectural(const RVArchitectural& obj);
         ~RVArchitectural();
 
-        XLen                            XLEN() const;
+        virtual XLen                            XLEN() const noexcept override;
 
-        pc_t                            PC() const;
-        pc_t&                           PC();
-        void                            SetPC32(arch32_t pc);
-        void                            SetPC64(arch64_t pc);
+        virtual pc_t                            PC() const noexcept override;
+        virtual void                            SetPC(pc_t pc) noexcept override;
+        virtual void                            SetPC32(arch32_t pc) override;
+        virtual void                            SetPC64(arch64_t pc) override;
 
-        void                            SetMI(RVMemoryInterface* MI);
-        void                            SetCSR(const RVCSRSpace& CSR);
+        virtual bool                            IsGR32() const noexcept override;
+        virtual bool                            IsGR64() const noexcept override;
 
-        bool                            IsGR32() const;
-        bool                            IsGR64() const;
+        virtual RVGeneralRegisters32*           GR32() override;
+        virtual const RVGeneralRegisters32*     GR32() const override;
+        virtual RVGeneralRegisters64*           GR64() override;
+        virtual const RVGeneralRegisters64*     GR64() const override;
 
-        const RVGeneralRegisters32&     GR32() const;
-        RVGeneralRegisters32&           GR32();
-        const RVGeneralRegisters64&     GR64() const;
-        RVGeneralRegisters64&           GR64();
+        virtual arch64_t                        GetGRx64Zext(int addr) const noexcept override;
+        virtual arch64_t                        GetGRx64Sext(int addr) const noexcept override;
+        virtual arch32_t                        GetGRx32(int addr) const noexcept override;
 
-        arch64_t                        GetGRx64Zext(int addr) const;
-        arch64_t                        GetGRx64Sext(int addr) const;
-        arch32_t                        GetGRx32(int addr) const;
-
-        void                            SetGRx64(int addr, arch64_t val64);
-        void                            SetGRx32Zext(int addr, arch32_t val32);
-        void                            SetGRx32Sext(int addr, arch32_t val32);
-
-        const RVMemoryInterface*        MI() const;
-        RVMemoryInterface*              MI();
-
-        const RVCSRSpace&               CSR() const;
-        RVCSRSpace&                     CSR();
+        virtual void                            SetGRx64(int addr, arch64_t val64) noexcept override;
+        virtual void                            SetGRx32Zext(int addr, arch32_t val32) noexcept override;
+        virtual void                            SetGRx32Sext(int addr, arch32_t val32) noexcept override;
 
         // TODO ... More architectural states could be appended here ...
     };
@@ -186,17 +165,6 @@ namespace Jasse {
     } RVExecStatus;
 
 
-    // RISC-V Codepoint Type
-    typedef enum {
-        RVTYPE_R = 0,
-        RVTYPE_I,
-        RVTYPE_S,
-        RVTYPE_B,
-        RVTYPE_U,
-        RVTYPE_J
-    } RVCodepointType;
-
-    
     //
     class RVInstruction;
 
@@ -207,7 +175,7 @@ namespace Jasse {
         typedef std::string     (*Textualizer)(const RVInstruction&);
 
         // RISC-V Instruction Executor
-        typedef RVExecStatus    (*Executor)(const RVInstruction&, RVArchitectural&);
+        typedef RVExecStatus    (*Executor)(const RVInstruction&, RVArchitecturalOOC*, RVMemoryInterface*, RVCSRSpace*);
 
     private:
         std::string     name;
@@ -292,7 +260,7 @@ namespace Jasse {
         void                        SetTextualizer(RVCodepoint::Textualizer textualizer);
         void                        SetExecutor(RVCodepoint::Executor executor);
 
-        RVExecStatus                Execute(RVArchitectural& arch) const;
+        RVExecStatus                Execute(RVArchitecturalOOC* arch, RVMemoryInterface* MI, RVCSRSpace* CSRs) const;
         std::string                 ToString() const;
     };
 
@@ -379,11 +347,17 @@ namespace Jasse {
 
         RVArchitectural         arch;
 
+        RVMemoryInterface*      MI;
+
+        RVCSRSpace              CSRs;
+
         RVExecEEIHandler        exec_handler;
 
     public:
         RVInstance(const RVDecoderCollection&   decoders,
                    RVArchitectural&&            arch,
+                   RVMemoryInterface*           MI,
+                   const RVCSRSpace&            CSRs,
                    RVExecEEIHandler             exec_handler) noexcept;
 
         RVInstance() = delete;
@@ -395,6 +369,13 @@ namespace Jasse {
 
         RVArchitectural&                GetArch() noexcept;
         const RVArchitectural&          GetArch() const noexcept;
+
+        RVMemoryInterface*              GetMI() noexcept;
+        const RVMemoryInterface*        GetMI() const noexcept;
+        void                            SetMI(RVMemoryInterface* MI) noexcept;
+
+        RVCSRSpace&                     GetCSRs() noexcept;
+        const RVCSRSpace&               GetCSRs() const noexcept;
 
         RVExecEEIHandler&               GetExecEEI() noexcept;
         RVExecEEIHandler                GetExecEEI() const noexcept;
@@ -444,9 +425,7 @@ namespace Jasse {
 
         Builder&                    ExecEEI(RVExecEEIHandler exec_handler) noexcept;
 
-        arch32_t&                   GR32(int address) noexcept;
         arch32_t                    GR32(int address) const noexcept;
-        arch64_t&                   GR64(int address) noexcept;
         arch64_t                    GR64(int address) const noexcept;
         RVCSRSpace&                 CSR() noexcept;
         const RVCSRSpace&           CSR() const noexcept;
@@ -468,12 +447,12 @@ namespace Jasse {
     */
 
     template<class TArch>
-    RVGeneralRegisters<TArch>::RVGeneralRegisters()
+    RVGeneralRegisters<TArch>::RVGeneralRegisters() noexcept
         : registers (new TArch[SIZE]())
     { }
 
     template<class TArch>
-    RVGeneralRegisters<TArch>::RVGeneralRegisters(const RVGeneralRegisters<TArch>& obj)
+    RVGeneralRegisters<TArch>::RVGeneralRegisters(const RVGeneralRegisters<TArch>& obj) noexcept
         : registers (new TArch[SIZE]())
     { 
         // should be replaced as "memcpy", but suppressing warnings
@@ -482,19 +461,19 @@ namespace Jasse {
     }
 
     template<class TArch>
-    RVGeneralRegisters<TArch>::~RVGeneralRegisters()
+    RVGeneralRegisters<TArch>::~RVGeneralRegisters() noexcept
     {
         delete[] registers;
     }
 
     template<class TArch>
-    inline int RVGeneralRegisters<TArch>::GetSize() const
+    inline int RVGeneralRegisters<TArch>::GetSize() const noexcept
     {
         return SIZE;
     }
 
     template<class TArch>
-    inline bool RVGeneralRegisters<TArch>::CheckBound(int address) const
+    inline bool RVGeneralRegisters<TArch>::CheckBound(int address) const noexcept
     {
         return address >= 0 && address < SIZE;
     }
@@ -509,18 +488,6 @@ namespace Jasse {
     inline void RVGeneralRegisters<TArch>::Set(int address, TArch value)
     {
         registers[address] = value;
-    }
-
-    template<class TArch>
-    TArch RVGeneralRegisters<TArch>::operator[](int address) const
-    {
-        return !address ? TArch() : registers[address];
-    }
-
-    template<class TArch>
-    TArch& RVGeneralRegisters<TArch>::operator[](int address)
-    {
-        return !address ? (registers[address] = TArch()) : registers[address];
     }
 
     template<class TArch>
@@ -541,17 +508,11 @@ namespace Jasse {
     RVGeneralRegisters32*   _GR32;
 
     RVGeneralRegisters64*   _GR64;
-
-    RVMemoryInterface*      _MI;
-
-    RVCSRSpace              _CSR;
     */
 
-    RVArchitectural::RVArchitectural(XLen XLEN, const RVCSRSpace& CSRs, RVMemoryInterface* MI)
+    RVArchitectural::RVArchitectural(XLen XLEN)
         : _XLEN (XLEN)
         , _PC   (pc_t())
-        , _MI   (MI)
-        , _CSR  (CSRs)
     {
         switch (XLEN)
         {
@@ -574,8 +535,6 @@ namespace Jasse {
     RVArchitectural::RVArchitectural(const RVArchitectural& obj)
         : _XLEN (obj._XLEN)
         , _PC   (obj._PC)
-        , _MI   (obj._MI)
-        , _CSR  (obj._CSR)
     {
         _GR32 = obj._GR32 ? new RVGeneralRegisters32(*obj._GR32) : nullptr;
         _GR64 = obj._GR64 ? new RVGeneralRegisters64(*obj._GR64) : nullptr;
@@ -590,22 +549,22 @@ namespace Jasse {
             delete _GR64;
     }
 
-    inline XLen RVArchitectural::XLEN() const
+    XLen RVArchitectural::XLEN() const noexcept
     {
         return _XLEN;
     }
 
-    inline pc_t RVArchitectural::PC() const
+    pc_t RVArchitectural::PC() const noexcept
     {
         return _PC;
     }
 
-    inline pc_t& RVArchitectural::PC()
+    void RVArchitectural::SetPC(pc_t pc) noexcept
     {
-        return _PC;
+        _PC = pc;
     }
 
-    void RVArchitectural::SetPC32(arch32_t pc)
+    void RVArchitectural::SetPC32(arch32_t pc) noexcept
     {
         if (_XLEN != XLEN32)
             throw std::logic_error("set 32-bit PC in non-32-XLEN arch");
@@ -613,7 +572,7 @@ namespace Jasse {
         _PC.pc32 = pc;
     }
 
-    void RVArchitectural::SetPC64(arch64_t pc)
+    void RVArchitectural::SetPC64(arch64_t pc) noexcept
     {
         if (_XLEN != XLEN64)
             throw std::logic_error("set 64-bit PC in non-64-XLEN arch");
@@ -621,62 +580,52 @@ namespace Jasse {
         _PC.pc64 = pc;
     }
 
-    inline void RVArchitectural::SetMI(RVMemoryInterface* MI)
-    {
-        _MI = MI;
-    }
-
-    inline void RVArchitectural::SetCSR(const RVCSRSpace& CSR)
-    {
-        _CSR = CSR;
-    }
-
-    inline bool RVArchitectural::IsGR32() const
+    bool RVArchitectural::IsGR32() const noexcept
     {
         return _GR32;
     }
 
-    inline bool RVArchitectural::IsGR64() const
+    bool RVArchitectural::IsGR64() const noexcept
     {
         return _GR64;
     }
 
-    const RVGeneralRegisters32& RVArchitectural::GR32() const
+    const RVGeneralRegisters32* RVArchitectural::GR32() const
     {
         if (!_GR32)
             throw std::logic_error("non-GR32 arch");
 
-        return *_GR32;
+        return _GR32;
     }
 
-    RVGeneralRegisters32& RVArchitectural::GR32()
+    RVGeneralRegisters32* RVArchitectural::GR32()
     {
         if (!_GR32)
             throw std::logic_error("non-GR32 arch");
 
-        return *_GR32;
+        return _GR32;
     }
 
-    const RVGeneralRegisters64& RVArchitectural::GR64() const
+    const RVGeneralRegisters64* RVArchitectural::GR64() const
     {
         if (!_GR64)
             throw std::logic_error("non-GR64 arch");
         
-        return *_GR64;
+        return _GR64;
     }
 
-    RVGeneralRegisters64& RVArchitectural::GR64()
+    RVGeneralRegisters64* RVArchitectural::GR64()
     {
         if (!_GR64)
             throw std::logic_error("non-GR64 arch");
         
-        return *_GR64;
+        return _GR64;
     }
 
     // *NOTICE: Get 64-bit value from General Register.
     //          If XLEN is less than 64, the value read is zero-extended,
     //          and wouldn't raise any exception.
-    inline arch64_t RVArchitectural::GetGRx64Zext(int addr) const
+    arch64_t RVArchitectural::GetGRx64Zext(int addr) const noexcept
     {
         if (_GR64)
             return _GR64->Get(addr);
@@ -689,7 +638,7 @@ namespace Jasse {
     // *NOTICE: Get 64-bit value from General Register.
     //          If XLEN is less than 64, the value read is sign-extended,
     //          and wouldn't raise any exception.
-    inline arch64_t RVArchitectural::GetGRx64Sext(int addr) const
+    arch64_t RVArchitectural::GetGRx64Sext(int addr) const noexcept
     {
         if (_GR64)
             return _GR64->Get(addr);
@@ -702,7 +651,7 @@ namespace Jasse {
     // *NOTICE: Get 32-bit value from General Register.
     //          If XLEN is greater than 32, the value read is truncated,
     //          and wouldn't raise any exception.
-    inline arch32_t RVArchitectural::GetGRx32(int addr) const
+    arch32_t RVArchitectural::GetGRx32(int addr) const noexcept
     {
         if (_GR64)
             return (arch32_t) _GR64->Get(addr);
@@ -715,7 +664,7 @@ namespace Jasse {
     // *NOTICE: Set General Register with 64-bit value.
     //          If XLEN is less than 64, the value passed through is truncated,
     //          and wouldn't raise any exception.
-    inline void RVArchitectural::SetGRx64(int addr, arch64_t val64)
+    void RVArchitectural::SetGRx64(int addr, arch64_t val64) noexcept
     {
         if (_GR64)
             _GR64->Set(addr, val64);
@@ -726,7 +675,7 @@ namespace Jasse {
     // *NOTICE: Set General Register with 32-bit value.
     //          If XLEN is greater than 32, the value passed through is zero-extended,
     //          and wouldn't raise any exception.
-    inline void RVArchitectural::SetGRx32Zext(int addr, arch32_t val32)
+    void RVArchitectural::SetGRx32Zext(int addr, arch32_t val32) noexcept
     {
         if (_GR64)
             _GR64->Set(addr, ZEXT_W(val32));
@@ -737,32 +686,12 @@ namespace Jasse {
     // *NOTICE: Set General Register with 32-bit value.
     //          If XLEN is greater than 32, the value passed through is sign-extended,
     //          and wouldn't raise any exception.
-    inline void RVArchitectural::SetGRx32Sext(int addr, arch32_t val32)
+    void RVArchitectural::SetGRx32Sext(int addr, arch32_t val32) noexcept
     {
         if (_GR64)
             _GR64->Set(addr, SEXT_W(val32));
         else if (_GR32)
             _GR32->Set(addr, val32);
-    }
-
-    inline const RVMemoryInterface* RVArchitectural::MI() const
-    {
-        return _MI;
-    }
-
-    inline RVMemoryInterface* RVArchitectural::MI()
-    {
-        return _MI;
-    }
-
-    inline const RVCSRSpace& RVArchitectural::CSR() const
-    {
-        return _CSR;
-    }
-
-    inline RVCSRSpace& RVArchitectural::CSR()
-    {
-        return _CSR;
     }
 }
 
@@ -1003,9 +932,9 @@ namespace Jasse {
         trait.SetExecutor(executor);
     }
 
-    inline RVExecStatus RVInstruction::Execute(RVArchitectural& arch) const
+    inline RVExecStatus RVInstruction::Execute(RVArchitecturalOOC* arch, RVMemoryInterface* MI, RVCSRSpace* CSRs) const
     {
-        return GetExecutor()(*this, arch);
+        return GetExecutor()(*this, arch, MI, CSRs);
     }
 
     inline std::string RVInstruction::ToString() const
@@ -1188,21 +1117,31 @@ namespace Jasse {
     RVDecoderCollection     decoders;
 
     RVArchitectural         arch;
+    
+    RVMemoryInterface*      MI;
+
+    RVCSRSpace              CSRs;
 
     RVExecEEIHandler        exec_handler;
     */
 
     RVInstance::RVInstance(const RVDecoderCollection&   decoders,
                            RVArchitectural&&            arch,
+                           RVMemoryInterface*           MI,
+                           const RVCSRSpace&            CSRs,
                            RVExecEEIHandler             exec_handler) noexcept
         : decoders      (decoders)
         , arch          (arch)
+        , MI            (MI)
+        , CSRs          (CSRs)
         , exec_handler  (exec_handler)
     { }
 
     RVInstance::RVInstance(const RVInstance& obj) noexcept
         : decoders      (obj.decoders)
         , arch          (obj.arch)
+        , MI            (obj.MI)
+        , CSRs          (obj.CSRs)
         , exec_handler  (obj.exec_handler)
     { }
 
@@ -1229,6 +1168,31 @@ namespace Jasse {
         return arch;
     }
 
+    inline RVMemoryInterface* RVInstance::GetMI() noexcept
+    {
+        return MI;
+    }
+
+    inline const RVMemoryInterface* RVInstance::GetMI() const noexcept
+    {
+        return MI;
+    }
+
+    inline void RVInstance::SetMI(RVMemoryInterface* MI) noexcept
+    {
+        this->MI = MI;
+    }
+
+    inline RVCSRSpace& RVInstance::GetCSRs() noexcept
+    {
+        return CSRs;
+    }
+
+    inline const RVCSRSpace& RVInstance::GetCSRs() const noexcept
+    {
+        return CSRs;
+    }
+
     inline RVExecEEIHandler& RVInstance::GetExecEEI() noexcept
     {
         return exec_handler;
@@ -1253,9 +1217,9 @@ namespace Jasse {
         RVMOPStatus mopstatus;
 
         if (arch.XLEN() == XLEN32) // XLEN=32
-            mopstatus = arch.MI()->Read(arch.PC().pc32, MOPW_WORD, &fetched);
+            mopstatus = MI->Read(arch.PC().pc32, MOPW_WORD, &fetched);
         else // XLEN=64
-            mopstatus = arch.MI()->Read(arch.PC().pc64, MOPW_WORD, &fetched);
+            mopstatus = MI->Read(arch.PC().pc64, MOPW_WORD, &fetched);
 
         if (mopstatus != MOP_SUCCESS)
         {
@@ -1293,7 +1257,7 @@ namespace Jasse {
         }
 
         // execution
-        RVExecStatus exec_status = decoded.Execute(arch);
+        RVExecStatus exec_status = decoded.Execute(&arch, MI, &CSRs);
         RVEEIStatus  eei_status  = EEI_BYPASS;
 
         // - note: @see RVExecStatus
@@ -1377,13 +1341,13 @@ namespace Jasse {
 
     inline RVInstance::Builder& RVInstance::Builder::GR32(int address, arch32_t init_value) noexcept
     {
-        this->_GR[address] = (arch64_t)init_value;
+        this->_GR.Set(address, (arch64_t) init_value);
         return *this;
     }
 
     inline RVInstance::Builder& RVInstance::Builder::GR64(int address, arch64_t init_value) noexcept
     {
-        this->_GR[address] = init_value;
+        this->_GR.Set(address, init_value);
         return *this;
     }
 
@@ -1430,24 +1394,14 @@ namespace Jasse {
         return *this;
     }
 
-    inline arch32_t& RVInstance::Builder::GR32(int address) noexcept
-    {
-        return (arch32_t&)_GR[address];
-    }
-
     inline arch32_t RVInstance::Builder::GR32(int address) const noexcept
     {
-        return (arch32_t)_GR[address];
-    }
-
-    inline arch64_t& RVInstance::Builder::GR64(int address) noexcept
-    {
-        return _GR[address];
+        return (arch32_t) _GR.Get(address);
     }
 
     inline arch64_t RVInstance::Builder::GR64(int address) const noexcept
     {
-        return _GR[address];
+        return _GR.Get(address);
     }
 
     inline RVCSRSpace& RVInstance::Builder::CSR() noexcept
@@ -1485,20 +1439,22 @@ namespace Jasse {
         // copy-on-build
         RVInstance* instance = new RVInstance(
             _decoders,
-            RVArchitectural(xlen, _CSR, _MI),
+            RVArchitectural(xlen),
+            _MI,
+            _CSR,
             exec_handler);
 
-        instance->arch.PC().pc64 = startup_pc.pc64;
+        instance->arch.SetPC({ startup_pc.pc64 });
         
         switch (xlen)
         {
             case XLEN32:
-                for (int i = 0; i < instance->arch.GR32().GetSize(); i++)
-                    instance->arch.GR32()[i] = (arch32_t)_GR[i];
+                for (int i = 0; i < instance->arch.GR32()->GetSize(); i++)
+                    instance->arch.GR32()->Set(i, (arch32_t) _GR.Get(i));
                 break;
 
             case XLEN64:
-                instance->arch.GR64() = _GR;
+                *(instance->arch.GR64()) = _GR;
                 break;
 
             default:

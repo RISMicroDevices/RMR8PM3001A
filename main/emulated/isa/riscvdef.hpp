@@ -5,6 +5,7 @@
 //
 //
 
+#include <cstdint>
 
 // Global type definitions
 namespace Jasse {
@@ -29,6 +30,24 @@ namespace Jasse {
 
     // Type definition of Raw Instruction
     typedef     uint32_t        insnraw_t;
+
+
+    // X-Len Enumeration
+    typedef enum {
+        XLEN32 = 0,
+        XLEN64
+    } XLen;
+
+
+    // RISC-V Codepoint Type
+    typedef enum {
+        RVTYPE_R = 0,
+        RVTYPE_I,
+        RVTYPE_S,
+        RVTYPE_B,
+        RVTYPE_U,
+        RVTYPE_J
+    } RVCodepointType;
 }
 
 
