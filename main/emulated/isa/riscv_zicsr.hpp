@@ -28,37 +28,39 @@
 // executors
 namespace Jasse {
 
+#define RVZICSR_EXECUTOR_PARAMS     const RVInstruction& insn, RVArchitecturalOOC* arch, RVMemoryInterface* MI, RVCSRSpace* CSRs    
+
 #define __RVZICSR_ACQUIRE_CSR(csr, insn) \
-    RVCSR* csr = arch.CSR().GetCSR(GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_CSR)); \
+    RVCSR* csr = CSRs->GetCSR(GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_CSR)); \
     if (!csr) \
     { \
-        TrapEnter(arch, TRAP_EXCEPTION, EXCEPTION_ILLEGAL_INSTRUCTION); \
+        TrapEnter(arch, CSRs, TRAP_EXCEPTION, EXCEPTION_ILLEGAL_INSTRUCTION); \
         return EXEC_TRAP_ENTER; \
     }
 
 
     // CSRRW
-    RVExecStatus RVZicsrExecutor_CSRRW(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RVZicsrExecutor_CSRRW(RVZICSR_EXECUTOR_PARAMS)
     {
         __RVZICSR_ACQUIRE_CSR(csr, insn)
 
         if (insn.GetRD())
-            arch.SetGRx64(insn.GetRD(), csr->GetValue());
+            arch->SetGRx64(insn.GetRD(), csr->GetValue());
 
-        csr->SetValue(arch.GetGRx64Zext(insn.GetRS1()));
+        csr->SetValue(arch->GetGRx64Zext(insn.GetRS1()));
 
         return EXEC_SEQUENTIAL;
     }
 
     // CSRRS
-    RVExecStatus RVZicsrExecutor_CSRRS(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RVZicsrExecutor_CSRRS(RVZICSR_EXECUTOR_PARAMS)
     {
         __RVZICSR_ACQUIRE_CSR(csr, insn)
 
         csr_t csrval  = csr->GetValue();
-        csr_t csrmask = arch.GetGRx64Zext(insn.GetRS1());
+        csr_t csrmask = arch->GetGRx64Zext(insn.GetRS1());
 
-        arch.SetGRx64(insn.GetRD(), csrval);
+        arch->SetGRx64(insn.GetRD(), csrval);
 
         csrval = SET_CSR_BITS(csrval, csrmask);
 
@@ -68,14 +70,14 @@ namespace Jasse {
     }
 
     // CSRRC
-    RVExecStatus RVZicsrExecutor_CSRRC(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RVZicsrExecutor_CSRRC(RVZICSR_EXECUTOR_PARAMS)
     {
         __RVZICSR_ACQUIRE_CSR(csr, insn)
 
         csr_t csrval  = csr->GetValue();
-        csr_t csrmask = arch.GetGRx64Zext(insn.GetRS1());
+        csr_t csrmask = arch->GetGRx64Zext(insn.GetRS1());
 
-        arch.SetGRx64(insn.GetRD(), csrval);
+        arch->SetGRx64(insn.GetRD(), csrval);
 
         csrval = CLEAR_CSR_BITS(csrval, csrmask);
 
@@ -85,27 +87,27 @@ namespace Jasse {
     }
 
     // CSRRWI
-    RVExecStatus RVZicsrExecutor_CSRRWI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RVZicsrExecutor_CSRRWI(RVZICSR_EXECUTOR_PARAMS)
     {
         __RVZICSR_ACQUIRE_CSR(csr, insn)
 
         if (insn.GetRD())
-            arch.SetGRx64(insn.GetRD(), csr->GetValue());
+            arch->SetGRx64(insn.GetRD(), csr->GetValue());
 
-        csr->SetValue(arch.GetGRx64Zext(insn.GetRS1()));
+        csr->SetValue(arch->GetGRx64Zext(insn.GetRS1()));
 
         return EXEC_SEQUENTIAL;
     }
 
     // CSRRSI
-    RVExecStatus RVZicsrExecutor_CSRRSI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RVZicsrExecutor_CSRRSI(RVZICSR_EXECUTOR_PARAMS)
     {
         __RVZICSR_ACQUIRE_CSR(csr, insn);
 
         csr_t csrval  = csr->GetValue();
         csr_t csrmask = GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_CSR_UIMM);
 
-        arch.SetGRx64(insn.GetRD(), csrval);
+        arch->SetGRx64(insn.GetRD(), csrval);
 
         csrval = SET_CSR_BITS(csrval, csrmask);
 
@@ -115,14 +117,14 @@ namespace Jasse {
     }
 
     // CSRRCI
-    RVExecStatus RVZicsrExecutor_CSRRCI(const RVInstruction& insn, RVArchitectural& arch)
+    RVExecStatus RVZicsrExecutor_CSRRCI(RVZICSR_EXECUTOR_PARAMS)
     {
         __RVZICSR_ACQUIRE_CSR(csr, insn);
 
         csr_t csrval  = csr->GetValue();
         csr_t csrmask = GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_CSR_UIMM);
 
-        arch.SetGRx64(insn.GetRD(), csrval);
+        arch->SetGRx64(insn.GetRD(), csrval);
 
         csrval = CLEAR_CSR_BITS(csrval, csrmask);
 
