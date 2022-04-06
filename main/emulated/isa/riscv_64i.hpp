@@ -16,8 +16,53 @@
 
 
 // Function-3
-#define RV64I_FUNCT3_MASK                       0x00007000
-#define RV64I_FUNCT3_OFFSET                     12
+#define RV64I_FUNCT3_MASK                       RV_FUNCT3_MASK
+#define RV64I_FUNCT3_OFFSET                     RV_FUNCT3_OFFSET
+
+#define RV64I_FUNCT3_ADDI                       RV32I_FUNCT3_ADDI 
+#define RV64I_FUNCT3_SLTI                       RV32I_FUNCT3_SLTI 
+#define RV64I_FUNCT3_SLTIU                      RV32I_FUNCT3_SLTIU
+#define RV64I_FUNCT3_XORI                       RV32I_FUNCT3_XORI 
+#define RV64I_FUNCT3_ORI                        RV32I_FUNCT3_ORI  
+#define RV64I_FUNCT3_ANDI                       RV32I_FUNCT3_ANDI 
+
+#define RV64I_FUNCT3_SLLI                       RV32I_FUNCT3_SLLI      
+#define RV64I_FUNCT3_SRLI                       RV32I_FUNCT3_SRLI      
+#define RV64I_FUNCT3_SRAI                       RV32I_FUNCT3_SRAI      
+#define RV64I_FUNCT3_SRLI__SRAI                 RV32I_FUNCT3_SRLI__SRAI
+
+#define RV64I_FUNCT3_ADD                        RV32I_FUNCT3_ADD      
+#define RV64I_FUNCT3_SUB                        RV32I_FUNCT3_SUB      
+#define RV64I_FUNCT3_ADD__SUB                   RV32I_FUNCT3_ADD__SUB 
+#define RV64I_FUNCT3_SLL                        RV32I_FUNCT3_SLL      
+#define RV64I_FUNCT3_SLT                        RV32I_FUNCT3_SLT      
+#define RV64I_FUNCT3_SLTU                       RV32I_FUNCT3_SLTU     
+#define RV64I_FUNCT3_XOR                        RV32I_FUNCT3_XOR      
+#define RV64I_FUNCT3_SRL                        RV32I_FUNCT3_SRL      
+#define RV64I_FUNCT3_SRA                        RV32I_FUNCT3_SRA      
+#define RV64I_FUNCT3_SRL__SRA                   RV32I_FUNCT3_SRL__SRA 
+#define RV64I_FUNCT3_OR                         RV32I_FUNCT3_OR       
+#define RV64I_FUNCT3_AND                        RV32I_FUNCT3_AND      
+
+#define RV64I_FUNCT3_JALR                       RV32I_FUNCT3_JALR
+#define RV64I_FUNCT3_BEQ                        RV32I_FUNCT3_BEQ 
+#define RV64I_FUNCT3_BNE                        RV32I_FUNCT3_BNE 
+#define RV64I_FUNCT3_BLT                        RV32I_FUNCT3_BLT 
+#define RV64I_FUNCT3_BGE                        RV32I_FUNCT3_BGE 
+#define RV64I_FUNCT3_BLTU                       RV32I_FUNCT3_BLTU
+#define RV64I_FUNCT3_BGEU                       RV32I_FUNCT3_BGEU
+
+#define RV64I_FUNCT3_LB                         RV32I_FUNCT3_LB 
+#define RV64I_FUNCT3_LH                         RV32I_FUNCT3_LH 
+#define RV64I_FUNCT3_LW                         RV32I_FUNCT3_LW 
+#define RV64I_FUNCT3_LBU                        RV32I_FUNCT3_LBU
+#define RV64I_FUNCT3_LHU                        RV32I_FUNCT3_LHU
+
+#define RV64I_FUNCT3_SB                         RV32I_FUNCT3_SB
+#define RV64I_FUNCT3_SH                         RV32I_FUNCT3_SH
+#define RV64I_FUNCT3_SW                         RV32I_FUNCT3_SW
+
+#define RV64I_FUNCT3_FENCE                      RV32I_FUNCT3_FENCE
 
 #define RV64I_FUNCT3_ADDIW                      0b000
 #define RV64I_FUNCT3_SLLIW                      0b001
@@ -39,7 +84,7 @@
 
 
 // Function-6
-#define RV64I_FUNCT6_MASK                       0xFC000000
+#define RV64I_FUNCT6_MASK                       0xFC000000U
 #define RV64I_FUNCT6_OFFSET                     26
 
 #define RV64I_FUNCT6_SLLI                       0b000000
@@ -48,8 +93,21 @@
 
 
 // Function-7
-#define RV64I_FUNCT7_MASK                       0xFE000000
-#define RV64I_FUNCT7_OFFSET                     25
+#define RV64I_FUNCT7_MASK                       RV_FUNCT7_MASK
+#define RV64I_FUNCT7_OFFSET                     RV_FUNCT7_OFFSET
+
+#define RV64I_FUNCT7_ADD                        RV32I_FUNCT7_ADD 
+#define RV64I_FUNCT7_SUB                        RV32I_FUNCT7_SUB 
+
+#define RV64I_FUNCT7_SLL                        RV32I_FUNCT7_SLL 
+#define RV64I_FUNCT7_SLT                        RV32I_FUNCT7_SLT 
+#define RV64I_FUNCT7_SLTU                       RV32I_FUNCT7_SLTU
+#define RV64I_FUNCT7_XOR                        RV32I_FUNCT7_XOR 
+#define RV64I_FUNCT7_OR                         RV32I_FUNCT7_OR  
+#define RV64I_FUNCT7_AND                        RV32I_FUNCT7_AND 
+
+#define RV64I_FUNCT7_SRL                        RV32I_FUNCT7_SRL 
+#define RV64I_FUNCT7_SRA                        RV32I_FUNCT7_SRA 
 
 #define RV64I_FUNCT7_SLLIW                      0b0000000
 #define RV64I_FUNCT7_SRLIW                      0b0000000
@@ -62,6 +120,46 @@
 #define RV64I_FUNCT7_SRLW                       0b0000000
 #define RV64I_FUNCT7_SRAW                       0b0100000
 
+// Function-12
+#define RV64I_FUNCT12_MASK                      RV32I_FUNCT12_MASK  
+#define RV64I_FUNCT12_OFFSET                    RV32I_FUNCT12_OFFSET
+
+#define RV64I_FUNCT12_ECALL                     RV32I_FUNCT12_ECALL 
+#define RV64I_FUNCT12_EBREAK                    RV32I_FUNCT12_EBREAK
+
+#define RV64I_FUNCT12_SRET                      RV32I_FUNCT12_SRET  
+#define RV64I_FUNCT12_MRET                      RV32I_FUNCT12_MRET  
+
+#define RV64I_FUNCT12_WFI                       RV32I_FUNCT12_WFI   
+
+
+// Operands
+#define RV64I_OPERAND_FENCE_FM_MASK             RV32I_OPERAND_FENCE_FM_MASK  
+#define RV64I_OPERAND_FENCE_FM_OFFSET           RV32I_OPERAND_FENCE_FM_OFFSET
+
+#define RV64I_OPERAND_FENCE_PI_MASK             RV32I_OPERAND_FENCE_PI_MASK  
+#define RV64I_OPERAND_FENCE_PI_OFFSET           RV32I_OPERAND_FENCE_PI_OFFSET
+
+#define RV64I_OPERAND_FENCE_PO_MASK             RV32I_OPERAND_FENCE_PO_MASK  
+#define RV64I_OPERAND_FENCE_PO_OFFSET           RV32I_OPERAND_FENCE_PO_OFFSET
+
+#define RV64I_OPERAND_FENCE_PR_MASK             RV32I_OPERAND_FENCE_PR_MASK  
+#define RV64I_OPERAND_FENCE_PR_OFFSET           RV32I_OPERAND_FENCE_PR_OFFSET
+
+#define RV64I_OPERAND_FENCE_PW_MASK             RV32I_OPERAND_FENCE_PW_MASK  
+#define RV64I_OPERAND_FENCE_PW_OFFSET           RV32I_OPERAND_FENCE_PW_OFFSET
+
+#define RV64I_OPERAND_FENCE_SI_MASK             RV32I_OPERAND_FENCE_SI_MASK  
+#define RV64I_OPERAND_FENCE_SI_OFFSET           RV32I_OPERAND_FENCE_SI_OFFSET
+
+#define RV64I_OPERAND_FENCE_SO_MASK             RV32I_OPERAND_FENCE_SO_MASK  
+#define RV64I_OPERAND_FENCE_SO_OFFSET           RV32I_OPERAND_FENCE_SO_OFFSET
+
+#define RV64I_OPERAND_FENCE_SR_MASK             RV32I_OPERAND_FENCE_SR_MASK  
+#define RV64I_OPERAND_FENCE_SR_OFFSET           RV32I_OPERAND_FENCE_SR_OFFSET
+
+#define RV64I_OPERAND_FENCE_SW_MASK             RV32I_OPERAND_FENCE_SW_MASK  
+#define RV64I_OPERAND_FENCE_SW_OFFSET           RV32I_OPERAND_FENCE_SW_OFFSET
 
 
 
@@ -788,6 +886,7 @@ namespace Jasse {
     static const RVCodepoint RV64I_ANDI     = RVCodepoint("andi"    , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_ANDI);
     static const RVCodepoint RV64I_ORI      = RVCodepoint("ori"     , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_ORI);
     static const RVCodepoint RV64I_XORI     = RVCodepoint("xori"    , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_XORI);
+    
     static const RVCodepoint RV64I_SLLI     = RVCodepoint("slli"    , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_SLLI);
     static const RVCodepoint RV64I_SRLI     = RVCodepoint("srli"    , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_SRLI);
     static const RVCodepoint RV64I_SRAI     = RVCodepoint("srai"    , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_SRAI);
@@ -850,6 +949,87 @@ namespace Jasse {
 }
 
 
+//
+#define ENCODE_RV64I_SHx(funct3, funct6, rd, rs1, shamt) \
+    ENCODE_RVTYPE_I(RV_OPCODE_OP_IMM, funct3, rd, rs1, (funct6 << 6) | shamt)
+
+#define ENCODE_RV64I_SHxW(funct3, funct7, rd, rs1, shamt) \
+    ENCODE_RVTYPE_I(RV_OPCODE_OP_IMM, funct3, rd, rs1, (funct7 << 5) | shamt)
+
+//
+#define ENCODE_RV64I_ADDI(rd, rs1, imm)             ENCODE_RV32I_ADDI(rd, rs1, imm)
+#define ENCODE_RV64I_SLTI(rd, rs1, imm)             ENCODE_RV32I_SLTI(rd, rs1, imm)
+#define ENCODE_RV64I_SLTIU(rd, rs1, imm)            ENCODE_RV32I_SLTIU(rd, rs1, imm)
+#define ENCODE_RV64I_XORI(rd, rs1, imm)             ENCODE_RV32I_XORI(rd, rs1, imm)
+#define ENCODE_RV64I_ORI(rd, rs1, imm)              ENCODE_RV32I_ORI(rd, rs1, imm)
+#define ENCODE_RV64I_ANDI(rd, rs1, imm)             ENCODE_RV32I_ANDI(rd, rs1, imm)
+
+#define ENCODE_RV64I_SLLI(rd, rs1, shamt)           ENCODE_RV64I_SHx(RV64I_FUNCT3_SLLI, RV64I_FUNCT6_SLLI, rd, rs1, shamt)
+#define ENCODE_RV64I_SRLI(rd, rs1, shamt)           ENCODE_RV64I_SHx(RV64I_FUNCT3_SRLI, RV64I_FUNCT6_SRLI, rd, rs1, shamt)
+#define ENCODE_RV64I_SRAI(rd, rs1, shamt)           ENCODE_RV64I_SHx(RV64I_FUNCT3_SRAI, RV64I_FUNCT6_SRAI, rd, rs1, shamt)
+
+#define ENCODE_RV64I_ADDIW(rd, rs1, imm)            ENCODE_RVTYPE_I(RV_OPCODE_OP_IMM_32, RV64I_FUNCT3_ADDIW, rd, rs1, imm)
+
+#define ENCODE_RV64I_SLLIW(rd, rs1, shamt)          ENCODE_RV64I_SHxW(RV64I_FUNCT3_SLLIW, RV64I_FUNCT7_SLLIW, rd, rs1, shamt)
+#define ENCODE_RV64I_SRLIW(rd, rs1, shamt)          ENCODE_RV64I_SHxW(RV64I_FUNCT3_SRLIW, RV64I_FUNCT7_SRLIW, rd, rs1, shamt)
+#define ENCODE_RV64I_SRAIW(rd, rs1, shamt)          ENCODE_RV64I_SHxW(RV64I_FUNCT3_SRAIW, RV64I_FUNCT7_SRAIW, rd, rs1, shamt)
+
+#define ENCODE_RV64I_ADD(rd, rs1, rs2)              ENCODE_RV32I_ADD(rd, rs1, rs2)
+#define ENCODE_RV64I_SUB(rd, rs1, rs2)              ENCODE_RV32I_SUB(rd, rs1, rs2)
+#define ENCODE_RV64I_SLL(rd, rs1, rs2)              ENCODE_RV32I_SLL(rd, rs1, rs2)
+#define ENCODE_RV64I_SLT(rd, rs1, rs2)              ENCODE_RV32I_SLT(rd, rs1, rs2)
+#define ENCODE_RV64I_SLTU(rd, rs1, rs2)             ENCODE_RV32I_SLTU(rd, rs1, rs2)
+#define ENCODE_RV64I_XOR(rd, rs1, rs2)              ENCODE_RV32I_XOR(rd, rs1, rs2)
+#define ENCODE_RV64I_SRL(rd, rs1, rs2)              ENCODE_RV32I_SRL(rd, rs1, rs2)
+#define ENCODE_RV64I_SRA(rd, rs1, rs2)              ENCODE_RV32I_SRA(rd, rs1, rs2)
+#define ENCODE_RV64I_OR(rd, rs1, rs2)               ENCODE_RV32I_OR(rd, rs1, rs2)
+#define ENCODE_RV64I_AND(rd, rs1, rs2)              ENCODE_RV32I_AND(rd, rs1, rs2)
+
+#define ENCODE_RV64I_ADDW(rd, rs1, rs2)             ENCODE_RVTYPE_R(RV_OPCODE_OP_32, RV64I_FUNCT3_ADDW, rd, rs1, rs2, RV64I_FUNCT7_ADDW)
+#define ENCODE_RV64I_SUBW(rd, rs1, rs2)             ENCODE_RVTYPE_R(RV_OPCODE_OP_32, RV64I_FUNCT3_SUBW, rd, rs1, rs2, RV64I_FUNCT7_SUBW)
+#define ENCODE_RV64I_SLLW(rd, rs1, rs2)             ENCODE_RVTYPE_R(RV_OPCODE_OP_32, RV64I_FUNCT3_SLLW, rd, rs1, rs2, RV64I_FUNCT7_SLLW)
+#define ENCODE_RV64I_SRLW(rd, rs1, rs2)             ENCODE_RVTYPE_R(RV_OPCODE_OP_32, RV64I_FUNCT3_SRLW, rd, rs1, rs2, RV64I_FUNCT7_SRLW)
+#define ENCODE_RV64I_SRAW(rd, rs1, rs2)             ENCODE_RVTYPE_R(RV_OPCODE_OP_32, RV64I_FUNCT3_SRAW, rd, rs1, rs2, RV64I_FUNCT7_SRAW)
+
+#define ENCODE_RV64I_LUI(rd, imm)                   ENCODE_RV32I_LUI(rd, imm)
+#define ENCODE_RV64I_AUIPC(rd, imm)                 ENCODE_RV32I_AUIPC(rd, imm)
+
+#define ENCODE_RV64I_JALR(rd, rs1, offset)          ENCODE_RV32I_JALR(rd, rs1, offset)
+#define ENCODE_RV64I_JAL(rd, offset)                ENCODE_RV32I_JAL(rd, offset)     
+
+#define ENCODE_RV64I_BEQ(rs1, rs2, offset)          ENCODE_RV32I_BEQ(rs1, rs2, offset)
+#define ENCODE_RV64I_BNE(rs1, rs2, offset)          ENCODE_RV32I_BNE(rs1, rs2, offset)
+#define ENCODE_RV64I_BLT(rs1, rs2, offset)          ENCODE_RV32I_BLT(rs1, rs2, offset)
+#define ENCODE_RV64I_BGE(rs1, rs2, offset)          ENCODE_RV32I_BGE (rs1, rs2, offset)
+#define ENCODE_RV64I_BLTU(rs1, rs2, offset)         ENCODE_RV32I_BLTU(rs1, rs2, offset)
+#define ENCODE_RV64I_BGEU(rs1, rs2, offset)         ENCODE_RV32I_BGEU(rs1, rs2, offset)
+
+#define ENCODE_RV64I_LB(rd, rs1, offset)            ENCODE_RV32I_LB(rd, rs1, offset)
+#define ENCODE_RV64I_LH(rd, rs1, offset)            ENCODE_RV32I_LH(rd, rs1, offset)
+#define ENCODE_RV64I_LW(rd, rs1, offset)            ENCODE_RV32I_LW(rd, rs1, offset)
+#define ENCODE_RV64I_LBU(rd, rs1, offset)           ENCODE_RV32I_LBU(rd, rs1, offset)
+#define ENCODE_RV64I_LHU(rd, rs1, offset)           ENCODE_RV32I_LHU(rd, rs1, offset)
+
+#define ENCODE_RV64I_LD(rd, rs1, offset)            ENCODE_RVTYPE_I(RV_OPCODE_LOAD, RV64I_FUNCT3_LD , rd, rs1, offset)
+#define ENCODE_RV64I_LWU(rd, rs1, offset)           ENCODE_RVTYPE_I(RV_OPCODE_LOAD, RV64I_FUNCT3_LWU, rd, rs1, offset)
+
+#define ENCODE_RV64I_SB(rs1, rs2, offset)           ENCODE_RV32I_SB(rs1, rs2, offset)
+#define ENCODE_RV64I_SH(rs1, rs2, offset)           ENCODE_RV32I_SH(rs1, rs2, offset)
+#define ENCODE_RV64I_SW(rs1, rs2, offset)           ENCODE_RV32I_SW(rs1, rs2, offset)
+
+#define ENCODE_RV64I_SD(rs1, rs2, offset)           ENCODE_RVTYPE_S(RV_OPCODE_STORE, RV64I_FUNCT3_SD, rs1, rs2, offset)
+
+#define ENCODE_RV64I_FENCE(fm, pre, suc)            ENCODE_RV32I_FENCE(fm, pre, suc)
+
+#define ENCODE_RV64I_ECALL                          ENCODE_RV32I_ECALL              
+#define ENCODE_RV64I_EBREAK                         ENCODE_RV32I_EBREAK             
+
+#define ENCODE_RV64I_SRET                           ENCODE_RV32I_SRET               
+#define ENCODE_RV64I_MRET                           ENCODE_RV32I_MRET               
+
+
+
+//
 #define RV64I_DECINSN(T, codepoint) \
     (DecodeNormalRV64Type##T(insnraw, insn), insn.SetTrait(codepoint), true)
 
@@ -940,11 +1120,11 @@ namespace Jasse {
     //
     bool RV64ICodePoint_Funct3_ADD__SUB(insnraw_t insnraw, RVInstruction& insn)
     {
-        int funct7 = GET_STD_OPERAND(insnraw, RV32I_FUNCT7);
+        int funct7 = GET_STD_OPERAND(insnraw, RV64I_FUNCT7);
 
-        if (funct7 == RV32I_FUNCT7_ADD)
+        if (funct7 == RV64I_FUNCT7_ADD)
             return RV64I_DECINSN(R, RV64I_ADD);
-        else if (funct7 == RV32I_FUNCT7_SUB)
+        else if (funct7 == RV64I_FUNCT7_SUB)
             return RV64I_DECINSN(R, RV64I_SUB);
         else
             return false;
@@ -952,9 +1132,9 @@ namespace Jasse {
 
     bool RV64ICodePoint_Funct3_SLT(insnraw_t insnraw, RVInstruction& insn)
     {
-        int funct7 = GET_STD_OPERAND(insnraw, RV32I_FUNCT7);
+        int funct7 = GET_STD_OPERAND(insnraw, RV64I_FUNCT7);
 
-        if (funct7 == RV32I_FUNCT7_SLT)
+        if (funct7 == RV64I_FUNCT7_SLT)
             return RV64I_DECINSN(R, RV64I_SLT);
         else
             return false;
@@ -962,9 +1142,9 @@ namespace Jasse {
 
     bool RV64ICodePoint_Funct3_SLTU(insnraw_t insnraw, RVInstruction& insn)
     {
-        int funct7 = GET_STD_OPERAND(insnraw, RV32I_FUNCT7);
+        int funct7 = GET_STD_OPERAND(insnraw, RV64I_FUNCT7);
 
-        if (funct7 == RV32I_FUNCT7_SLTU)
+        if (funct7 == RV64I_FUNCT7_SLTU)
             return RV64I_DECINSN(R, RV64I_SLTU);
         else
             return false;
@@ -972,9 +1152,9 @@ namespace Jasse {
 
     bool RV64ICodePoint_Funct3_AND(insnraw_t insnraw, RVInstruction& insn)
     {
-        int funct7 = GET_STD_OPERAND(insnraw, RV32I_FUNCT7);
+        int funct7 = GET_STD_OPERAND(insnraw, RV64I_FUNCT7);
 
-        if (funct7 == RV32I_FUNCT7_AND)
+        if (funct7 == RV64I_FUNCT7_AND)
             return RV64I_DECINSN(R, RV64I_AND);
         else
             return false;
@@ -982,9 +1162,9 @@ namespace Jasse {
 
     bool RV64ICodePoint_Funct3_OR(insnraw_t insnraw, RVInstruction& insn)
     {
-        int funct7 = GET_STD_OPERAND(insnraw, RV32I_FUNCT7);
+        int funct7 = GET_STD_OPERAND(insnraw, RV64I_FUNCT7);
 
-        if (funct7 == RV32I_FUNCT7_OR)
+        if (funct7 == RV64I_FUNCT7_OR)
             return RV64I_DECINSN(R, RV64I_OR);
         else
             return false;
@@ -992,9 +1172,9 @@ namespace Jasse {
 
     bool RV64ICodePoint_Funct3_XOR(insnraw_t insnraw, RVInstruction& insn)
     {
-        int funct7 = GET_STD_OPERAND(insnraw, RV32I_FUNCT7);
+        int funct7 = GET_STD_OPERAND(insnraw, RV64I_FUNCT7);
 
-        if (funct7 == RV32I_FUNCT7_XOR)
+        if (funct7 == RV64I_FUNCT7_XOR)
             return RV64I_DECINSN(R, RV64I_XOR);
         else
             return false;
@@ -1002,9 +1182,9 @@ namespace Jasse {
 
     bool RV64ICodePoint_Funct3_SLL(insnraw_t insnraw, RVInstruction& insn)
     {
-        int funct7 = GET_STD_OPERAND(insnraw, RV32I_FUNCT7);
+        int funct7 = GET_STD_OPERAND(insnraw, RV64I_FUNCT7);
 
-        if (funct7 == RV32I_FUNCT7_SLL)
+        if (funct7 == RV64I_FUNCT7_SLL)
             return RV64I_DECINSN(R, RV64I_SLL);
         else
             return false;
@@ -1012,11 +1192,11 @@ namespace Jasse {
 
     bool RV64ICodePoint_Funct3_SRL__SRA(insnraw_t insnraw, RVInstruction& insn)
     {
-        int funct7 = GET_STD_OPERAND(insnraw, RV32I_FUNCT7);
+        int funct7 = GET_STD_OPERAND(insnraw, RV64I_FUNCT7);
 
-        if (funct7 == RV32I_FUNCT7_SRL)
+        if (funct7 == RV64I_FUNCT7_SRL)
             return RV64I_DECINSN(R, RV64I_SRL);
-        else if (funct7 == RV32I_FUNCT7_SRA)
+        else if (funct7 == RV64I_FUNCT7_SRA)
             return RV64I_DECINSN(R, RV64I_SRA);
         else
             return false;
@@ -1343,14 +1523,14 @@ namespace Jasse {
     //
     __RV64I_FUNCT3_CODEGROUP_CONSTRUCTOR(OP_IMM)
     {
-        Define(RV32I_FUNCT3_ADDI,           &RV64ICodePoint_Funct3_ADDI);
-        Define(RV32I_FUNCT3_SLTI,           &RV64ICodePoint_Funct3_SLTI);
-        Define(RV32I_FUNCT3_SLTIU,          &RV64ICodePoint_Funct3_SLTIU);
-        Define(RV32I_FUNCT3_ANDI,           &RV64ICodePoint_Funct3_ANDI);
-        Define(RV32I_FUNCT3_ORI,            &RV64ICodePoint_Funct3_ORI);
-        Define(RV32I_FUNCT3_XORI,           &RV64ICodePoint_Funct3_XORI);
-        Define(RV32I_FUNCT3_SLLI,           &RV64ICodePoint_Funct3_SLLI);
-        Define(RV32I_FUNCT3_SRLI__SRAI,     &RV64ICodePoint_Funct3_SRLI__SRAI);
+        Define(RV64I_FUNCT3_ADDI,           &RV64ICodePoint_Funct3_ADDI);
+        Define(RV64I_FUNCT3_SLTI,           &RV64ICodePoint_Funct3_SLTI);
+        Define(RV64I_FUNCT3_SLTIU,          &RV64ICodePoint_Funct3_SLTIU);
+        Define(RV64I_FUNCT3_ANDI,           &RV64ICodePoint_Funct3_ANDI);
+        Define(RV64I_FUNCT3_ORI,            &RV64ICodePoint_Funct3_ORI);
+        Define(RV64I_FUNCT3_XORI,           &RV64ICodePoint_Funct3_XORI);
+        Define(RV64I_FUNCT3_SLLI,           &RV64ICodePoint_Funct3_SLLI);
+        Define(RV64I_FUNCT3_SRLI__SRAI,     &RV64ICodePoint_Funct3_SRLI__SRAI);
     }
 
     __RV64I_FUNCT3_CODEGROUP_DECONSTRUCTOR(OP_IMM)
@@ -1370,14 +1550,14 @@ namespace Jasse {
     //
     __RV64I_FUNCT3_CODEGROUP_CONSTRUCTOR(OP)
     {
-        Define(RV32I_FUNCT3_ADD__SUB,       &RV64ICodePoint_Funct3_ADD__SUB);
-        Define(RV32I_FUNCT3_SLT,            &RV64ICodePoint_Funct3_SLT);
-        Define(RV32I_FUNCT3_SLTU,           &RV64ICodePoint_Funct3_SLTU);
-        Define(RV32I_FUNCT3_AND,            &RV64ICodePoint_Funct3_AND);
-        Define(RV32I_FUNCT3_OR,             &RV64ICodePoint_Funct3_OR);
-        Define(RV32I_FUNCT3_XOR,            &RV64ICodePoint_Funct3_XOR);
-        Define(RV32I_FUNCT3_SLL,            &RV64ICodePoint_Funct3_SLL);
-        Define(RV32I_FUNCT3_SRL__SRA,       &RV64ICodePoint_Funct3_SRL__SRA);
+        Define(RV64I_FUNCT3_ADD__SUB,       &RV64ICodePoint_Funct3_ADD__SUB);
+        Define(RV64I_FUNCT3_SLT,            &RV64ICodePoint_Funct3_SLT);
+        Define(RV64I_FUNCT3_SLTU,           &RV64ICodePoint_Funct3_SLTU);
+        Define(RV64I_FUNCT3_AND,            &RV64ICodePoint_Funct3_AND);
+        Define(RV64I_FUNCT3_OR,             &RV64ICodePoint_Funct3_OR);
+        Define(RV64I_FUNCT3_XOR,            &RV64ICodePoint_Funct3_XOR);
+        Define(RV64I_FUNCT3_SLL,            &RV64ICodePoint_Funct3_SLL);
+        Define(RV64I_FUNCT3_SRL__SRA,       &RV64ICodePoint_Funct3_SRL__SRA);
     }
 
     __RV64I_FUNCT3_CODEGROUP_DECONSTRUCTOR(OP)
@@ -1397,12 +1577,12 @@ namespace Jasse {
     // 
     __RV64I_FUNCT3_CODEGROUP_CONSTRUCTOR(BRANCH)
     {
-        Define(RV32I_FUNCT3_BEQ,            &RV64ICodePoint_Funct3_BEQ);
-        Define(RV32I_FUNCT3_BNE,            &RV64ICodePoint_Funct3_BNE);
-        Define(RV32I_FUNCT3_BLT,            &RV64ICodePoint_Funct3_BLT);
-        Define(RV32I_FUNCT3_BLTU,           &RV64ICodePoint_Funct3_BLTU);
-        Define(RV32I_FUNCT3_BGE,            &RV64ICodePoint_Funct3_BGE);
-        Define(RV32I_FUNCT3_BGEU,           &RV64ICodePoint_Funct3_BGEU);
+        Define(RV64I_FUNCT3_BEQ,            &RV64ICodePoint_Funct3_BEQ);
+        Define(RV64I_FUNCT3_BNE,            &RV64ICodePoint_Funct3_BNE);
+        Define(RV64I_FUNCT3_BLT,            &RV64ICodePoint_Funct3_BLT);
+        Define(RV64I_FUNCT3_BLTU,           &RV64ICodePoint_Funct3_BLTU);
+        Define(RV64I_FUNCT3_BGE,            &RV64ICodePoint_Funct3_BGE);
+        Define(RV64I_FUNCT3_BGEU,           &RV64ICodePoint_Funct3_BGEU);
     }
 
     __RV64I_FUNCT3_CODEGROUP_DECONSTRUCTOR(BRANCH)
@@ -1412,12 +1592,12 @@ namespace Jasse {
     __RV64I_FUNCT3_CODEGROUP_CONSTRUCTOR(LOAD)
     {
         Define(RV64I_FUNCT3_LD,             &RV64ICodePoint_Funct3_LD);
-        Define(RV32I_FUNCT3_LW,             &RV64ICodePoint_Funct3_LW);
-        Define(RV32I_FUNCT3_LH,             &RV64ICodePoint_Funct3_LH);
-        Define(RV32I_FUNCT3_LB,             &RV64ICodePoint_Funct3_LB);
+        Define(RV64I_FUNCT3_LW,             &RV64ICodePoint_Funct3_LW);
+        Define(RV64I_FUNCT3_LH,             &RV64ICodePoint_Funct3_LH);
+        Define(RV64I_FUNCT3_LB,             &RV64ICodePoint_Funct3_LB);
         Define(RV64I_FUNCT3_LWU,            &RV64ICodePoint_Funct3_LWU);
-        Define(RV32I_FUNCT3_LHU,            &RV64ICodePoint_Funct3_LHU);
-        Define(RV32I_FUNCT3_LBU,            &RV64ICodePoint_Funct3_LBU);
+        Define(RV64I_FUNCT3_LHU,            &RV64ICodePoint_Funct3_LHU);
+        Define(RV64I_FUNCT3_LBU,            &RV64ICodePoint_Funct3_LBU);
     }
 
     __RV64I_FUNCT3_CODEGROUP_DECONSTRUCTOR(LOAD)
@@ -1427,9 +1607,9 @@ namespace Jasse {
     __RV64I_FUNCT3_CODEGROUP_CONSTRUCTOR(STORE)
     {
         Define(RV64I_FUNCT3_SD,             &RV64ICodePoint_Funct3_SD);
-        Define(RV32I_FUNCT3_SW,             &RV64ICodePoint_Funct3_SW);
-        Define(RV32I_FUNCT3_SH,             &RV64ICodePoint_Funct3_SH);
-        Define(RV32I_FUNCT3_SB,             &RV64ICodePoint_Funct3_SB);
+        Define(RV64I_FUNCT3_SW,             &RV64ICodePoint_Funct3_SW);
+        Define(RV64I_FUNCT3_SH,             &RV64ICodePoint_Funct3_SH);
+        Define(RV64I_FUNCT3_SB,             &RV64ICodePoint_Funct3_SB);
     }
 
     __RV64I_FUNCT3_CODEGROUP_DECONSTRUCTOR(STORE)
@@ -1444,7 +1624,7 @@ namespace Jasse {
         if (GET_STD_OPERAND(insnraw, RV_OPERAND_RS1) != 0)
             return false;
 
-        if (GET_STD_OPERAND(insnraw, RV32I_FUNCT3) != RV32I_FUNCT3_FENCE)
+        if (GET_STD_OPERAND(insnraw, RV64I_FUNCT3) != RV64I_FUNCT3_FENCE)
             return false;
 
         return RV64I_DECINSN(I, RV64I_FENCE);
@@ -1459,24 +1639,24 @@ namespace Jasse {
         if (GET_STD_OPERAND(insnraw, RV_OPERAND_RS1) != 0)
             return false;
 
-        if (GET_STD_OPERAND(insnraw, RV32I_FUNCT3) != 0)
+        if (GET_STD_OPERAND(insnraw, RV64I_FUNCT3) != 0)
             return false;
 
-        switch (GET_STD_OPERAND(insnraw, RV32I_FUNCT12))
+        switch (GET_STD_OPERAND(insnraw, RV64I_FUNCT12))
         {
-            case RV32I_FUNCT12_ECALL:
+            case RV64I_FUNCT12_ECALL:
                 return RV64ICodePoint_Funct12_ECALL(insnraw, insn);
 
-            case RV32I_FUNCT12_EBREAK:
+            case RV64I_FUNCT12_EBREAK:
                 return RV64ICodePoint_Funct12_EBREAK(insnraw, insn);
 
-            case RV32I_FUNCT12_MRET:
+            case RV64I_FUNCT12_MRET:
                 return RV64ICodePoint_Funct12_MRET(insnraw, insn);
 
-            case RV32I_FUNCT12_SRET:
+            case RV64I_FUNCT12_SRET:
                 return RV64ICodePoint_Funct12_SRET(insnraw, insn);
 
-            case RV32I_FUNCT12_WFI:
+            case RV64I_FUNCT12_WFI:
                 return RV64ICodePoint_Funct12_WFI(insnraw, insn);
 
             default:
@@ -1505,7 +1685,7 @@ namespace Jasse {
     //
     __RV64I_UNIQUE_CODEGROUP_DEFINE_FUNC(JALR, RV64ICodeGroup_Unique_JALR)
     {
-        if (GET_STD_OPERAND(insnraw, RV32I_FUNCT3) == RV32I_FUNCT3_JALR)
+        if (GET_STD_OPERAND(insnraw, RV64I_FUNCT3) == RV64I_FUNCT3_JALR)
             return RV64I_DECINSN(I, RV64I_JALR);
         else
             return false;
