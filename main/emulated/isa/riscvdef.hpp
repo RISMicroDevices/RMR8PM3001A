@@ -72,33 +72,39 @@ namespace Jasse {
 // Basis
 #define RV_ARCH_REG_COUNT                   32
 
+#define RV_FUNCT3_MASK                      0x00007000U
+#define RV_FUNCT3_OFFSET                    12
+
+#define RV_FUNCT7_MASK                      0xFE000000U
+#define RV_FUNCT7_OFFSET                    25
+
 
 // Operand
-#define RV_OPERAND_RD_MASK                  0x00000F80
+#define RV_OPERAND_RD_MASK                  0x00000F80U
 #define RV_OPERAND_RD_OFFSET                7
 
-#define RV_OPERAND_RS1_MASK                 0x000F8000
+#define RV_OPERAND_RS1_MASK                 0x000F8000U
 #define RV_OPERAND_RS1_OFFSET               15
 
-#define RV_OPERAND_RS2_MASK                 0x01F00000
+#define RV_OPERAND_RS2_MASK                 0x01F00000U
 #define RV_OPERAND_RS2_OFFSET               20
 
-#define RV_OPERAND_SHAMT5_MASK              0x01F00000
+#define RV_OPERAND_SHAMT5_MASK              0x01F00000U
 #define RV_OPERAND_SHAMT5_OFFSET            20
 
-#define RV_OPERAND_SHAMT6_MASK              0x03F00000
+#define RV_OPERAND_SHAMT6_MASK              0x03F00000U
 #define RV_OPERAND_SHAMT6_OFFSET            20
 
-#define RV_OPERAND_CSR_MASK                 0xFFF00000
+#define RV_OPERAND_CSR_MASK                 0xFFF00000U
 #define RV_OPERAND_CSR_OFFSET               20
 
-#define RV_OPERAND_CSR_UIMM_MASK            0x000F8000
+#define RV_OPERAND_CSR_UIMM_MASK            0x000F8000U
 #define RV_OPERAND_CSR_UIMM_OFFSET          15
 
 
 
 // Opcode
-#define RV_OPCODE_MASK                      0x0000007F
+#define RV_OPCODE_MASK                      0x0000007FU
 #define RV_OPCODE_OFFSET                    0
 
 #define RV_OPCODE_OP_IMM                    0b0010011
@@ -114,3 +120,38 @@ namespace Jasse {
 #define RV_OPCODE_STORE                     0b0100011
 #define RV_OPCODE_MISC_MEM                  0b0001111
 #define RV_OPCODE_SYSTEM                    0b1110011
+
+
+// General Registers
+#define RV_GR_X0                            0
+#define RV_GR_X1                            1
+#define RV_GR_X2                            2
+#define RV_GR_X3                            3
+#define RV_GR_X4                            4
+#define RV_GR_X5                            5
+#define RV_GR_X6                            6
+#define RV_GR_X7                            7
+#define RV_GR_X8                            8
+#define RV_GR_X9                            9
+#define RV_GR_X10                           10
+#define RV_GR_X11                           11
+#define RV_GR_X12                           12
+#define RV_GR_X13                           13
+#define RV_GR_X14                           14
+#define RV_GR_X15                           15
+#define RV_GR_X16                           16
+#define RV_GR_X17                           17
+#define RV_GR_X18                           18
+#define RV_GR_X19                           19
+#define RV_GR_X20                           20
+#define RV_GR_X21                           21
+#define RV_GR_X22                           22
+#define RV_GR_X23                           23
+#define RV_GR_X24                           24
+#define RV_GR_X25                           25
+#define RV_GR_X26                           26
+#define RV_GR_X27                           27
+#define RV_GR_X28                           28
+#define RV_GR_X29                           29
+#define RV_GR_X30                           30
+#define RV_GR_X31                           31

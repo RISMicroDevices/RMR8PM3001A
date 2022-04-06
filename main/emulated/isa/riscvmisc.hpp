@@ -12,6 +12,57 @@
     (imm.imm64 = SEXT_W(imm.imm32), imm)
 
 
+#define ENCODE_STD_OPERAND(val, name) \
+    ((val & (name##_MASK >> name##_OFFSET)) << name##_OFFSET)
+
+
+#define ENCODE_RVTYPE_R(opcode, funct3, rd, rs1, rs2, funct7) \
+    ( ENCODE_STD_OPERAND(opcode , RV_OPCODE) \
+    | ENCODE_STD_OPERAND(funct3 , RV_FUNCT3) \
+    | ENCODE_STD_OPERAND(rd     , RV_OPERAND_RD) \
+    | ENCODE_STD_OPERAND(rs1    , RV_OPERAND_RS1) \
+    | ENCODE_STD_OPERAND(rs2    , RV_OPERAND_RS2) \
+    | ENCODE_STD_OPERAND(funct7 , RV_FUNCT7))
+
+#define ENCODE_RVTYPE_I(opcode, funct3, rd, rs1, imm) \
+    ( ENCODE_STD_OPERAND(opcode , RV_OPCODE) \
+    | ENCODE_STD_OPERAND(funct3 , RV_FUNCT3) \
+    | ENCODE_STD_OPERAND(rd     , RV_OPERAND_RD) \
+    | ENCODE_STD_OPERAND(rs1    , RV_OPERAND_RS1) \
+    | ((imm & 0x00000FFFU) << 20))
+
+#define ENCODE_RVTYPE_S(opcode, funct3, rs1, rs2, imm) \
+    ( ENCODE_STD_OPERAND(opcode , RV_OPCODE) \
+    | ENCODE_STD_OPERAND(funct3 , RV_FUNCT3) \
+    | ENCODE_STD_OPERAND(rs1    , RV_OPERAND_RS1) \
+    | ENCODE_STD_OPERAND(rs2    , RV_OPERAND_RS2) \
+    | ((imm & 0x0000001FU) << 7) \
+    | ((imm & 0x00000FE0U) << 20))
+
+#define ENCODE_RVTYPE_B(opcode, funct3, rs1, rs2, imm) \
+    ( ENCODE_STD_OPERAND(opcode , RV_OPCODE) \
+    | ENCODE_STD_OPERAND(funct3 , RV_FUNCT3) \
+    | ENCODE_STD_OPERAND(rs1    , RV_OPERAND_RS1) \
+    | ENCODE_STD_OPERAND(rs2    , RV_OPERAND_RS2) \
+    | ((imm & 0x00000800U) >> 4) \
+    | ((imm & 0x0000001EU) << 7) \
+    | ((imm & 0x000007E0U) << 20) \
+    | ((imm & 0x00001000U) << 19))
+
+#define ENCODE_RVTYPE_U(opcode, rd, imm) \
+    ( ENCODE_STD_OPERAND(opcode , RV_OPCODE) \
+    | ENCODE_STD_OPERAND(rd     , RV_OPERAND_RD) \
+    | (imm & 0xFFFFF000U))
+
+#define ENCODE_RVTYPE_J(opcode, rd, imm) \
+    ( ENCODE_STD_OPERAND(opcode , RV_OPCODE) \
+    | ENCODE_STD_OPERAND(rd     , RV_OPERAND_RD) \
+    |  (imm & 0x000FF000U) \
+    | ((imm & 0x00000800U) << 9) \
+    | ((imm & 0x000007FEU) << 20) \
+    | ((imm & 0x00100000U) << 11))
+
+
 
 namespace Jasse {
     // RISC-V Instruction Immediate Decoder
