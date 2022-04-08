@@ -21,8 +21,18 @@
 
 
 // Function-3
-#define RV64M_FUNCT3_MASK                       0x00007000
-#define RV64M_FUNCT3_OFFSET                     12
+#define RV64M_FUNCT3_MASK                       RV_FUNCT3_MASK
+#define RV64M_FUNCT3_OFFSET                     RV_FUNCT3_OFFSET
+
+#define RV64M_FUNCT3_MUL                        RV32M_FUNCT3_MUL   
+#define RV64M_FUNCT3_MULH                       RV32M_FUNCT3_MULH  
+#define RV64M_FUNCT3_MULHSU                     RV32M_FUNCT3_MULHSU
+#define RV64M_FUNCT3_MULHU                      RV32M_FUNCT3_MULHU 
+
+#define RV64M_FUNCT3_DIV                        RV32M_FUNCT3_DIV   
+#define RV64M_FUNCT3_DIVU                       RV32M_FUNCT3_DIVU  
+#define RV64M_FUNCT3_REM                        RV32M_FUNCT3_REM   
+#define RV64M_FUNCT3_REMU                       RV32M_FUNCT3_REMU  
 
 #define RV64M_FUNCT3_MULW                       0b000
 #define RV64M_FUNCT3_DIVW                       0b100
@@ -32,8 +42,18 @@
 
 
 // Function-7
-#define RV64M_FUNCT7_MASK                       0xFE000000
-#define RV64M_FUNCT7_OFFSET                     25
+#define RV64M_FUNCT7_MASK                       RV_FUNCT7_MASK
+#define RV64M_FUNCT7_OFFSET                     RV_FUNCT7_OFFSET
+
+#define RV64M_FUNCT7_MUL                        RV32M_FUNCT7_MUL   
+#define RV64M_FUNCT7_MULH                       RV32M_FUNCT7_MULH  
+#define RV64M_FUNCT7_MULHSU                     RV32M_FUNCT7_MULHSU
+#define RV64M_FUNCT7_MULHU                      RV32M_FUNCT7_MULHU 
+
+#define RV64M_FUNCT7_DIV                        RV32M_FUNCT7_DIV   
+#define RV64M_FUNCT7_DIVU                       RV32M_FUNCT7_DIVU  
+#define RV64M_FUNCT7_REM                        RV32M_FUNCT7_REM   
+#define RV64M_FUNCT7_REMU                       RV32M_FUNCT7_REMU  
 
 #define RV64M_FUNCT7_MULW                       0b0000001
 #define RV64M_FUNCT7_DIVW                       0b0000001
@@ -338,6 +358,27 @@ namespace Jasse {
 }
 
 
+//
+#define ENCODE_RV64M_MUL(rd, rs1, rs2)          ENCODE_RV32M_MUL(rd, rs1, rs2)   
+#define ENCODE_RV64M_MULH(rd, rs1, rs2)         ENCODE_RV32M_MULH(rd, rs1, rs2)  
+#define ENCODE_RV64M_MULHSU(rd, rs1, rs2)       ENCODE_RV32M_MULHSU(rd, rs1, rs2)
+#define ENCODE_RV64M_MULHU(rd, rs1, rs2)        ENCODE_RV32M_MULHU(rd, rs1, rs2) 
+
+#define ENCODE_RV64M_DIV(rd, rs1, rs2)          ENCODE_RV32M_DIV(rd, rs1, rs2)   
+#define ENCODE_RV64M_DIVU(rd, rs1, rs2)         ENCODE_RV32M_DIVU(rd, rs1, rs2)  
+#define ENCODE_RV64M_REM(rd, rs1, rs2)          ENCODE_RV32M_REM(rd, rs1, rs2)   
+#define ENCODE_RV64M_REMU(rd, rs1, rs2)         ENCODE_RV32M_REMU(rd, rs1, rs2)  
+
+#define ENCODE_RV64M_MULW(rd, rs1, rs2)         ENCODE_RVTYPE_R(RV_OPCODE_OP_32, RV64M_FUNCT3_MULW , rd, rs1, rs2, RV64M_FUNCT7_MULW)
+
+#define ENCODE_RV64M_DIVW(rd, rs1, rs2)         ENCODE_RVTYPE_R(RV_OPCODE_OP_32, RV64M_FUNCT3_DIVW , rd, rs1, rs2, RV64M_FUNCT7_DIVW)
+#define ENCODE_RV64M_DIVUW(rd, rs1, rs2)        ENCODE_RVTYPE_R(RV_OPCODE_OP_32, RV64M_FUNCT3_DIVUW, rd, rs1, rs2, RV64M_FUNCT7_DIVUW)
+#define ENCODE_RV64M_REMW(rd, rs1, rs2)         ENCODE_RVTYPE_R(RV_OPCODE_OP_32, RV64M_FUNCT3_REMW , rd, rs1, rs2, RV64M_FUNCT7_REMW)
+#define ENCODE_RV64M_REMUW(rd, rs1, rs2)        ENCODE_RVTYPE_R(RV_OPCODE_OP_32, RV64M_FUNCT3_REMUW, rd, rs1, rs2, RV64M_FUNCT7_REMUW)
+
+
+
+//
 #define RV64M_DECINSN(funct7, T, codepoint) \
     (GET_STD_OPERAND(insnraw, RV64M_FUNCT7) == funct7 \
         ? (DecodeNormalRV64Type##T(insnraw, insn), insn.SetTrait(codepoint), true) \
