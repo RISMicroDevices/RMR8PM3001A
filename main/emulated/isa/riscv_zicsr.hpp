@@ -13,8 +13,8 @@
 
 
 // Function-3
-#define RVZICSR_FUNCT3_MASK                     0x00007000
-#define RVZICSR_FUNCT3_OFFSET                   12
+#define RVZICSR_FUNCT3_MASK                     RV_FUNCT3_MASK
+#define RVZICSR_FUNCT3_OFFSET                   RV_FUNCT3_OFFSET
 
 #define RVZICSR_FUNCT3_CSRRW                    0b001
 #define RVZICSR_FUNCT3_CSRRS                    0b010
@@ -150,6 +150,18 @@ namespace Jasse {
 }
 
 
+//
+#define ENCODE_RVZICSR_CSRRW(rd, rs1, csr)      ENCODE_RVTYPE_I(RV_OPCODE_SYSTEM, RVZICSR_FUNCT3_CSRRW, rd, rs1, csr)
+#define ENCODE_RVZICSR_CSRRS(rd, rs1, csr)      ENCODE_RVTYPE_I(RV_OPCODE_SYSTEM, RVZICSR_FUNCT3_CSRRS, rd, rs1, csr)
+#define ENCODE_RVZICSR_CSRRC(rd, rs1, csr)      ENCODE_RVTYPE_I(RV_OPCODE_SYSTEM, RVZICSR_FUNCT3_CSRRC, rd, rs1, csr)
+
+#define ENCODE_RVZICSR_CSRRWI(rd, uimm, csr)    ENCODE_RVTYPE_I(RV_OPCODE_SYSTEM, RVZICSR_FUNCT3_CSRRWI, rd, uimm, csr)
+#define ENCODE_RVZICSR_CSRRSI(rd, uimm, csr)    ENCODE_RVTYPE_I(RV_OPCODE_SYSTEM, RVZICSR_FUNCT3_CSRRSI, rd, uimm, csr)
+#define ENCODE_RVZICSR_CSRRCI(rd, uimm, csr)    ENCODE_RVTYPE_I(RV_OPCODE_SYSTEM, RVZICSR_FUNCT3_CSRRCI, rd, uimm, csr)
+
+
+
+//
 #define RVZICSR_DECINSN(T, codepoint) \
     (DecodeNormalRV64Type##T(insnraw, insn), insn.SetTrait(codepoint), true)
 
