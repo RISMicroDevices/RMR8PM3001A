@@ -208,6 +208,12 @@ namespace Jasse {
         RVCodepointType         GetType() const;
         const Textualizer       GetTextualizer() const;
         const Executor          GetExecutor() const;
+        
+        bool                    CompareCanonical(const RVCodepoint& obj) const;
+        bool                    Compare(const RVCodepoint& obj) const;
+
+        bool                    operator==(const RVCodepoint& obj) const;
+        bool                    operator!=(const RVCodepoint& obj) const;
     };
 
     // RISC-V Decoded Instruction
@@ -781,6 +787,41 @@ namespace Jasse {
     inline const RVCodepoint::Executor RVCodepoint::GetExecutor() const
     {
         return executor;
+    }
+
+    bool RVCodepoint::CompareCanonical(const RVCodepoint& obj) const
+    {
+        if (name != obj.name)
+            return false;
+
+        if (type != obj.type)
+            return false;
+
+        return true;
+    }
+
+    bool RVCodepoint::Compare(const RVCodepoint& obj) const
+    {
+        if (!CompareCanonical(obj))
+            return false;
+
+        if (textualizer != obj.textualizer)
+            return false;
+
+        if (executor != obj.executor)
+            return false;
+
+        return true;
+    }
+
+    inline bool RVCodepoint::operator==(const RVCodepoint& obj) const
+    {
+        return Compare(obj);
+    }
+
+    inline bool RVCodepoint::operator!=(const RVCodepoint& obj) const
+    {
+        return !(*this == obj);
     }
 }
 
