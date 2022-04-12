@@ -39,6 +39,9 @@ namespace Jasse {
     } XLen;
 
 
+    // RISC-V Codepoint (declaration)
+    class RVCodepoint;
+
     // RISC-V Codepoint Type
     typedef enum {
         RVTYPE_R = 0,
