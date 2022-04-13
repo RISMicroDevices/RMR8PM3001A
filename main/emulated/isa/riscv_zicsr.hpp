@@ -147,6 +147,12 @@ namespace Jasse {
     static const RVCodepoint RVZicsr_CSRRWI = RVCodepoint("csrrwi"  , RVTYPE_I, &TextualizeRVTypeI, &RVZicsrExecutor_CSRRWI);
     static const RVCodepoint RVZicsr_CSRRSI = RVCodepoint("csrrsi"  , RVTYPE_I, &TextualizeRVTypeI, &RVZicsrExecutor_CSRRSI);
     static const RVCodepoint RVZicsr_CSRRCI = RVCodepoint("csrrci"  , RVTYPE_I, &TextualizeRVTypeI, &RVZicsrExecutor_CSRRCI);
+
+
+    static const RVCodepointCollection __RVZicsr_ALL = {
+        &RVZicsr_CSRRW,     &RVZicsr_CSRRS,     &RVZicsr_CSRRC,
+        &RVZicsr_CSRRWI,    &RVZicsr_CSRRSI,    &RVZicsr_CSRRCI
+    };
 }
 
 
@@ -214,6 +220,8 @@ namespace Jasse {
         ~RVZicsrDecoder();
 
         virtual bool    Decode(insnraw_t insnraw, RVInstruction& insn) const override;
+
+        virtual const RVCodepointCollection&    GetAllCodepoints() const override;
     };
 
     static const RVZicsrDecoder* const  RVZicsr = new RVZicsrDecoder;
@@ -255,5 +263,10 @@ namespace Jasse {
             return false;
 
         return codepoint(insnraw, insn);
+    }
+
+    const RVCodepointCollection& RVZicsrDecoder::GetAllCodepoints() const
+    {
+        return __RVZicsr_ALL;
     }
 }
