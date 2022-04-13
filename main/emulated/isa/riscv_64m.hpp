@@ -355,6 +355,16 @@ namespace Jasse {
 
     static const RVCodepoint RV64M_REMW     = RVCodepoint("remw"    , RVTYPE_R, &TextualizeRVTypeR, &RV64MExecutor_REMW);
     static const RVCodepoint RV64M_REMUW    = RVCodepoint("remuw"   , RVTYPE_R, &TextualizeRVTypeR, &RV64MExecutor_REMUW);
+
+
+    static const RVCodepointCollection __RV64M_ALL = {
+        &RV64M_MUL,     &RV64M_MULH,    &RV64M_MULHSU,  &RV64M_MULHU,
+        &RV64M_DIV,     &RV64M_DIVU,
+        &RV64M_REM,     &RV64M_REMU,
+        &RV64M_MULW,
+        &RV64M_DIVW,    &RV64M_DIVUW,
+        &RV64M_REMW,    &RV64M_REMUW
+    };
 }
 
 
@@ -469,6 +479,8 @@ namespace Jasse {
         ~RV64MDecoder();
 
         virtual bool    Decode(insnraw_t insnraw, RVInstruction& insn) const override;
+
+        virtual const RVCodepointCollection&    GetAllCodepoints() const override;
     };
 
     // RV64M decoder instance
@@ -529,5 +541,10 @@ namespace Jasse {
             return false;
 
         return codepoint(insnraw, insn);
+    }
+
+    const RVCodepointCollection& RV64MDecoder::GetAllCodepoints() const
+    {
+        return __RV64M_ALL;
     }
 }
