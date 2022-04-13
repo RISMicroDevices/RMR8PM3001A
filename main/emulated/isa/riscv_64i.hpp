@@ -946,6 +946,23 @@ namespace Jasse {
     
     static const RVCodepoint RV64I_JAL      = RVCodepoint("jal"     , RVTYPE_J, &TextualizeRVTypeJ, &RV64IExecutor_JAL);
     static const RVCodepoint RV64I_JALR     = RVCodepoint("jalr"    , RVTYPE_I, &TextualizeRVTypeI, &RV64IExecutor_JALR);
+
+
+    static const RVCodepointCollection  __RV64I_ALL = {
+        &RV64I_ADDI,    &RV64I_SLTI,    &RV64I_SLTIU,   &RV64I_ANDI,    &RV64I_ORI,     &RV64I_XORI,
+        &RV64I_SLLI,    &RV64I_SRLI,    &RV64I_SRAI,
+        &RV64I_ADDUW,   &RV64I_SLLIW,   &RV64I_SRLIW,   &RV64I_SRAIW,
+        &RV64I_ADD,     &RV64I_SUB,     &RV64I_SLT,     &RV64I_SLTU,    &RV64I_AND,     &RV64I_OR,
+        &RV64I_XOR,     &RV64I_SLL,     &RV64I_SRL,     &RV64I_SRA,
+        &RV64I_ADDW,    &RV64I_SUBW,    &RV64I_SLLW,    &RV64I_SRLW,    &RV64I_SRAW,
+        &RV64I_BEQ,     &RV64I_BNE,     &RV64I_BLT,     &RV64I_BLTU,    &RV64I_BGE,     &RV64I_BGEU,
+        &RV64I_LD,      &RV64I_LW,      &RV64I_LH,      &RV64I_LB,      &RV64I_LWU,     &RV64I_LHU,     &RV64I_LBU,
+        &RV64I_SD,      &RV64I_SW,      &RV64I_SH,      &RV64I_SB,
+        &RV64I_ECALL,   &RV64I_EBREAK,  &RV64I_MRET,    &RV64I_SRET,    &RV64I_WFI,
+        &RV64I_FENCE,
+        &RV64I_LUI,     &RV64I_AUIPC,
+        &RV64I_JAL,     &RV64I_JALR
+    };
 }
 
 
@@ -1406,6 +1423,8 @@ namespace Jasse {
         ~RV64IDecoder();
 
         virtual bool    Decode(insnraw_t insnraw, RVInstruction& insn) const override;
+
+        virtual const RVCodepointCollection&    GetAllCodepoints() const override;
     };
 
     // RV64I Decoder Instance
@@ -1745,6 +1764,11 @@ namespace Jasse {
             return false;
 
         return codegroup->Decode(insnraw, insn);
+    }
+
+    const RVCodepointCollection& RV64IDecoder::GetAllCodepoints() const
+    {
+        return __RV64I_ALL;
     }
 }
 
