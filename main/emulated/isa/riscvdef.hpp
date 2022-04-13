@@ -17,10 +17,7 @@ namespace Jasse {
     typedef     uint64_t        arch64_t;
 
     // Type definition of Immediate Value of XLEN=32/64
-    typedef union {
-        arch64_t    imm64 = 0;
-        arch32_t    imm32;
-    } imm_t;
+    typedef     uint32_t        imm_t;
 
     // Type definition of PC Register Value of XLEN=32/64
     typedef union {

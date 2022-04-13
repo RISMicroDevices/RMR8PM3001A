@@ -8,10 +8,6 @@
 #include "riscv.hpp"
 
 
-#define IMM64_SEXT_W(imm) \
-    (imm.imm64 = SEXT_W(imm.imm32), imm)
-
-
 #define ENCODE_STD_OPERAND(val, name) \
     ((val & (name##_MASK >> name##_OFFSET)) << name##_OFFSET)
 
@@ -68,18 +64,12 @@ namespace Jasse {
     // RISC-V Instruction Immediate Decoder
     typedef imm_t       (*RVImmediateDecoder)(insnraw_t insnraw);
 
-    imm_t DecodeRV32ImmediateTypeR(insnraw_t insnraw) noexcept;
-    imm_t DecodeRV64ImmediateTypeR(insnraw_t insnraw) noexcept;
-    imm_t DecodeRV32ImmediateTypeI(insnraw_t insnraw) noexcept;
-    imm_t DecodeRV64ImmediateTypeI(insnraw_t insnraw) noexcept;
-    imm_t DecodeRV32ImmediateTypeS(insnraw_t insnraw) noexcept;
-    imm_t DecodeRV64ImmediateTypeS(insnraw_t insnraw) noexcept;
-    imm_t DecodeRV32ImmediateTypeB(insnraw_t insnraw) noexcept;
-    imm_t DecodeRV64ImmediateTypeB(insnraw_t insnraw) noexcept;
-    imm_t DecodeRV32ImmediateTypeU(insnraw_t insnraw) noexcept;
-    imm_t DecodeRV64ImmediateTypeU(insnraw_t insnraw) noexcept;
-    imm_t DecodeRV32ImmediateTypeJ(insnraw_t insnraw) noexcept;
-    imm_t DecodeRV64ImmediateTypeJ(insnraw_t insnraw) noexcept;
+    imm_t DecodeRVImmediateTypeR(insnraw_t insnraw) noexcept;
+    imm_t DecodeRVImmediateTypeI(insnraw_t insnraw) noexcept;
+    imm_t DecodeRVImmediateTypeS(insnraw_t insnraw) noexcept;
+    imm_t DecodeRVImmediateTypeB(insnraw_t insnraw) noexcept;
+    imm_t DecodeRVImmediateTypeU(insnraw_t insnraw) noexcept;
+    imm_t DecodeRVImmediateTypeJ(insnraw_t insnraw) noexcept;
 
     // RISC-V Instruction Normal Textualizer
     std::string TextualizeRVTypeR(const RVInstruction& insn) noexcept;
@@ -90,134 +80,75 @@ namespace Jasse {
     std::string TextualizeRVTypeJ(const RVInstruction& insn) noexcept;
     std::string TextualizeRVZeroOperand(const RVInstruction& insn) noexcept;
 
-    // RISC-V 64 Normal Instruction Form Decoder
-    void DecodeNormalRV64TypeR(insnraw_t insnraw, RVInstruction& insn) noexcept;
-    void DecodeNormalRV64TypeI(insnraw_t insnraw, RVInstruction& insn) noexcept;
-    void DecodeNormalRV64TypeS(insnraw_t insnraw, RVInstruction& insn) noexcept;
-    void DecodeNormalRV64TypeB(insnraw_t insnraw, RVInstruction& insn) noexcept;
-    void DecodeNormalRV64TypeU(insnraw_t insnraw, RVInstruction& insn) noexcept;
-    void DecodeNormalRV64TypeJ(insnraw_t insnraw, RVInstruction& insn) noexcept;
-
-    // RISC-V 32 Normal Instruction Form Decoder
-    void DecodeNormalRV32TypeR(insnraw_t insnraw, RVInstruction& insn) noexcept;
-    void DecodeNormalRV32TypeI(insnraw_t insnraw, RVInstruction& insn) noexcept;
-    void DecodeNormalRV32TypeS(insnraw_t insnraw, RVInstruction& insn) noexcept;
-    void DecodeNormalRV32TypeB(insnraw_t insnraw, RVInstruction& insn) noexcept;
-    void DecodeNormalRV32TypeU(insnraw_t insnraw, RVInstruction& insn) noexcept;
-    void DecodeNormalRV32TypeJ(insnraw_t insnraw, RVInstruction& insn) noexcept;
+    // RISC-V Normal Instruction Form Decoder
+    void DecodeNormalRVTypeR(insnraw_t insnraw, RVInstruction& insn) noexcept;
+    void DecodeNormalRVTypeI(insnraw_t insnraw, RVInstruction& insn) noexcept;
+    void DecodeNormalRVTypeS(insnraw_t insnraw, RVInstruction& insn) noexcept;
+    void DecodeNormalRVTypeB(insnraw_t insnraw, RVInstruction& insn) noexcept;
+    void DecodeNormalRVTypeU(insnraw_t insnraw, RVInstruction& insn) noexcept;
+    void DecodeNormalRVTypeJ(insnraw_t insnraw, RVInstruction& insn) noexcept;
 }
 
 
 // Implementation of Immediate Decoders
 namespace Jasse {
-    imm_t DecodeRV32ImmediateTypeR(insnraw_t insnraw) noexcept
+    imm_t DecodeRVImmediateTypeR(insnraw_t insnraw) noexcept
+    {
+        return 0;
+    }
+
+    imm_t DecodeRVImmediateTypeI(insnraw_t insnraw) noexcept
     {
         imm_t imm;
-        imm.imm32 = 0;
+
+        imm  = ((insnraw & 0xFFF00000U) >> 20);
+        imm |= ((insnraw & 0x80000000U) ? 0xFFFFF000U : 0);
 
         return imm;
     }
 
-    imm_t DecodeRV64ImmediateTypeR(insnraw_t insnraw) noexcept
+    imm_t DecodeRVImmediateTypeS(insnraw_t insnraw) noexcept
     {
         imm_t imm;
-        imm.imm64 = 0;
+
+        imm  = ((insnraw & 0x00000F80U) >> 7);
+        imm |= ((insnraw & 0xFE000000U) >> 20);
+        imm |= ((insnraw & 0x80000000U) ? 0xFFFFF000U : 0);
 
         return imm;
     }
 
-    imm_t DecodeRV32ImmediateTypeI(insnraw_t insnraw) noexcept
+    imm_t DecodeRVImmediateTypeB(insnraw_t insnraw) noexcept
     {
         imm_t imm;
-        imm.imm32 = 0;
 
-        imm.imm32 |= ((insnraw & 0xFFF00000U) >> 20);
-        imm.imm32 |= ((insnraw & 0x80000000U) ? 0xFFFFF000U : 0);
+        imm  = ((insnraw & 0x00000F00U) >> 7);
+        imm |= ((insnraw & 0x00000080U) << 4);
+        imm |= ((insnraw & 0x7E000000U) >> 20);
+        imm |= ((insnraw & 0x80000000U) ? 0xFFFFF000U : 0);
 
         return imm;
     }
 
-    imm_t DecodeRV64ImmediateTypeI(insnraw_t insnraw) noexcept
+    imm_t DecodeRVImmediateTypeU(insnraw_t insnraw) noexcept
     {
-        imm_t imm = DecodeRV32ImmediateTypeI(insnraw);
+        imm_t imm = 0;
 
-        return IMM64_SEXT_W(imm);
-    }
-
-    imm_t DecodeRV32ImmediateTypeS(insnraw_t insnraw) noexcept
-    {
-        imm_t imm;
-        imm.imm32 = 0;
-
-        imm.imm32 |= ((insnraw & 0x00000F80U) >> 7);
-        imm.imm32 |= ((insnraw & 0xFE000000U) >> 20);
-        imm.imm32 |= ((insnraw & 0x80000000U) ? 0xFFFFF000U : 0);
+        imm = ((insnraw & 0xFFFFF000));
 
         return imm;
     }
 
-    imm_t DecodeRV64ImmediateTypeS(insnraw_t insnraw) noexcept
-    {
-        imm_t imm = DecodeRV32ImmediateTypeS(insnraw);
-
-        return IMM64_SEXT_W(imm);
-    }
-
-    imm_t DecodeRV32ImmediateTypeB(insnraw_t insnraw) noexcept
+    imm_t DecodeRVImmediateTypeJ(insnraw_t insnraw) noexcept
     {
         imm_t imm;
-        imm.imm32 = 0;
 
-        imm.imm32 |= ((insnraw & 0x00000F00U) >> 7);
-        imm.imm32 |= ((insnraw & 0x00000080U) << 4);
-        imm.imm32 |= ((insnraw & 0x7E000000U) >> 20);
-        imm.imm32 |= ((insnraw & 0x80000000U) ? 0xFFFFF000U : 0);
-
-        return imm;
-    }
-
-    imm_t DecodeRV64ImmediateTypeB(insnraw_t insnraw) noexcept
-    {
-        imm_t imm = DecodeRV32ImmediateTypeB(insnraw);
-
-        return IMM64_SEXT_W(imm);
-    }
-
-    imm_t DecodeRV32ImmediateTypeU(insnraw_t insnraw) noexcept
-    {
-        imm_t imm;
-        imm.imm32 = 0;
-
-        imm.imm32 |= ((insnraw & 0xFFFFF000));
+        imm  = ((insnraw & 0x7FE00000U) >> 20);
+        imm |= ((insnraw & 0x00100000U) >> 9);
+        imm |= ((insnraw & 0x000FF000U));
+        imm |= ((insnraw & 0x80000000U) ? 0xFFF00000U : 0);
 
         return imm;
-    }
-
-    imm_t DecodeRV64ImmediateTypeU(insnraw_t insnraw) noexcept
-    {
-        imm_t imm = DecodeRV32ImmediateTypeU(insnraw);
-
-        return IMM64_SEXT_W(imm);
-    }
-
-    imm_t DecodeRV32ImmediateTypeJ(insnraw_t insnraw) noexcept
-    {
-        imm_t imm;
-        imm.imm32 = 0;
-
-        imm.imm32 |= ((insnraw & 0x7FE00000U) >> 20);
-        imm.imm32 |= ((insnraw & 0x00100000U) >> 9);
-        imm.imm32 |= ((insnraw & 0x000FF000U));
-        imm.imm32 |= ((insnraw & 0x80000000U) ? 0xFFF00000U : 0);
-
-        return imm;
-    }
-
-    imm_t DecodeRV64ImmediateTypeJ(insnraw_t insnraw) noexcept
-    {
-        imm_t imm = DecodeRV32ImmediateTypeJ(insnraw);
-
-        return IMM64_SEXT_W(imm);
     }
 }
 
@@ -260,7 +191,7 @@ namespace Jasse {
         oss << insn.GetName()                   << " \t";
         oss << TextualizeRVGR(insn.GetRD())     << ", ";
         oss << TextualizeRVGR(insn.GetRS1())    << ", ";
-        oss << "0x" << std::hex << std::setw(3) << std::setfill('0') << (insn.GetImmediate().imm32 & 0xFFF);
+        oss << "0x" << std::hex << std::setw(3) << std::setfill('0') << (insn.GetImmediate() & 0xFFF);
         // Note: Only display 12 bits of immediate value here.
         //       Because higher bits are only produced by sign-extension. The same below.
 
@@ -274,7 +205,7 @@ namespace Jasse {
         oss << insn.GetName()                   << " \t";
         oss << TextualizeRVGR(insn.GetRS1())    << ", ";
         oss << TextualizeRVGR(insn.GetRS2())    << ", ";
-        oss << "0x" << std::hex << std::setw(3) << std::setfill('0') << (insn.GetImmediate().imm32 & 0xFFF);
+        oss << "0x" << std::hex << std::setw(3) << std::setfill('0') << (insn.GetImmediate() & 0xFFF);
 
         return oss.str();
     }
@@ -286,7 +217,7 @@ namespace Jasse {
         oss << insn.GetName()                   << " \t";
         oss << TextualizeRVGR(insn.GetRS1())    << ", ";
         oss << TextualizeRVGR(insn.GetRS2())    << ", ";
-        oss << "0x" << std::hex << std::setw(4) << std::setfill('0') << (insn.GetImmediate().imm32 & 0xFFFF);
+        oss << "0x" << std::hex << std::setw(4) << std::setfill('0') << (insn.GetImmediate() & 0xFFFF);
 
         return oss.str();
     }
@@ -297,7 +228,7 @@ namespace Jasse {
 
         oss << insn.GetName()                   << " \t";
         oss << TextualizeRVGR(insn.GetRD())     << ", ";
-        oss << "0x" << std::hex << std::setw(8) << std::setfill('0') << (insn.GetImmediate().imm32);
+        oss << "0x" << std::hex << std::setw(8) << std::setfill('0') << (insn.GetImmediate());
 
         return oss.str();
     }
@@ -308,7 +239,7 @@ namespace Jasse {
 
         oss << insn.GetName()                   << " \t";
         oss << TextualizeRVGR(insn.GetRD())     << ", ";
-        oss << "0x" << std::hex << std::setw(6) << std::setfill('0') << (insn.GetImmediate().imm32 & 0x00FFFFFF);
+        oss << "0x" << std::hex << std::setw(6) << std::setfill('0') << (insn.GetImmediate() & 0x00FFFFFF);
 
         return oss.str();
     }
@@ -322,86 +253,45 @@ namespace Jasse {
 
 // Implementation of Normal Form Decoders
 namespace Jasse {
-    // RV64
-    inline void DecodeNormalRV64TypeR(insnraw_t insnraw, RVInstruction& insn) noexcept
+
+    inline void DecodeNormalRVTypeR(insnraw_t insnraw, RVInstruction& insn) noexcept
     {
         insn.SetRD (GET_STD_OPERAND(insnraw, RV_OPERAND_RD));
         insn.SetRS1(GET_STD_OPERAND(insnraw, RV_OPERAND_RS1));
         insn.SetRS2(GET_STD_OPERAND(insnraw, RV_OPERAND_RS2));
     }
 
-    inline void DecodeNormalRV64TypeI(insnraw_t insnraw, RVInstruction& insn) noexcept
+    inline void DecodeNormalRVTypeI(insnraw_t insnraw, RVInstruction& insn) noexcept
     {
         insn.SetRD (GET_STD_OPERAND(insnraw, RV_OPERAND_RD));
         insn.SetRS1(GET_STD_OPERAND(insnraw, RV_OPERAND_RS1));
-        insn.SetImmediate(DecodeRV64ImmediateTypeI(insnraw));
+        insn.SetImmediate(DecodeRVImmediateTypeI(insnraw));
     }
 
-    inline void DecodeNormalRV64TypeS(insnraw_t insnraw, RVInstruction& insn) noexcept
-    {
-        insn.SetRS1(GET_STD_OPERAND(insnraw, RV_OPERAND_RS1));
-        insn.SetRS2(GET_STD_OPERAND(insnraw, RV_OPERAND_RS2));
-        insn.SetImmediate(DecodeRV64ImmediateTypeS(insnraw));
-    }
-
-    inline void DecodeNormalRV64TypeB(insnraw_t insnraw, RVInstruction& insn) noexcept
+    inline void DecodeNormalRVTypeS(insnraw_t insnraw, RVInstruction& insn) noexcept
     {
         insn.SetRS1(GET_STD_OPERAND(insnraw, RV_OPERAND_RS1));
         insn.SetRS2(GET_STD_OPERAND(insnraw, RV_OPERAND_RS2));
-        insn.SetImmediate(DecodeRV64ImmediateTypeB(insnraw));
+        insn.SetImmediate(DecodeRVImmediateTypeS(insnraw));
     }
 
-    inline void DecodeNormalRV64TypeU(insnraw_t insnraw, RVInstruction& insn) noexcept
-    {
-        insn.SetRD (GET_STD_OPERAND(insnraw, RV_OPERAND_RD));
-        insn.SetImmediate(DecodeRV64ImmediateTypeU(insnraw));
-    }
-
-    inline void DecodeNormalRV64TypeJ(insnraw_t insnraw, RVInstruction& insn) noexcept
-    {
-        insn.SetRD (GET_STD_OPERAND(insnraw, RV_OPERAND_RD));
-        insn.SetImmediate(DecodeRV64ImmediateTypeJ(insnraw));
-    }
-
-    // RV32
-    inline void DecodeNormalRV32TypeR(insnraw_t insnraw, RVInstruction& insn) noexcept
-    {
-        insn.SetRD (GET_STD_OPERAND(insnraw, RV_OPERAND_RD));
-        insn.SetRS1(GET_STD_OPERAND(insnraw, RV_OPERAND_RS1));
-        insn.SetRS2(GET_STD_OPERAND(insnraw, RV_OPERAND_RS2));
-    }
-
-    inline void DecodeNormalRV32TypeI(insnraw_t insnraw, RVInstruction& insn) noexcept
-    {
-        insn.SetRD (GET_STD_OPERAND(insnraw, RV_OPERAND_RD));
-        insn.SetRS1(GET_STD_OPERAND(insnraw, RV_OPERAND_RS1));
-        insn.SetImmediate(DecodeRV32ImmediateTypeI(insnraw));
-    }
-
-    inline void DecodeNormalRV32TypeS(insnraw_t insnraw, RVInstruction& insn) noexcept
+    inline void DecodeNormalRVTypeB(insnraw_t insnraw, RVInstruction& insn) noexcept
     {
         insn.SetRS1(GET_STD_OPERAND(insnraw, RV_OPERAND_RS1));
         insn.SetRS2(GET_STD_OPERAND(insnraw, RV_OPERAND_RS2));
-        insn.SetImmediate(DecodeRV32ImmediateTypeS(insnraw));
+        insn.SetImmediate(DecodeRVImmediateTypeB(insnraw));
     }
 
-    inline void DecodeNormalRV32TypeB(insnraw_t insnraw, RVInstruction& insn) noexcept
-    {
-        insn.SetRS1(GET_STD_OPERAND(insnraw, RV_OPERAND_RS1));
-        insn.SetRS2(GET_STD_OPERAND(insnraw, RV_OPERAND_RS2));
-        insn.SetImmediate(DecodeRV32ImmediateTypeB(insnraw));
-    }
-
-    inline void DecodeNormalRV32TypeU(insnraw_t insnraw, RVInstruction& insn) noexcept
+    inline void DecodeNormalRVTypeU(insnraw_t insnraw, RVInstruction& insn) noexcept
     {
         insn.SetRD (GET_STD_OPERAND(insnraw, RV_OPERAND_RD));
-        insn.SetImmediate(DecodeRV32ImmediateTypeU(insnraw));
+        insn.SetImmediate(DecodeRVImmediateTypeU(insnraw));
     }
 
-    inline void DecodeNormalRV32TypeJ(insnraw_t insnraw, RVInstruction& insn) noexcept
+    inline void DecodeNormalRVTypeJ(insnraw_t insnraw, RVInstruction& insn) noexcept
     {
         insn.SetRD (GET_STD_OPERAND(insnraw, RV_OPERAND_RD));
-        insn.SetImmediate(DecodeRV32ImmediateTypeJ(insnraw));
+        insn.SetImmediate(DecodeRVImmediateTypeJ(insnraw));
     }
 }
 
