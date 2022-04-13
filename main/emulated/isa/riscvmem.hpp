@@ -52,8 +52,10 @@ namespace Jasse {
     // RISC-V Memory Interface (EEI defined, Proxy in case of RVWMO) 
     class RVMemoryInterface { // *pure virtual*
     public:
-        virtual RVMOPStatus     Read (addr_t address, RVMOPWidth width, data_t* dst) = 0;
-        virtual RVMOPStatus     Write(addr_t address, RVMOPWidth width, data_t  src) = 0;
+        virtual RVMOPStatus     ReadInsn (addr_t address, RVMOPWidth width, data_t* dst) = 0;
+        virtual RVMOPStatus     ReadData (addr_t address, RVMOPWidth width, data_t* dst) = 0;
+        virtual RVMOPStatus     WriteInsn(addr_t address, RVMOPWidth width, data_t  src) = 0;
+        virtual RVMOPStatus     WriteData(addr_t address, RVMOPWidth width, data_t  src) = 0;
     };
 
 
@@ -74,8 +76,10 @@ namespace Jasse {
         size_t              GetSize() const;
         size_t              GetCapacity() const;
 
-        virtual RVMOPStatus Read(addr_t address, RVMOPWidth width, data_t* dst) override;
-        virtual RVMOPStatus Write(addr_t address, RVMOPWidth width, data_t src) override;
+        virtual RVMOPStatus ReadInsn (addr_t address, RVMOPWidth width, data_t* dst) override;
+        virtual RVMOPStatus ReadData (addr_t address, RVMOPWidth width, data_t* dst) override;
+        virtual RVMOPStatus WriteInsn(addr_t address, RVMOPWidth width, data_t  src) override;
+        virtual RVMOPStatus WriteData(addr_t address, RVMOPWidth width, data_t  src) override;
     };
 }
 
@@ -125,7 +129,12 @@ namespace Jasse {
         return size << 3;
     }
 
-    RVMOPStatus SimpleLinearMemory::Read(addr_t address, RVMOPWidth width, data_t* dst)
+    inline RVMOPStatus SimpleLinearMemory::ReadInsn(addr_t address, RVMOPWidth width, data_t* dst)
+    {
+        return ReadData(address, width, dst);
+    }
+
+    RVMOPStatus SimpleLinearMemory::ReadData(addr_t address, RVMOPWidth width, data_t* dst)
     {
         // !! little-endian system only !!
 
@@ -140,7 +149,12 @@ namespace Jasse {
         return MOP_SUCCESS;
     }
 
-    RVMOPStatus SimpleLinearMemory::Write(addr_t address, RVMOPWidth width, data_t src)
+    inline RVMOPStatus SimpleLinearMemory::WriteInsn(addr_t address, RVMOPWidth width, data_t src)
+    {
+        return WriteData(address, width, src);
+    }
+
+    RVMOPStatus SimpleLinearMemory::WriteData(addr_t address, RVMOPWidth width, data_t src)
     {
         // !! little-endian system only !!
 
