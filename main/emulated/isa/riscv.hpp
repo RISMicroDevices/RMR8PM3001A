@@ -243,6 +243,7 @@ namespace Jasse {
         const RVCodepoint*          Get(int index) const;
         void                        Set(int index, const RVCodepoint* codepoint);
         void                        Add(const RVCodepoint* codepoint);
+        void                        AddAll(const RVCodepointCollection& another);
         void                        Remove(int index);
         void                        Remove(RVCodepointConstIterator pos);
         void                        Remove(RVCodepointConstIterator first, RVCodepointConstIterator last);
@@ -328,6 +329,8 @@ namespace Jasse {
         const std::string&  GetCanonicalName() const;
 
         virtual bool        Decode(insnraw_t insnraw, RVInstruction& insn) const = 0;
+
+        virtual const RVCodepointCollection&    GetAllCodepoints() const = 0;
 
         void    operator=(const RVDecoder& obj) = delete;
     };
@@ -940,6 +943,11 @@ namespace Jasse {
     inline RVCodepointConstIterator RVCodepointCollection::End() const
     {
         return codepoints.end();
+    }
+
+    void RVCodepointCollection::AddAll(const RVCodepointCollection& another)
+    {
+        codepoints.insert(codepoints.end(), another.Begin(), another.End());
     }
 }
 
