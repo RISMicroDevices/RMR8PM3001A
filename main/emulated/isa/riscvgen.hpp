@@ -5,6 +5,7 @@
 // Instruction Generator (CodeGen) components
 //
 
+#include <random>
 #include <set>
 
 #include "riscvdef.hpp"
@@ -22,6 +23,7 @@
 #define RV_CODEGEN_RANGE_I_PC                   0x01
 #define RV_CODEGEN_RANGE_I_GRx                  0x11
 #define RV_CODEGEN_RANGE_I_MEM                  0x21
+#define RV_CODEGEN_RANGE_I_IMM                  0x31
 
 
 namespace Jasse {
@@ -154,12 +156,22 @@ namespace Jasse {
 
     static constexpr RVCodeGenConstraintTrait<RVCodeGenConstraintRangeI>    RV_CODEGEN_MEM_RANGE
         { RV_CODEGEN_RANGE_I_MEM };
+
+    static constexpr RVCodeGenConstraintTrait<RVCodeGenConstraintRangeI>    RV_CODEGEN_IMM_RANGE
+        { RV_CODEGEN_RANGE_I_IMM };
 }
 
 
 // RISC-V Code Generator utilities
 namespace Jasse {
     
+    void        Rand32Seed(uint32_t seed);
+    uint32_t    Rand32(uint32_t lower_range, uint32_t upper_range);
+    uint32_t    Rand32(RVCodeGenConstraintRangeI* range = nullptr);
+
+    void        Rand64Seed(uint64_t seed);
+    uint64_t    Rand64(uint64_t lower_range, uint64_t upper_range);
+    uint64_t    Rand64(RVCodeGenConstraintRangeI* range = nullptr);
 }
 
 
@@ -455,5 +467,52 @@ namespace Jasse {
                 constraints[i] = nullptr;
             }
         }
+    }
+}
+
+
+// Implementation of utilities
+namespace Jasse {
+
+    //
+    static std::mt19937     rand32_engine = std::mt19937(std::random_device()());
+
+    inline uint32_t Rand32(uint32_t lower_range, uint32_t upper_range)
+    {
+        return std::uniform_int_distribution<uint32_t>(lower_range, upper_range)(rand32_engine);
+    }
+
+    inline uint32_t Rand32(RVCodeGenConstraintRangeI* range)
+    {
+        if (!range)
+            return Rand32(0, UINT32_MAX);
+        else
+            return Rand32((uint32_t) range->GetLowerRange(), (uint32_t) range->GetUpperRange());
+    }
+
+    inline void Rand32Seed(uint32_t seed)
+    {
+        rand32_engine.seed(seed);
+    }
+
+    // 
+    static std::mt19937_64  rand64_engine = std::mt19937_64(std::random_device()());
+
+    inline uint64_t Rand64(uint64_t lower_range, uint64_t upper_range)
+    {
+        return std::uniform_int_distribution<uint64_t>(lower_range, upper_range)(rand64_engine);
+    }
+
+    inline uint64_t Rand64(RVCodeGenConstraintRangeI* range)
+    {
+        if (!range)
+            return Rand64(0, UINT64_MAX);
+        else
+            return Rand64(range->GetLowerRange(), range->GetUpperRange());
+    }
+
+    inline void Rand64Seed(uint64_t seed)
+    {
+        rand64_engine.seed(seed);
     }
 }
