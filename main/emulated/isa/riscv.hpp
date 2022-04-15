@@ -168,6 +168,10 @@ namespace Jasse {
 
     //
     class RVInstruction;
+    class RVEncoder;
+
+    // RISC-V Instruction Encoder Allocator
+    typedef RVEncoder*  (*RVEncoderAllocator)(void);
 
     // RISC-V Codepoint
     class RVCodepoint {
@@ -350,9 +354,6 @@ namespace Jasse {
         RVEncoder&          RS1(int rs1) noexcept;
         RVEncoder&          RS2(int rs2) noexcept;
     };
-
-    // RISC-V Instruction Encoder Allocator
-    typedef RVEncoder*  (*RVEncoderAllocator)();
 
 
     // RISC-V Instruction Decoder Trait Function
