@@ -182,19 +182,23 @@ namespace Jasse {
         std::string     name;
         RVCodepointType type;
 
+        RVEncoderAllocator  encoderAlloc;
+
         Textualizer     textualizer;
         Executor        executor;
 
     public:
-        RVCodepoint(const char*             name, 
-                    const RVCodepointType   type,
-                    const Textualizer       textualizer, 
-                    const Executor          executor);
+        RVCodepoint(const char*                 name, 
+                    const RVCodepointType       type,
+                    const RVEncoderAllocator    encoderAlloc,
+                    const Textualizer           textualizer, 
+                    const Executor              executor);
 
-        RVCodepoint(const std::string&      name,
-                    const RVCodepointType   type,
-                    const Textualizer       textualizer,
-                    const Executor          executor);
+        RVCodepoint(const std::string&          name,
+                    const RVCodepointType       type,
+                    const RVEncoderAllocator    encoderAlloc,
+                    const Textualizer           textualizer,
+                    const Executor              executor);
 
         RVCodepoint();
         RVCodepoint(const RVCodepoint& obj);
@@ -205,10 +209,15 @@ namespace Jasse {
         void                    SetTextualizer(const Textualizer textualizer);
         void                    SetExecutor(const Executor executor);
 
+        void                    SetEncoderAllocator(RVEncoderAllocator encoder);
+
         const std::string&      GetName() const;
         RVCodepointType         GetType() const;
         const Textualizer       GetTextualizer() const;
         const Executor          GetExecutor() const;
+
+        RVEncoderAllocator      GetEncoderAllocator() const;
+        RVEncoder*              AllocEncoder() const;
         
         bool                    CompareCanonical(const RVCodepoint& obj) const;
         bool                    Compare(const RVCodepoint& obj) const;
@@ -789,22 +798,26 @@ namespace Jasse {
     Executor        executor;
     */
 
-    RVCodepoint::RVCodepoint(const char*             name, 
-                             const RVCodepointType   type,
-                             const Textualizer       textualizer, 
-                             const Executor          executor)
+    RVCodepoint::RVCodepoint(const char*                name, 
+                             const RVCodepointType      type,
+                             const RVEncoderAllocator   encoderAlloc,
+                             const Textualizer          textualizer, 
+                             const Executor             executor)
         : name          (std::string(name))
         , type          (type)
+        , encoderAlloc  (encoderAlloc)
         , textualizer   (textualizer)
         , executor      (executor)
     { }
 
-    RVCodepoint::RVCodepoint(const std::string&      name,
-                             const RVCodepointType   type,
-                             const Textualizer       textualizer,
-                             const Executor          executor)
+    RVCodepoint::RVCodepoint(const std::string&         name,
+                             const RVCodepointType      type,
+                             const RVEncoderAllocator   encoderAlloc,
+                             const Textualizer          textualizer,
+                             const Executor             executor)
         : name          (name)
         , type          (type)
+        , encoderAlloc  (encoderAlloc)
         , textualizer   (textualizer)
         , executor      (executor)
     { }
@@ -812,6 +825,7 @@ namespace Jasse {
     RVCodepoint::RVCodepoint()
         : name          ()
         , type          ()
+        , encoderAlloc  (nullptr)
         , textualizer   (nullptr)
         , executor      (nullptr)
     { }
@@ -819,6 +833,7 @@ namespace Jasse {
     RVCodepoint::RVCodepoint(const RVCodepoint& obj)
         : name          (obj.name)
         , type          (obj.type)
+        , encoderAlloc  (obj.encoderAlloc)
         , textualizer   (obj.textualizer)
         , executor      (obj.executor)
     { }
@@ -846,6 +861,11 @@ namespace Jasse {
         this->executor = executor;
     }
 
+    inline void RVCodepoint::SetEncoderAllocator(RVEncoderAllocator encoderAlloc)
+    {
+        this->encoderAlloc = encoderAlloc;
+    }
+
     inline const std::string& RVCodepoint::GetName() const
     {
         return name;
@@ -864,6 +884,16 @@ namespace Jasse {
     inline const RVCodepoint::Executor RVCodepoint::GetExecutor() const
     {
         return executor;
+    }
+
+    inline RVEncoderAllocator RVCodepoint::GetEncoderAllocator() const
+    {
+        return encoderAlloc;
+    }
+
+    inline RVEncoder* RVCodepoint::AllocEncoder() const
+    {
+        return encoderAlloc();
     }
 
     bool RVCodepoint::CompareCanonical(const RVCodepoint& obj) const
