@@ -113,14 +113,14 @@ namespace Jasse {
     class RVEncoderTypeJ;
     class RVEncoderTypeIZeroOperand;
 
-    // RISC-V Normal Instruction Form Encoder Allocator
-    RVEncoder* AllocRVEncoderTypeR() noexcept;
-    RVEncoder* AllocRVEncoderTypeI() noexcept;
-    RVEncoder* AllocRVEncoderTypeS() noexcept;
-    RVEncoder* AllocRVEncoderTypeB() noexcept;
-    RVEncoder* AllocRVEncoderTypeU() noexcept;
-    RVEncoder* AllocRVEncoderTypeJ() noexcept;
-    RVEncoder* AllocRVEncoderTypeIZeroOperand() noexcept;
+    // RISC-V Normal Instruction Form Encoder Allocator templates
+    template<int opcode, int funct3, int funct7>    RVEncoder* AllocRVEncoderTypeR() noexcept;
+    template<int opcode, int funct3>                RVEncoder* AllocRVEncoderTypeI() noexcept;
+    template<int opcode, int funct3>                RVEncoder* AllocRVEncoderTypeS() noexcept;
+    template<int opcode, int funct3>                RVEncoder* AllocRVEncoderTypeB() noexcept;
+    template<int opcode>                            RVEncoder* AllocRVEncoderTypeU() noexcept;
+    template<int opcode>                            RVEncoder* AllocRVEncoderTypeJ() noexcept;
+    template<int opcode, int funct3, int funct12>   RVEncoder* AllocRVEncoderTypeIZeroOperand() noexcept;
 
 
 #define __RV_ENCODER_DECLARATIONS \
@@ -678,5 +678,45 @@ namespace Jasse {
     insnraw_t RVEncoderTypeIZeroOperand::Get() const noexcept
     {
         return insn;
+    }
+}
+
+
+// Implementation of Normal Form Encoder Allocator templates
+namespace Jasse {
+
+    template<int opcode, int funct3, int funct7> RVEncoder* AllocRVEncoderTypeR() noexcept
+    {
+        return new RVEncoderTypeR(opcode, funct3, funct7);
+    }
+
+    template<int opcode, int funct3> RVEncoder* AllocRVEncoderTypeI() noexcept
+    {
+        return new RVEncoderTypeI(opcode, funct3);
+    }
+
+    template<int opcode, int funct3> RVEncoder* AllocRVEncoderTypeS() noexcept
+    {
+        return new RVEncoderTypeS(opcode, funct3);
+    }
+
+    template<int opcode, int funct3> RVEncoder* AllocRVEncoderTypeB() noexcept
+    {
+        return new RVEncoderTypeB(opcode, funct3);
+    }
+
+    template<int opcode> RVEncoder* AllocRVEncoderTypeU() noexcept
+    {
+        return new RVEncoderTypeU(opcode);
+    }
+
+    template<int opcode> RVEncoder* AllocRVEncoderTypeJ() noexcept
+    {
+        return new RVEncoderTypeJ(opcode);
+    }
+
+    template<int opcode, int funct3, int funct12> RVEncoder* AllocRVEncoderTypeIZeroOperand() noexcept
+    {
+        return new RVEncoderTypeIZeroOperand(opcode, funct3, funct12);
     }
 }
