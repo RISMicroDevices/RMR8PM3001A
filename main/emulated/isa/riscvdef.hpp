@@ -78,6 +78,9 @@ namespace Jasse {
 #define RV_FUNCT7_MASK                      0xFE000000U
 #define RV_FUNCT7_OFFSET                    25
 
+#define RV_FUNCT12_MASK                     0xFFF00000U
+#define RV_FUNCT12_OFFSET                   20
+
 
 // Operand
 #define RV_OPERAND_RD_MASK                  0x00000F80U
