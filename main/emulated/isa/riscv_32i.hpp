@@ -57,6 +57,14 @@
 
 #define RV32I_FUNCT3_FENCE                      0b000
 
+#define RV32I_FUNCT3_ECALL                      0b000
+#define RV32I_FUNCT3_EBREAK                     0b000
+
+#define RV32I_FUNCT3_SRET                       0b000
+#define RV32I_FUNCT3_MRET                       0b000
+
+#define RV32I_FUNCT3_WFI                        0b000
+
 
 // Function-7
 #define RV32I_FUNCT7_MASK                       0xFE000000U
@@ -81,8 +89,8 @@
 
 
 // Function-12
-#define RV32I_FUNCT12_MASK                      0xFFF00000U
-#define RV32I_FUNCT12_OFFSET                    20
+#define RV32I_FUNCT12_MASK                      RV_FUNCT12_MASK
+#define RV32I_FUNCT12_OFFSET                    RV_FUNCT12_OFFSET
 
 #define RV32I_FUNCT12_ECALL                     0b0000000'00000
 #define RV32I_FUNCT12_EBREAK                    0b0000000'00001
@@ -174,7 +182,7 @@
 #define ENCODE_RV32I_SH(rs1, rs2, offset)           ENCODE_RVTYPE_S(RV_OPCODE_STORE, RV32I_FUNCT3_SH, rs1, rs2, offset)
 #define ENCODE_RV32I_SW(rs1, rs2, offset)           ENCODE_RVTYPE_S(RV_OPCODE_STORE, RV32I_FUNCT3_SW, rs1, rs2, offset)
 
-#define ENCODE_RV32I_FENCE(fm, pre, suc)            ENCODE_RVTYPE_I(RV_OPCODE_MISC_MEM, RV_FUNCT3_FENCE, 0, 0, ((fm << 8) | (pre << 4) | suc))
+#define ENCODE_RV32I_FENCE(fm, pre, suc)            ENCODE_RVTYPE_I(RV_OPCODE_MISC_MEM, RV32I_FUNCT3_FENCE, 0, 0, ((fm << 8) | (pre << 4) | suc))
 
 #define ENCODE_RV32I_ECALL                          ENCODE_RVTYPE_I(RV_OPCODE_SYSTEM, 0, 0, 0, RV32I_FUNCT12_ECALL)
 #define ENCODE_RV32I_EBREAK                         ENCODE_RVTYPE_I(RV_OPCODE_SYSTEM, 0, 0, 0, RV32I_FUNCT12_EBREAK)
