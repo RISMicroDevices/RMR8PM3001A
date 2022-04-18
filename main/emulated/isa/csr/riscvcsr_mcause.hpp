@@ -5,7 +5,7 @@
 // Machine Cause Register 'mcause'
 //
 
-#include "riscvcsr.hpp"
+#include "base/riscvcsr.hpp"
 
 // Interrupt field      - [63]  (MXLEN=64 only)
 #define CSR_mcause_FIELD_INTERRUPT_MX64_MASK            0x80000000'00000000UL

@@ -5,7 +5,7 @@
 // Machine Status Register upper 32 bits 'mstatush', RV32 only
 //
 
-#include "riscvcsr.hpp"
+#include "base/riscvcsr.hpp"
 
 // SBE field    - [4]
 #define CSR_mstatush_FIELD_SBE_MASK             0x00000010U

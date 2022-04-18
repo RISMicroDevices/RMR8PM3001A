@@ -5,7 +5,7 @@
 // Machine Trap-Vector Base-Address Register 'mtvec'
 //
 
-#include "riscvcsr.hpp"
+#include "base/riscvcsr.hpp"
 
 // MODE field   - [1:0]
 #define CSR_mtvec_FIELD_MODE_MASK                   0x00000003U

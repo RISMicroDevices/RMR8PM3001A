@@ -5,7 +5,7 @@
 // Machine Implementation ID Register 'mimpid'
 //
 
-#include "riscvcsr.hpp"
+#include "base/riscvcsr.hpp"
 
 #define CSR_mimpid_DEFAULT_AT_COMPILE                   0
 

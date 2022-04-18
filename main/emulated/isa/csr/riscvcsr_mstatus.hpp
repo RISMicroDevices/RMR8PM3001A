@@ -5,7 +5,7 @@
 // Machine Status Register 'mstatus'
 //
 
-#include "riscvcsr.hpp"
+#include "base/riscvcsr.hpp"
 
 // SIE field    - [1]
 #define CSR_mstatus_FIELD_SIE_MASK              0x00000002U

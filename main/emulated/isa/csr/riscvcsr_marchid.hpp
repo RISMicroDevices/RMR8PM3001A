@@ -5,7 +5,7 @@
 // Machine Architecture ID Register 'marchid'
 //
 
-#include "riscvcsr.hpp"
+#include "base/riscvcsr.hpp"
 
 #define CSR_marchid_DEFAULT_AT_COMPILE                0
 

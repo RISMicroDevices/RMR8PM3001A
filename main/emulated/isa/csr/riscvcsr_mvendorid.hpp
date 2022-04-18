@@ -5,7 +5,7 @@
 // Machine Vendor ID Register 'mvendorid'
 //
 
-#include "riscvcsr.hpp"
+#include "base/riscvcsr.hpp"
 
 #define CSR_mvendorid_DEFAULT_AT_COMPILE                0
 

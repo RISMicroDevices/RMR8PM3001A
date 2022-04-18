@@ -5,7 +5,7 @@
 // Machine Trap Value Register 'mtval'
 //
 
-#include "riscvcsr.hpp"
+#include "base/riscvcsr.hpp"
 
 
 //

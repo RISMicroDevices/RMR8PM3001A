@@ -5,7 +5,7 @@
 // Machine ISA Register 'misa'
 //
 
-#include "riscvcsr.hpp"
+#include "base/riscvcsr.hpp"
 
 #define CSR_misa_FIELD_MXL_DEF_XLEN32                   1
 #define CSR_misa_FIELD_MXL_DEF_XLEN64                   2
