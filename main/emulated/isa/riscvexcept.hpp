@@ -6,7 +6,7 @@
 //
 
 #include "riscv.hpp"
-#include "riscvcsr.hpp"
+#include "base/riscvcsr.hpp"
 
 #include "csr/riscvcsr_mstatus.hpp"
 #include "csr/riscvcsr_mcause.hpp"
