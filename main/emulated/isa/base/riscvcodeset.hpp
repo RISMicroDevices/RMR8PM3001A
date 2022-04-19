@@ -27,7 +27,9 @@ namespace Jasse {
         std::vector<const RVCodepoint*> codepoints;
 
     public:
+        RVCodepointCollection();
         RVCodepointCollection(std::initializer_list<const RVCodepoint*> codepoints);
+        RVCodepointCollection(std::initializer_list<RVCodepointCollection> collections);
         RVCodepointCollection(const RVCodepointCollection& obj);
         ~RVCodepointCollection();
 
@@ -57,9 +59,20 @@ namespace Jasse {
     std::vector<const RVCodepoint*> codepoints;
     */
 
+    RVCodepointCollection::RVCodepointCollection()
+        : codepoints()
+    { }
+
     RVCodepointCollection::RVCodepointCollection(std::initializer_list<const RVCodepoint*> codepoints)
         : codepoints(codepoints)
     { }
+
+    RVCodepointCollection::RVCodepointCollection(std::initializer_list<RVCodepointCollection> collections)
+        : codepoints()
+    {
+        for (auto& collection : collections)
+            this->AddAll(collection);
+    }
 
     RVCodepointCollection::RVCodepointCollection(const RVCodepointCollection& obj)
         : codepoints(obj.codepoints)
