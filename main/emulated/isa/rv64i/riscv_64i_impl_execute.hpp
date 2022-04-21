@@ -5,7 +5,7 @@
 // Base RV64I, bahaviour function implementations
 //
 
-#include "rv64i/riscv_64i_def_execute.hpp"
+#include "riscv_64i_def_execute.hpp"
 #include "riscvexcept.hpp"
 
 // executors

@@ -5,9 +5,9 @@
 // Base RV64I, exporting fields
 //
 
-#include "rv64i/riscv_64i_impl_execute.hpp"
-#include "rv64i/riscv_64i_impl_decode.hpp"
-#include "rv64i/riscv_64i_impl_encode.hpp"
+#include "riscv_64i_impl_execute.hpp"
+#include "riscv_64i_impl_decode.hpp"
+#include "riscv_64i_impl_encode.hpp"
 
 // RV Codepoint instance exporting
 namespace Jasse {

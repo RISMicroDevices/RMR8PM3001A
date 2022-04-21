@@ -6,10 +6,7 @@
 //
 
 #include "riscvmisc.hpp"
-#include "rv64i/riscv_64i_def_base.hpp"
-#include "rv64i/riscv_64i_def_execute.hpp"
-#include "rv64i/riscv_64i_def_decode.hpp"
-#include "rv64i/riscv_64i_def_encode.hpp"
+#include "riscv_64i_def_encode.hpp"
 
 #define __RV64I_DUCGEI(name) \
     &RV64ICodeGroup_Unique_##name, \

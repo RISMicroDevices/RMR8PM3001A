@@ -5,9 +5,9 @@
 // Base RV64I, decoding infrastructure implementations
 //
 
-#include "rv64i/riscv_64i_def_base.hpp"
-#include "rv64i/riscv_64i_def_decode.hpp"
-#include "rv64i/riscv_64i_def_export.hpp"
+#include "riscv_64i_def_base.hpp"
+#include "riscv_64i_def_decode.hpp"
+#include "riscv_64i_def_export.hpp"
 #include "riscvmisc.hpp"
 
 //

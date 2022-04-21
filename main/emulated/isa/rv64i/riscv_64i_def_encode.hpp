@@ -6,7 +6,7 @@
 //
 
 
-#include "rv64i/riscv_64i_def_base.hpp"
+#include "riscv_64i_def_base.hpp"
 
 //
 #define ENCODE_RV64I_SHx(funct3, funct6, rd, rs1, shamt) \

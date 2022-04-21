@@ -5,7 +5,7 @@
 // Base RV64I, exporting fields declarations
 //
 
-#include "rv64i/riscv_64i_def_decode.hpp"
+#include "riscv.hpp"
 
 // RV Codepoint instance exporting declarations
 namespace Jasse {
