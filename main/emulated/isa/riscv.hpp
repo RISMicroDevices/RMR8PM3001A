@@ -309,7 +309,7 @@ namespace Jasse {
             _GR64 = new RVGeneralRegisters64();
             break;
 
-        default:
+        [[unlikely]] default:
             _GR32 = nullptr;
             _GR64 = nullptr;
         }
@@ -349,7 +349,7 @@ namespace Jasse {
 
     void RVArchitectural::SetPC32(arch32_t pc)
     {
-        if (_XLEN != XLEN32)
+        [[unlikely]] if (_XLEN != XLEN32)
             throw std::logic_error("set 32-bit PC in non-32-XLEN arch");
 
         _PC.pc32 = pc;
@@ -357,7 +357,7 @@ namespace Jasse {
 
     void RVArchitectural::SetPC64(arch64_t pc)
     {
-        if (_XLEN != XLEN64)
+        [[unlikely]] if (_XLEN != XLEN64)
             throw std::logic_error("set 64-bit PC in non-64-XLEN arch");
 
         _PC.pc64 = pc;
@@ -375,7 +375,7 @@ namespace Jasse {
 
     const RVGeneralRegisters32* RVArchitectural::GR32() const
     {
-        if (!_GR32)
+        [[unlikely]] if (!_GR32)
             throw std::logic_error("non-GR32 arch");
 
         return _GR32;
@@ -383,7 +383,7 @@ namespace Jasse {
 
     RVGeneralRegisters32* RVArchitectural::GR32()
     {
-        if (!_GR32)
+        [[unlikely]] if (!_GR32)
             throw std::logic_error("non-GR32 arch");
 
         return _GR32;
@@ -391,7 +391,7 @@ namespace Jasse {
 
     const RVGeneralRegisters64* RVArchitectural::GR64() const
     {
-        if (!_GR64)
+        [[unlikely]] if (!_GR64)
             throw std::logic_error("non-GR64 arch");
         
         return _GR64;
@@ -399,7 +399,7 @@ namespace Jasse {
 
     RVGeneralRegisters64* RVArchitectural::GR64()
     {
-        if (!_GR64)
+        [[unlikely]] if (!_GR64)
             throw std::logic_error("non-GR64 arch");
         
         return _GR64;
@@ -414,7 +414,7 @@ namespace Jasse {
             return _GR64->Get(addr);
         else if (_GR32)
             return ZEXT_W(_GR32->Get(addr));
-        else
+        else [[unlikely]] 
             return 0;
     }
 
@@ -427,7 +427,7 @@ namespace Jasse {
             return _GR64->Get(addr);
         else if (_GR32)
             return SEXT_W(_GR32->Get(addr));
-        else
+        else [[unlikely]] 
             return 0;
     }
 
@@ -440,7 +440,7 @@ namespace Jasse {
             return (arch32_t) _GR64->Get(addr);
         else if (_GR32)
             return _GR32->Get(addr);
-        else
+        else [[unlikely]] 
             return 0;
     }
 
@@ -603,7 +603,7 @@ namespace Jasse {
                     rstatus = EXEC_FETCH_ADDRESS_MISALIGNED;
                     break;
 
-                default:
+                [[unlikely]] default:
                     SHOULD_NOT_REACH_HERE;
             }
 
