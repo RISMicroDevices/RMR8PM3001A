@@ -5,7 +5,7 @@
 // Base RV32I
 //
 
-#include "riscvdef.hpp"
+#include "base/riscvdef.hpp"
 #include "riscvmisc.hpp"
 
 // Function-3
