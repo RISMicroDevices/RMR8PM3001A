@@ -518,13 +518,21 @@ namespace Jasse {
         const std::string&      GetName() const noexcept;
         const RVCSRDefinition&  GetDefinition() const noexcept;
 
-        virtual RVCSR*          Clone() = 0;
-
         virtual bool            CheckBitBound(int bit) noexcept;
 
-        virtual csr_t           GetValue() noexcept = 0;
-        virtual void            SetValue(csr_t value) noexcept = 0;
-        virtual void            ResetValue() noexcept; // only implemented when RESET action is SPECIFIED
+        // *NOTICE: CSRs may have side effects on read or write, they are not specified to be pure.
+        //          And they might not be capable of getting or setting valid values without any
+        //          side effect.
+        //          - General read/write operations could be done by calling 'Read()' and 'Write(...)'.
+        //          - 'GetValue(...)' and 'SetValue(...)' would try to get/set CSR values without any
+        //          side effect. Otherwise nothing would be done and false would be returned.
+        //
+        virtual bool            GetValue(csr_t* dst) const noexcept = 0;
+        virtual bool            SetValue(csr_t value) noexcept = 0;
+
+        virtual csr_t           Read() noexcept = 0;
+        virtual void            Write(csr_t value) noexcept = 0;
+        //
 
         void                    operator=(const RVCSR& obj) = delete;
     };
@@ -581,7 +589,7 @@ namespace Jasse {
 
         public:
             SubspaceL2();
-            SubspaceL2(const SubspaceL2& obj);
+            SubspaceL2(const SubspaceL2& obj) = delete;
             ~SubspaceL2();
 
             RVCSR*  SetCSR(int index, const RVCSRAllocator allocator) noexcept;
@@ -598,7 +606,7 @@ namespace Jasse {
 
         public:
             SubspaceL1();
-            SubspaceL1(const SubspaceL1& obj);
+            SubspaceL1(const SubspaceL1& obj) = delete;
             ~SubspaceL1();
 
             RVCSR*  SetCSR(int index, const RVCSRAllocator allocator) noexcept;
@@ -618,7 +626,7 @@ namespace Jasse {
         RVCSRSpace() noexcept;
         RVCSRSpace(std::initializer_list<const RVCSRDefinition> list) noexcept;
         RVCSRSpace(const RVCSRList& list) noexcept;
-        RVCSRSpace(const RVCSRSpace& obj) noexcept;
+        RVCSRSpace(const RVCSRSpace& obj) = delete;
         ~RVCSRSpace() noexcept;
 
         bool                CheckBound(int index) const noexcept;
@@ -633,7 +641,7 @@ namespace Jasse {
 
         const RVCSRList&    ToList() const noexcept;
 
-        void                operator=(const RVCSRSpace& obj) noexcept;
+        void                operator=(const RVCSRSpace& obj) = delete;
     };
 }
 
@@ -706,9 +714,6 @@ namespace Jasse {
     {
         return bit >= 0 && bit < 64;
     }
-
-    void RVCSR::ResetValue() noexcept
-    { }
 }
 
 
@@ -721,16 +726,6 @@ namespace Jasse {
     RVCSRSpace::SubspaceL2::SubspaceL2()
         : csrs  (new RVCSR*[__RVCSRSPACE_SUB_L2_SIZE]())
     { }
-
-    RVCSRSpace::SubspaceL2::SubspaceL2(const SubspaceL2& obj)
-        : csrs  (new RVCSR*[__RVCSRSPACE_SUB_L2_SIZE])
-    {
-        for (int i = 0; i < __RVCSRSPACE_SUB_L2_SIZE; i++)
-            if (obj.csrs[i])
-                csrs[i] = obj.csrs[i]->Clone();
-            else
-                csrs[i] = nullptr;
-    }
 
     RVCSRSpace::SubspaceL2::~SubspaceL2()
     { 
@@ -772,16 +767,6 @@ namespace Jasse {
     RVCSRSpace::SubspaceL1::SubspaceL1()
         : subspaces (new SubspaceL2*[__RVCSRSPACE_SUB_L1_SIZE]())
     { }
-
-    RVCSRSpace::SubspaceL1::SubspaceL1(const SubspaceL1& obj)
-        : subspaces (new SubspaceL2*[__RVCSRSPACE_SUB_L1_SIZE])
-    { 
-        for (int i = 0; i < __RVCSRSPACE_SUB_L1_SIZE; i++)
-            if (obj.subspaces[i])
-                subspaces[i] = new SubspaceL2(*obj.subspaces[i]);
-            else
-                subspaces[i] = nullptr;
-    }
 
     RVCSRSpace::SubspaceL1::~SubspaceL1()
     {
@@ -926,16 +911,6 @@ namespace Jasse {
         SetCSRs(list);
     }
 
-    RVCSRSpace::RVCSRSpace(const RVCSRSpace& obj) noexcept
-        : RVCSRSpace()
-    {
-        for (int i = 0; i < __RVCSRSPACE_ARR_SIZE; i++)
-            if (obj.subspaces[i])
-                subspaces[i] = new SubspaceL1(*obj.subspaces[i]);
-            else
-                subspaces[i] = nullptr;
-    }
-
     RVCSRSpace::~RVCSRSpace() noexcept
     {
         for (int i = 0; i < __RVCSRSPACE_ARR_SIZE; i++)
@@ -1027,19 +1002,5 @@ namespace Jasse {
         }
 
         return list;
-    }
-
-    void RVCSRSpace::operator=(const RVCSRSpace& obj) noexcept
-    {
-        for (int i = 0; i < __RVCSRSPACE_ARR_SIZE; i++)
-        {
-            if (subspaces[i])
-                delete subspaces[i];
-
-            if (obj.subspaces[i])
-                subspaces[i] = new SubspaceL1(*obj.subspaces[i]);
-            else
-                subspaces[i] = nullptr;
-        }
     }
 }
