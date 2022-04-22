@@ -135,7 +135,7 @@ namespace Jasse::CSR {
     */
 
     RVCSR_mstatus::RVCSR_mstatus()
-        : RVCSR (CSR_mstatus, "mstatus")
+        : RVCSR (mstatus, "mstatus")
         , value (CSR_mstatus_DEFAULT_AT_COMPILE)
     { }
 

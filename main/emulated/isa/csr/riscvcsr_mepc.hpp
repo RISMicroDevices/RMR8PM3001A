@@ -47,7 +47,7 @@ namespace Jasse::CSR {
     */
 
     RVCSR_mepc::RVCSR_mepc()
-        : RVCSR (CSR_mepc, "mepc")
+        : RVCSR (mepc, "mepc")
         , value (CSR_mepc_DEFAULT_AT_COMPILE)
     { }
 

@@ -63,7 +63,7 @@ namespace Jasse::CSR {
     */
 
     RVCSR_mcause::RVCSR_mcause()
-        : RVCSR (CSR_mcause, "mcause")
+        : RVCSR (mcause, "mcause")
         , value (CSR_mcause_DEFAULT_AT_COMPILE)
     { }
 

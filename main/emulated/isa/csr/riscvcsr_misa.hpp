@@ -96,7 +96,7 @@ namespace Jasse::CSR {
     */
 
     RVCSR_misa::RVCSR_misa()
-        : RVCSR (CSR_misa, "misa")
+        : RVCSR (misa, "misa")
         , value (CSR_misa_DEFAULT_AT_COMPILE)
     { }
 

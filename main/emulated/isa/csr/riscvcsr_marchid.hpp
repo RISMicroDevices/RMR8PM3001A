@@ -45,7 +45,7 @@ namespace Jasse::CSR {
     */
 
     RVCSR_marchid::RVCSR_marchid()
-        : RVCSR (CSR_marchid, "marchid")
+        : RVCSR (marchid, "marchid")
         , value (CSR_marchid_DEFAULT_AT_COMPILE)
     { }
 

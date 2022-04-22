@@ -55,7 +55,7 @@ namespace Jasse::CSR {
     */
 
     RVCSR_mstatush::RVCSR_mstatush()
-        : RVCSR (CSR_mstatush, "mstatush")
+        : RVCSR (mstatush, "mstatush")
         , value (CSR_mstatush_DEFAULT_AT_COMPILE)
     { }
 

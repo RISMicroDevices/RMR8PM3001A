@@ -47,7 +47,7 @@ namespace Jasse::CSR {
     */
 
     RVCSR_mtval::RVCSR_mtval()
-        : RVCSR (CSR_mtval, "mtval")
+        : RVCSR (mtval, "mtval")
         , value (CSR_mtval_DEFAULT_AT_COMPILE)
     { }
 

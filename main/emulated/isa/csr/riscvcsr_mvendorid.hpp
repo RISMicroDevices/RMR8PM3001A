@@ -45,7 +45,7 @@ namespace Jasse::CSR {
     */
 
     RVCSR_mvendorid::RVCSR_mvendorid()
-        : RVCSR (CSR_mvendorid, "mvendorid")
+        : RVCSR (mvendorid, "mvendorid")
         , value (CSR_mvendorid_DEFAULT_AT_COMPILE)
     { }
 

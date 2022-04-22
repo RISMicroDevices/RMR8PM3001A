@@ -64,7 +64,7 @@ namespace Jasse::CSR {
     */
 
     RVCSR_mtvec::RVCSR_mtvec()
-        : RVCSR (CSR_mtvec, "mtvec")
+        : RVCSR (mtvec, "mtvec")
         , value (CSR_mtvec_DEFAULT_AT_COMPILE)
     { }
 

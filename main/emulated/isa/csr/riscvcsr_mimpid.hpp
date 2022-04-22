@@ -45,7 +45,7 @@ namespace Jasse::CSR {
     */
 
     RVCSR_mimpid::RVCSR_mimpid()
-        : RVCSR (CSR_mimpid, "mimpid")
+        : RVCSR (mimpid, "mimpid")
         , value (CSR_mimpid_DEFAULT_AT_COMPILE)
     { }
 
