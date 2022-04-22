@@ -39,10 +39,11 @@ namespace Jasse::CSR {
         RVCSR_mcause(const RVCSR_mcause& obj);
         ~RVCSR_mcause();
 
-        virtual RVCSR*          Clone();
+        virtual bool        GetValue(csr_t* dst) const noexcept override;
+        virtual bool        SetValue(csr_t value) noexcept override;
 
-        virtual csr_t           GetValue() noexcept;
-        virtual void            SetValue(csr_t value) noexcept;
+        virtual csr_t       Read() noexcept override;
+        virtual void        Write(csr_t value) noexcept override;
     };
 
     // CSR 'mcause' instance allocator
@@ -75,17 +76,24 @@ namespace Jasse::CSR {
     RVCSR_mcause::~RVCSR_mcause()
     { }
 
-    RVCSR* RVCSR_mcause::Clone()
+    bool RVCSR_mcause::GetValue(csr_t* dst) const noexcept
     {
-        return new RVCSR_mcause(*this);
+        *dst = value;
+        return true;
     }
 
-    csr_t RVCSR_mcause::GetValue() noexcept
+    bool RVCSR_mcause::SetValue(csr_t value) noexcept
+    {
+        this->value = value;
+        return true;
+    }
+
+    csr_t RVCSR_mcause::Read() noexcept
     {
         return value;
     }
 
-    void RVCSR_mcause::SetValue(csr_t value) noexcept
+    void RVCSR_mcause::Write(csr_t value) noexcept
     {
         this->value = value;
     }

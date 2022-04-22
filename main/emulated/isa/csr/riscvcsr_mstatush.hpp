@@ -31,10 +31,11 @@ namespace Jasse::CSR {
         RVCSR_mstatush(const RVCSR_mstatush& obj);
         ~RVCSR_mstatush();
 
-        virtual RVCSR*          Clone();
+        virtual bool        GetValue(csr_t* dst) const noexcept override;
+        virtual bool        SetValue(csr_t value) noexcept override;
 
-        virtual csr_t           GetValue() noexcept;
-        virtual void            SetValue(csr_t value) noexcept;
+        virtual csr_t       Read() noexcept override;
+        virtual void        Write(csr_t value) noexcept override;
     };
 
     // CSR 'mstatush' instance allocator
@@ -67,17 +68,24 @@ namespace Jasse::CSR {
     RVCSR_mstatush::~RVCSR_mstatush()
     { }
 
-    RVCSR* RVCSR_mstatush::Clone()
+    bool RVCSR_mstatush::GetValue(csr_t* dst) const noexcept
     {
-        return new RVCSR_mstatush(*this);
+        *dst = value;
+        return true;
     }
 
-    csr_t RVCSR_mstatush::GetValue() noexcept
+    bool RVCSR_mstatush::SetValue(csr_t value) noexcept
+    {
+        this->value = value;
+        return true;
+    }
+
+    csr_t RVCSR_mstatush::Read() noexcept
     {
         return value;
     }
 
-    void RVCSR_mstatush::SetValue(csr_t value) noexcept
+    void RVCSR_mstatush::Write(csr_t value) noexcept
     {
         this->value = value;
     }

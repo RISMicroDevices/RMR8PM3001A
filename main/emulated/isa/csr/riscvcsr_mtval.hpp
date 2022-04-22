@@ -23,10 +23,11 @@ namespace Jasse::CSR {
         RVCSR_mtval(const RVCSR_mtval& obj);
         ~RVCSR_mtval();
 
-        virtual RVCSR*          Clone();
+        virtual bool        GetValue(csr_t* dst) const noexcept override;
+        virtual bool        SetValue(csr_t value) noexcept override;
 
-        virtual csr_t           GetValue() noexcept;
-        virtual void            SetValue(csr_t value) noexcept;
+        virtual csr_t       Read() noexcept override;
+        virtual void        Write(csr_t value) noexcept override;
     };
 
     // CSR 'mtval' instance allocator
@@ -59,17 +60,24 @@ namespace Jasse::CSR {
     RVCSR_mtval::~RVCSR_mtval()
     { }
 
-    RVCSR* RVCSR_mtval::Clone()
+    bool RVCSR_mtval::GetValue(csr_t* dst) const noexcept
     {
-        return new RVCSR_mtval(*this);
+        *dst = value;
+        return true;
     }
 
-    csr_t RVCSR_mtval::GetValue() noexcept
+    bool RVCSR_mtval::SetValue(csr_t value) noexcept
+    {
+        this->value = value;
+        return true;
+    }
+
+    csr_t RVCSR_mtval::Read() noexcept
     {
         return value;
     }
 
-    void RVCSR_mtval::SetValue(csr_t value) noexcept
+    void RVCSR_mtval::Write(csr_t value) noexcept
     {
         this->value = value;
     }

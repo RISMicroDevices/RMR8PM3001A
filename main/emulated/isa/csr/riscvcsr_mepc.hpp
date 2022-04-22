@@ -23,10 +23,11 @@ namespace Jasse::CSR {
         RVCSR_mepc(const RVCSR_mepc& obj);
         ~RVCSR_mepc();
 
-        virtual RVCSR*          Clone();
+        virtual bool        GetValue(csr_t* dst) const noexcept override;
+        virtual bool        SetValue(csr_t value) noexcept override;
 
-        virtual csr_t           GetValue() noexcept;
-        virtual void            SetValue(csr_t value) noexcept;
+        virtual csr_t       Read() noexcept override;
+        virtual void        Write(csr_t value) noexcept override;
     };
 
     // CSR 'mepc' instance allocator
@@ -59,17 +60,24 @@ namespace Jasse::CSR {
     RVCSR_mepc::~RVCSR_mepc()
     { }
 
-    RVCSR* RVCSR_mepc::Clone()
+    bool RVCSR_mepc::GetValue(csr_t* dst) const noexcept
     {
-        return new RVCSR_mepc(*this);
+        *dst = value;
+        return true;
     }
 
-    csr_t RVCSR_mepc::GetValue() noexcept
+    bool RVCSR_mepc::SetValue(csr_t value) noexcept
+    {
+        this->value = value;
+        return true;
+    }
+
+    csr_t RVCSR_mepc::Read() noexcept
     {
         return value;
     }
 
-    void RVCSR_mepc::SetValue(csr_t value) noexcept
+    void RVCSR_mepc::Write(csr_t value) noexcept
     {
         this->value = value;
     }

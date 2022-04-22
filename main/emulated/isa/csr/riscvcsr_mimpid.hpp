@@ -21,10 +21,11 @@ namespace Jasse::CSR {
         RVCSR_mimpid(const RVCSR_mimpid& obj);
         ~RVCSR_mimpid();
 
-        virtual RVCSR*          Clone();
+        virtual bool        GetValue(csr_t* dst) const noexcept override;
+        virtual bool        SetValue(csr_t value) noexcept override;
 
-        virtual csr_t           GetValue() noexcept;
-        virtual void            SetValue(csr_t value) noexcept;
+        virtual csr_t       Read() noexcept override;
+        virtual void        Write(csr_t value) noexcept override;
     };
 
     // CSR 'mimpid' instance allocator
@@ -57,17 +58,24 @@ namespace Jasse::CSR {
     RVCSR_mimpid::~RVCSR_mimpid()
     { }
 
-    RVCSR* RVCSR_mimpid::Clone()
+    bool RVCSR_mimpid::GetValue(csr_t* dst) const noexcept
     {
-        return new RVCSR_mimpid(*this);
+        *dst = value;
+        return true;
     }
 
-    csr_t RVCSR_mimpid::GetValue() noexcept
+    bool RVCSR_mimpid::SetValue(csr_t value) noexcept
+    {
+        this->value = value;
+        return true;
+    }
+
+    csr_t RVCSR_mimpid::Read() noexcept
     {
         return value;
     }
 
-    void RVCSR_mimpid::SetValue(csr_t value) noexcept
+    void RVCSR_mimpid::Write(csr_t value) noexcept
     {
         this->value = value;
     }

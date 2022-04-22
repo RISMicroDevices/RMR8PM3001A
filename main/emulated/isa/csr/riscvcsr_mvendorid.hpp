@@ -21,10 +21,11 @@ namespace Jasse::CSR {
         RVCSR_mvendorid(const RVCSR_mvendorid& obj);
         ~RVCSR_mvendorid();
 
-        virtual RVCSR*          Clone();
+        virtual bool        GetValue(csr_t* dst) const noexcept override;
+        virtual bool        SetValue(csr_t value) noexcept override;
 
-        virtual csr_t           GetValue() noexcept;
-        virtual void            SetValue(csr_t value) noexcept;
+        virtual csr_t       Read() noexcept override;
+        virtual void        Write(csr_t value) noexcept override;
     };
 
     // CSR 'mvendorid' instance allocator
@@ -57,17 +58,24 @@ namespace Jasse::CSR {
     RVCSR_mvendorid::~RVCSR_mvendorid()
     { }
 
-    RVCSR* RVCSR_mvendorid::Clone()
+    bool RVCSR_mvendorid::GetValue(csr_t* dst) const noexcept
     {
-        return new RVCSR_mvendorid(*this);
+        *dst = value;
+        return true;
     }
 
-    csr_t RVCSR_mvendorid::GetValue() noexcept
+    bool RVCSR_mvendorid::SetValue(csr_t value) noexcept
+    {
+        this->value = value;
+        return true;
+    }
+
+    csr_t RVCSR_mvendorid::Read() noexcept
     {
         return value;
     }
 
-    void RVCSR_mvendorid::SetValue(csr_t value) noexcept
+    void RVCSR_mvendorid::Write(csr_t value) noexcept
     {
         this->value = value;
     }
