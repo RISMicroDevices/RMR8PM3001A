@@ -6,6 +6,7 @@
 //
 
 #include <cstdint>
+#include <vector>
 #include <string>
 #include <sstream>
 #include <iomanip>
@@ -90,6 +91,46 @@
 #define CSR_hpmcounter29h           0xC9D       // Performance-monitoring counter, RV32 only
 #define CSR_hpmcounter30h           0xC9E       // Performance-monitoring counter, RV32 only
 #define CSR_hpmcounter31h           0xC9F       // Performance-monitoring counter, RV32 only
+
+// .... Jasse defined MIMIC debugging registers (not in spec, Jasse CUSTOM)
+#define CSR_dmimic0                 0x800       // Debugging register 0
+#define CSR_dmimic1                 0x801       // Debugging register 1
+#define CSR_dmimic2                 0x802       // Debugging register 2
+#define CSR_dmimic3                 0x803       // Debugging register 3
+#define CSR_dmimic4                 0x804       // Debugging register 4
+#define CSR_dmimic5                 0x805       // Debugging register 5
+#define CSR_dmimic6                 0x806       // Debugging register 6
+#define CSR_dmimic7                 0x807       // Debugging register 7
+#define CSR_dmimic8                 0x808       // Debugging register 8
+#define CSR_dmimic9                 0x809       // Debugging register 9
+#define CSR_dmimic10                0x80A       // Debugging register 10
+#define CSR_dmimic11                0x80B       // Debugging register 11
+#define CSR_dmimic12                0x80C       // Debugging register 12
+#define CSR_dmimic13                0x80D       // Debugging register 13
+#define CSR_dmimic14                0x80E       // Debugging register 14
+#define CSR_dmimic15                0x80F       // Debugging register 15
+
+#define CSR_dmimicwinc0             0x810       // Debugging increase-on-write register 0
+#define CSR_dmimicwinc1             0x811       // Debugging increase-on-write register 1
+#define CSR_dmimicwinc2             0x812       // Debugging increase-on-write register 2
+#define CSR_dmimicwinc3             0x813       // Debugging increase-on-write register 3
+#define CSR_dmimicwinc4             0x814       // Debugging increase-on-write register 4
+#define CSR_dmimicwinc5             0x815       // Debugging increase-on-write register 5
+#define CSR_dmimicwinc6             0x816       // Debugging increase-on-write register 6
+#define CSR_dmimicwinc7             0x817       // Debugging increase-on-write register 7
+
+#define CSR_dmimicrinc0             0x820       // Debugging increase-on-read register 0
+#define CSR_dmimicrinc1             0x821       // Debugging increase-on-read register 1
+#define CSR_dmimicrinc2             0x822       // Debugging increase-on-read register 2
+#define CSR_dmimicrinc3             0x823       // Debugging increase-on-read register 3
+#define CSR_dmimicrinc4             0x824       // Debugging increase-on-read register 4
+#define CSR_dmimicrinc5             0x825       // Debugging increase-on-read register 5
+#define CSR_dmimicrinc6             0x826       // Debugging increase-on-read register 6
+#define CSR_dmimicrinc7             0x827       // Debugging increase-on-read register 7
+
+#define CSR_dmimicrdcnt             0x870       // Debugging MIMIC total-read counter register
+#define CSR_dmimicwrcnt             0x871       // Debugging MIMIC total-write counter register
+
 
 // .. Currently allocated RISC-V supervisor-level CSR addresses
 // .... Supervisor Trap Setup
@@ -407,6 +448,9 @@
 
 namespace Jasse {
 
+    // CSR address type
+    typedef     uint16_t        csraddr_t;
+
     // RV Privileged Level (for future implementation)
     typedef     uint32_t        RVPrivLevel;
 
@@ -442,23 +486,37 @@ namespace Jasse {
         CSR_MACHINE     // Machine-Level CSRs
     } RVCSRPrivLevel;
 
+
+    //
+    class RVCSR;
+
+    // CSR Allocator
+    typedef     RVCSR*      (*RVCSRAllocator)();
+
+    // CSR Definition
+    typedef struct {
+        csraddr_t       address : 12;   // CSR address
+        RVCSRAllocator  allocator;      // CSR allocator function
+    } RVCSRDefinition;
+
     // CSR
     class RVCSR {
     private:
-        const int           address;
+        const std::string       name;
 
-        const std::string   name;
+        const RVCSRDefinition   def;
 
     public:
-        RVCSR(int address, std::string name);
-        RVCSR(int address, const char* name);
+        RVCSR(const RVCSRDefinition& def, std::string name);
+        RVCSR(const RVCSRDefinition& def, const char* name);
         RVCSR(const RVCSR& obj);
         ~RVCSR();
 
-        int                     GetAddress() const noexcept;
+        csraddr_t               GetAddress() const noexcept;
         RVCSRPrivLevel          GetPrivLevel() const noexcept;
         RVCSRAccess             GetAccess() const noexcept;
         const std::string&      GetName() const noexcept;
+        const RVCSRDefinition&  GetDefinition() const noexcept;
 
         virtual RVCSR*          Clone() = 0;
 
@@ -471,15 +529,44 @@ namespace Jasse {
         void                    operator=(const RVCSR& obj) = delete;
     };
 
-    // CSR Allocator
-    typedef     RVCSR*      (*RVCSRAllocator)();
 
-    // CSR Definition
-    typedef struct {
-        uint16_t        address : 12;   // CSR address
-        RVCSRAllocator  allocator;      // CSR allocator function
-    } RVCSRDefinition;
+    //
+    class RVCSRList;
+    class RVCSRSpace;
 
+
+    // CSR List Iterator
+    using RVCSRListIterator      = std::vector<RVCSRDefinition>::iterator;
+    using RVCSRListConstIterator = std::vector<RVCSRDefinition>::const_iterator;
+
+    // CSR List
+    class RVCSRList {
+    private:
+        std::vector<RVCSRDefinition>  list;
+
+    public:
+        RVCSRList() noexcept;
+        RVCSRList(std::initializer_list<RVCSRDefinition> list) noexcept;
+        RVCSRList(const RVCSRList& obj) noexcept;
+        ~RVCSRList() noexcept;
+
+        int                     GetSize() const noexcept;
+
+        const RVCSRDefinition&  Get(int index) const noexcept;
+
+        void                    Add(const RVCSRDefinition& def) noexcept;
+        void                    AddAll(std::initializer_list<RVCSRDefinition> list) noexcept;
+        bool                    Remove(const RVCSRDefinition& def) noexcept;
+
+        void                    Clear() noexcept;
+
+        RVCSRListIterator       Begin() noexcept;
+        RVCSRListConstIterator  Begin() const noexcept;
+        RVCSRListIterator       End() noexcept;
+        RVCSRListConstIterator  End() const noexcept;
+    };
+
+    
     // CSR space
     class RVCSRSpace {
 
@@ -500,6 +587,8 @@ namespace Jasse {
             RVCSR*  SetCSR(int index, const RVCSRAllocator allocator) noexcept;
             RVCSR*  GetCSR(int index) noexcept;
 
+            void    ToList(RVCSRList& list) const noexcept;
+
             void    operator=(const SubspaceL2& obj) = delete;
         };
 
@@ -515,27 +604,36 @@ namespace Jasse {
             RVCSR*  SetCSR(int index, const RVCSRAllocator allocator) noexcept;
             RVCSR*  GetCSR(int index) noexcept;
 
+            void    ToList(RVCSRList& list) const noexcept;
+
             void    operator=(const SubspaceL1& obj) = delete;
         };
 
-        SubspaceL1**    subspaces;
+        SubspaceL1**        subspaces;
+
+        mutable RVCSRList   list;         // list conversion lazy cache
+        bool                list_unsync;
 
     public:
-        RVCSRSpace();
-        RVCSRSpace(std::initializer_list<const RVCSRDefinition> list);
-        RVCSRSpace(const RVCSRSpace& obj);
-        ~RVCSRSpace();
+        RVCSRSpace() noexcept;
+        RVCSRSpace(std::initializer_list<const RVCSRDefinition> list) noexcept;
+        RVCSRSpace(const RVCSRList& list) noexcept;
+        RVCSRSpace(const RVCSRSpace& obj) noexcept;
+        ~RVCSRSpace() noexcept;
 
-        bool    CheckBound(int index) const noexcept;
+        bool                CheckBound(int index) const noexcept;
 
-        void    SetCSRs(std::initializer_list<const RVCSRDefinition> list) noexcept;
-        RVCSR*  SetCSR(const RVCSRDefinition definition) noexcept;
-        RVCSR*  SetCSR(int address, const RVCSRAllocator allocator) noexcept;
-        RVCSR*  GetCSR(int address) const noexcept;
+        void                SetCSRs(std::initializer_list<const RVCSRDefinition> list) noexcept;
+        void                SetCSRs(const RVCSRList& list) noexcept;
+        RVCSR*              SetCSR(const RVCSRDefinition& definition) noexcept;
+        RVCSR*              SetCSR(int address, const RVCSRAllocator allocator) noexcept;
+        RVCSR*              GetCSR(int address) const noexcept;
         
-        RVCSR*  RequireCSR(int address, const char* hint_name = nullptr) const;
+        RVCSR*              RequireCSR(int address, const char* hint_name = nullptr) const;
 
-        void    operator=(const RVCSRSpace& obj);
+        const RVCSRList&    ToList() const noexcept;
+
+        void                operator=(const RVCSRSpace& obj) noexcept;
     };
 }
 
@@ -544,42 +642,42 @@ namespace Jasse {
 // Implementation of: class RVCSR
 namespace Jasse {
     /*
-    const int           address;
+    const std::string       name;
 
-    const std::string   name;
+    const RVCSRDefinition&  def;
     */
 
-    RVCSR::RVCSR(int address, std::string name)
-        : address   (address)
+    RVCSR::RVCSR(const RVCSRDefinition& def, std::string name)
+        : def       (def)
         , name      (name)
     { }
 
-    RVCSR::RVCSR(int address, const char* name)
-        : address   (address)
+    RVCSR::RVCSR(const RVCSRDefinition& def, const char* name)
+        : def       (def)
         , name      (std::string(name))
     { }
 
     RVCSR::RVCSR(const RVCSR& obj)
-        : address   (obj.address)
+        : def       (obj.def)
         , name      (obj.name)
     { }
 
     RVCSR::~RVCSR()
     { }
 
-    inline int RVCSR::GetAddress() const noexcept
+    inline csraddr_t RVCSR::GetAddress() const noexcept
     {
-        return address;
+        return def.address;
     }
 
-    RVCSRPrivLevel RVCSR::GetPrivLevel() const noexcept
+    inline RVCSRPrivLevel RVCSR::GetPrivLevel() const noexcept
     {
-        return RVCSRPrivLevel((address & 0x300) >> 8);
+        return RVCSRPrivLevel((def.address & 0x300) >> 8);
     }
 
     RVCSRAccess RVCSR::GetAccess() const noexcept
     {
-        switch ((address & 0xC00) >> 10)
+        switch ((def.address & 0xC00) >> 10)
         {
             case 0b00:
             case 0b01:
@@ -597,6 +695,11 @@ namespace Jasse {
     inline const std::string& RVCSR::GetName() const noexcept
     {
         return name;
+    }
+
+    inline const RVCSRDefinition& RVCSR::GetDefinition() const noexcept
+    {
+        return def;
     }
 
     bool RVCSR::CheckBitBound(int bit) noexcept
@@ -640,12 +743,22 @@ namespace Jasse {
 
     inline RVCSR* RVCSRSpace::SubspaceL2::SetCSR(int index, const RVCSRAllocator allocator) noexcept
     {
+        if (csrs[index & 0x00F])
+            delete csrs[index & 0x00F];
+
         return (csrs[index & 0x00F] = allocator());
     }
 
     inline RVCSR* RVCSRSpace::SubspaceL2::GetCSR(int index) noexcept
     {
         return csrs[index & 0x00F];
+    }
+
+    void RVCSRSpace::SubspaceL2::ToList(RVCSRList& list) const noexcept
+    {
+        for (int i = 0; i < __RVCSRSPACE_SUB_L2_SIZE; i++)
+            if (csrs[i])
+                list.Add(csrs[i]->GetDefinition());
     }
 }
 
@@ -698,6 +811,94 @@ namespace Jasse {
         else
             return subspaces[indexL1]->GetCSR(index);
     }
+
+    void RVCSRSpace::SubspaceL1::ToList(RVCSRList& list) const noexcept
+    {
+        for (int i = 0; i < __RVCSRSPACE_SUB_L1_SIZE; i++)
+            if (subspaces[i])
+                subspaces[i]->ToList(list);
+    }
+}
+
+
+// Implementation of: class RVCSRList
+namespace Jasse {
+    /*
+    std::vector<const RVCSRDefinition>  list;
+    */
+
+    RVCSRList::RVCSRList() noexcept
+        : list  ()
+    { }
+
+    RVCSRList::RVCSRList(std::initializer_list<RVCSRDefinition> list) noexcept
+        : list  (list)
+    { }
+
+    RVCSRList::RVCSRList(const RVCSRList& obj) noexcept
+        : list  (obj.list)
+    { }
+
+    RVCSRList::~RVCSRList() noexcept
+    { }
+
+    inline int RVCSRList::GetSize() const noexcept
+    {
+        return list.size();
+    }
+
+    inline const RVCSRDefinition& RVCSRList::Get(int index) const noexcept
+    {
+        return list[index];
+    }
+
+    inline void RVCSRList::Add(const RVCSRDefinition& def) noexcept
+    {
+        list.push_back(def);
+    }
+
+    void RVCSRList::AddAll(std::initializer_list<RVCSRDefinition> def) noexcept
+    {
+        for (auto& d : def)
+            list.push_back(d);
+    }
+
+    bool RVCSRList::Remove(const RVCSRDefinition& def) noexcept
+    {
+        for (auto iter = list.begin(); iter != list.end(); iter++)
+            if (iter->address == def.address)
+            {
+                iter = list.erase(iter);
+                return true;
+            }
+        
+        return false;
+    }
+
+    inline void RVCSRList::Clear() noexcept
+    {
+        list.clear();
+    }
+
+    inline RVCSRListIterator RVCSRList::Begin() noexcept
+    {
+        return list.begin();
+    }
+
+    inline RVCSRListConstIterator RVCSRList::Begin() const noexcept
+    {
+        return list.begin();
+    }
+
+    inline RVCSRListIterator RVCSRList::End() noexcept
+    {
+        return list.end();
+    }
+
+    inline RVCSRListConstIterator RVCSRList::End() const noexcept
+    {
+        return list.end();
+    }
 }
 
 
@@ -707,18 +908,26 @@ namespace Jasse {
     SubspaceL1**    subspaces;
     */
 
-    RVCSRSpace::RVCSRSpace()
-        : subspaces (new SubspaceL1*[__RVCSRSPACE_ARR_SIZE]())
+    RVCSRSpace::RVCSRSpace() noexcept
+        : subspaces     (new SubspaceL1*[__RVCSRSPACE_ARR_SIZE]())
+        , list          ()
+        , list_unsync   (true)
     { }
 
-    RVCSRSpace::RVCSRSpace(std::initializer_list<const RVCSRDefinition> list)
-        : subspaces (new SubspaceL1*[__RVCSRSPACE_ARR_SIZE]())
+    RVCSRSpace::RVCSRSpace(std::initializer_list<const RVCSRDefinition> list) noexcept
+        : RVCSRSpace()
     { 
         SetCSRs(list);
     }
 
-    RVCSRSpace::RVCSRSpace(const RVCSRSpace& obj)
-        : subspaces (new SubspaceL1*[__RVCSRSPACE_ARR_SIZE]())
+    RVCSRSpace::RVCSRSpace(const RVCSRList& list) noexcept
+        : RVCSRSpace()
+    {
+        SetCSRs(list);
+    }
+
+    RVCSRSpace::RVCSRSpace(const RVCSRSpace& obj) noexcept
+        : RVCSRSpace()
     {
         for (int i = 0; i < __RVCSRSPACE_ARR_SIZE; i++)
             if (obj.subspaces[i])
@@ -727,7 +936,7 @@ namespace Jasse {
                 subspaces[i] = nullptr;
     }
 
-    RVCSRSpace::~RVCSRSpace()
+    RVCSRSpace::~RVCSRSpace() noexcept
     {
         for (int i = 0; i < __RVCSRSPACE_ARR_SIZE; i++)
             if (subspaces[i])
@@ -747,13 +956,21 @@ namespace Jasse {
             SetCSR(*iter);
     }
 
-    inline RVCSR* RVCSRSpace::SetCSR(const RVCSRDefinition definition) noexcept
+    void RVCSRSpace::SetCSRs(const RVCSRList& list) noexcept
+    {
+        for (auto iter = list.Begin(); iter != list.End(); iter++)
+            SetCSR(*iter);
+    }
+
+    inline RVCSR* RVCSRSpace::SetCSR(const RVCSRDefinition& definition) noexcept
     {
         return SetCSR(definition.address, definition.allocator);
     }
 
     RVCSR* RVCSRSpace::SetCSR(int address, const RVCSRAllocator allocator) noexcept
     {
+        list_unsync = true;
+
         int index = (address & 0xF00) >> 8;
 
         if (!subspaces[index])
@@ -798,7 +1015,21 @@ namespace Jasse {
         return csr; 
     }
 
-    void RVCSRSpace::operator=(const RVCSRSpace& obj)
+    const RVCSRList& RVCSRSpace::ToList() const noexcept
+    {
+        if (list_unsync)
+        {
+            list.Clear();
+
+            for (int i = 0; i < __RVCSRSPACE_ARR_SIZE; i++)
+                if (subspaces[i])
+                    subspaces[i]->ToList(list);
+        }
+
+        return list;
+    }
+
+    void RVCSRSpace::operator=(const RVCSRSpace& obj) noexcept
     {
         for (int i = 0; i < __RVCSRSPACE_ARR_SIZE; i++)
         {
@@ -812,4 +1043,3 @@ namespace Jasse {
         }
     }
 }
-
