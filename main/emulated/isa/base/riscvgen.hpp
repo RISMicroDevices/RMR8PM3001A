@@ -82,6 +82,9 @@ namespace Jasse {
         RVCodeGenConstraint*** constraints;
 
         template<class TTrait>
+        RVCodeGenConstraint*& __AddressAndEnsure(const TTrait& trait) noexcept;
+
+        template<class TTrait>
         RVCodeGenConstraint*& __AddressAndReplace(const TTrait& trait) noexcept;
 
     public:
@@ -96,7 +99,12 @@ namespace Jasse {
             const TConstraint&                              constraint) noexcept;
 
         template<class TConstraint, class... Args>
-        void                Emplace(
+        TConstraint*        Emplace(
+            const RVCodeGenConstraintTrait<TConstraint>&    trait,
+            Args...                                         args) noexcept;
+
+        template<class TConstraint, class... Args>
+        TConstraint*        EmplaceIfAbsent(
             const RVCodeGenConstraintTrait<TConstraint>&    trait,
             Args...                                         args) noexcept;
 
@@ -298,14 +306,20 @@ namespace Jasse {
     }
 
     template<class TTrait>
-    inline RVCodeGenConstraint*& RVCodeGenConstraints::__AddressAndReplace(const TTrait& trait) noexcept
+    inline RVCodeGenConstraint*& RVCodeGenConstraints::__AddressAndEnsure(const TTrait& trait) noexcept
     {
         RVCodeGenConstraint**& l1 = constraints[trait.GetTypeCode()];
 
         if (!l1)
             l1 = new RVCodeGenConstraint*[1 << 4]();
 
-        RVCodeGenConstraint*&  l2 = l1[trait.GetOrdinal()];
+        return l1[trait.GetOrdinal()];
+    }
+
+    template<class TTrait>
+    inline RVCodeGenConstraint*& RVCodeGenConstraints::__AddressAndReplace(const TTrait& trait) noexcept
+    {
+        RVCodeGenConstraint*& l2 = __AddressAndEnsure(trait);
 
         if (l2)
             delete l2;
@@ -321,10 +335,19 @@ namespace Jasse {
     }
 
     template<class TConstraint, class... Args>
-    void RVCodeGenConstraints::Emplace(const RVCodeGenConstraintTrait<TConstraint>&    trait,
-                                       Args...                                         args) noexcept
+    TConstraint* RVCodeGenConstraints::Emplace(const RVCodeGenConstraintTrait<TConstraint>&    trait,
+                                               Args...                                         args) noexcept
     {
-        __AddressAndReplace(trait) = static_cast<RVCodeGenConstraint*>(new TConstraint(trait.GetCode(), args...));
+        return static_cast<TConstraint*>(
+            __AddressAndReplace(trait) = static_cast<RVCodeGenConstraint*>(new TConstraint(trait.GetCode(), args...)));
+    }
+
+    template<class TConstraint, class... Args>
+    TConstraint* RVCodeGenConstraints::EmplaceIfAbsent(const RVCodeGenConstraintTrait<TConstraint>& trait,
+                                                       Args...                                      args) noexcept
+    {
+        return static_cast<TConstraint*>(
+            __AddressAndEnsure(trait) = static_cast<RVCodeGenConstraint*>(new TConstraint(trait.GetCode(), args...)));
     }
 
     template<class TConstraint>
