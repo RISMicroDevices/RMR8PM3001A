@@ -6,6 +6,7 @@
 //
 
 #include "riscvmisc.hpp"
+#include "riscvgenutil.hpp"
 #include "riscv_64m_def_encode.hpp"
 
 
