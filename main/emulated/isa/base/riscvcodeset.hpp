@@ -39,9 +39,9 @@ namespace Jasse {
         void                        Set(int index, const RVCodepoint* codepoint);
         void                        Add(const RVCodepoint* codepoint);
         void                        AddAll(const RVCodepointCollection& another);
-        void                        Remove(int index);
-        void                        Remove(RVCodepointConstIterator pos);
-        void                        Remove(RVCodepointConstIterator first, RVCodepointConstIterator last);
+        void                        Erase(const RVCodepoint* codepoint);
+        void                        Erase(RVCodepointConstIterator pos);
+        void                        Erase(RVCodepointConstIterator first, RVCodepointConstIterator last);
         void                        Clear();
 
         RVCodepointIterator         Begin();
@@ -101,17 +101,17 @@ namespace Jasse {
         codepoints.push_back(codepoint);
     }
 
-    inline void RVCodepointCollection::Remove(int index)
+    inline void RVCodepointCollection::Erase(const RVCodepoint* codepoint)
     {
-        codepoints.erase(codepoints.begin() + index);
+        codepoints.erase(std::remove(codepoints.begin(), codepoints.end(), codepoint), codepoints.end());
     }
 
-    inline void RVCodepointCollection::Remove(RVCodepointConstIterator pos)
+    inline void RVCodepointCollection::Erase(RVCodepointConstIterator pos)
     {
         codepoints.erase(pos);
     }
 
-    inline void RVCodepointCollection::Remove(RVCodepointConstIterator first, RVCodepointConstIterator last)
+    inline void RVCodepointCollection::Erase(RVCodepointConstIterator first, RVCodepointConstIterator last)
     {
         codepoints.erase(first, last);
     }
