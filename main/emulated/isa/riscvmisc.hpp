@@ -7,6 +7,8 @@
 
 #include "riscv.hpp"
 
+#define RV_GENERAL_REGISTER_TEXTUALIZE_AS_ABI           false
+
 
 #define ENCODE_STD_OPERAND(val, name) \
     ((val & (name##_MASK >> name##_OFFSET)) << name##_OFFSET)
@@ -274,6 +276,30 @@ namespace Jasse {
 
 // Implementation of Instruction Textualizers
 namespace Jasse {
+#if RV_GENERAL_REGISTER_TEXTUALIZE_AS_ABI
+    std::string TextualizeRVGR(int GR) noexcept
+    {
+        // ABI-form
+
+        static const std::string ABI_NAMES[] = {
+            "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", "s0", "s1", "a0", "a1", "a2", "a3",
+            "a4", "a5", "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11",
+            "t3", "t4", "t5", "t6",
+        };
+
+        if (GR < 0 || GR > 31)
+        {
+            std::ostringstream oss;
+
+            oss << "x";
+            oss << GR;
+
+            return oss.str();
+        }
+
+        return ABI_NAMES[GR];
+    }
+#else
     std::string TextualizeRVGR(int GR) noexcept
     {
         std::ostringstream oss;
@@ -283,13 +309,8 @@ namespace Jasse {
 
         return oss.str();
     }
-
-    std::string TextualizeRVGR_ABI(int GR) noexcept
-    {
-        // TODO
-
-        return std::string();
-    }
+    
+#endif
 
     std::string TextualizeRVTypeR(const RVInstruction& insn) noexcept
     {
