@@ -14,6 +14,10 @@
 #include <initializer_list>
 
 
+#define csrdef                      static const RVCSRDefinition
+#define csrdecl                     extern const RVCSRDefinition
+
+//
 #define CSR_ADDRESS_MASK            0xFFF
 
 //
@@ -489,6 +493,8 @@ namespace Jasse {
 
     //
     class RVCSR;
+    class RVCSRList;
+    class RVCSRSpace;
 
     // CSR Allocator
     typedef     RVCSR*      (*RVCSRAllocator)();
@@ -496,19 +502,17 @@ namespace Jasse {
     // CSR Definition
     typedef struct {
         csraddr_t       address : 12;   // CSR address
+        std::string     name;           // CSR name
         RVCSRAllocator  allocator;      // CSR allocator function
     } RVCSRDefinition;
 
     // CSR
     class RVCSR {
     private:
-        const std::string       name;
-
         const RVCSRDefinition   def;
 
     public:
-        RVCSR(const RVCSRDefinition& def, std::string name);
-        RVCSR(const RVCSRDefinition& def, const char* name);
+        RVCSR(const RVCSRDefinition& def);
         RVCSR(const RVCSR& obj);
         ~RVCSR();
 
@@ -530,8 +534,8 @@ namespace Jasse {
         virtual bool            GetValue(csr_t* dst) const noexcept = 0;
         virtual bool            SetValue(csr_t value) noexcept = 0;
 
-        virtual csr_t           Read() noexcept = 0;
-        virtual void            Write(csr_t value) noexcept = 0;
+        virtual csr_t           Read(RVCSRSpace* CSRs) noexcept = 0;
+        virtual void            Write(RVCSRSpace* CSRs, csr_t value) noexcept = 0;
         //
 
         void                    operator=(const RVCSR& obj) = delete;
@@ -564,7 +568,10 @@ namespace Jasse {
 
         void                    Add(const RVCSRDefinition& def) noexcept;
         void                    AddAll(std::initializer_list<RVCSRDefinition> list) noexcept;
-        bool                    Remove(const RVCSRDefinition& def) noexcept;
+        void                    Erase(csraddr_t addr) noexcept;
+        void                    Erase(const RVCSRDefinition& def) noexcept;
+        void                    Erase(RVCSRListConstIterator pos) noexcept;
+        void                    Erase(RVCSRListConstIterator first, RVCSRListConstIterator last) noexcept;
 
         void                    Clear() noexcept;
 
@@ -636,8 +643,10 @@ namespace Jasse {
         RVCSR*              SetCSR(const RVCSRDefinition& definition) noexcept;
         RVCSR*              SetCSR(int address, const RVCSRAllocator allocator) noexcept;
         RVCSR*              GetCSR(int address) const noexcept;
+        RVCSR*              GetCSR(const RVCSRDefinition& definition) const noexcept;
         
         RVCSR*              RequireCSR(int address, const char* hint_name = nullptr) const;
+        RVCSR*              RequireCSR(const RVCSRDefinition& definition) const;
 
         const RVCSRList&    ToList() const noexcept;
 
@@ -655,19 +664,12 @@ namespace Jasse {
     const RVCSRDefinition&  def;
     */
 
-    RVCSR::RVCSR(const RVCSRDefinition& def, std::string name)
+    RVCSR::RVCSR(const RVCSRDefinition& def)
         : def       (def)
-        , name      (name)
-    { }
-
-    RVCSR::RVCSR(const RVCSRDefinition& def, const char* name)
-        : def       (def)
-        , name      (std::string(name))
     { }
 
     RVCSR::RVCSR(const RVCSR& obj)
         : def       (obj.def)
-        , name      (obj.name)
     { }
 
     RVCSR::~RVCSR()
@@ -702,7 +704,7 @@ namespace Jasse {
 
     inline const std::string& RVCSR::GetName() const noexcept
     {
-        return name;
+        return def.name;
     }
 
     inline const RVCSRDefinition& RVCSR::GetDefinition() const noexcept
@@ -848,16 +850,30 @@ namespace Jasse {
             list.push_back(d);
     }
 
-    bool RVCSRList::Remove(const RVCSRDefinition& def) noexcept
+    void RVCSRList::Erase(csraddr_t addr) noexcept
     {
-        for (auto iter = list.begin(); iter != list.end(); iter++)
-            if (iter->address == def.address)
-            {
-                iter = list.erase(iter);
-                return true;
-            }
-        
-        return false;
+        list.erase(std::remove_if(list.begin(), list.end(), 
+            [=] (const RVCSRDefinition& _def) -> bool {
+                return _def.address == addr;
+            }), list.end());
+    }
+
+    void RVCSRList::Erase(const RVCSRDefinition& def) noexcept
+    {
+        list.erase(std::remove_if(list.begin(), list.end(), 
+            [=] (const RVCSRDefinition& _def) -> bool {
+                return _def.address == def.address && _def.name.compare(def.name) == 0;
+            }), list.end());
+    }
+
+    void RVCSRList::Erase(RVCSRListConstIterator pos) noexcept
+    {
+        list.erase(pos);
+    }
+
+    void RVCSRList::Erase(RVCSRListConstIterator first, RVCSRListConstIterator last) noexcept
+    {
+        list.erase(first, last);
     }
 
     inline void RVCSRList::Clear() noexcept
@@ -964,6 +980,16 @@ namespace Jasse {
             return subspaces[index]->GetCSR(address);
     }
 
+    inline RVCSR* RVCSRSpace::GetCSR(const RVCSRDefinition& definition) const noexcept
+    {
+        RVCSR* csr = GetCSR(definition.address);
+
+        if (!csr || csr->GetDefinition().name.compare(definition.name))
+            return nullptr;
+
+        return csr;
+    }
+
     RVCSR* RVCSRSpace::RequireCSR(int address, const char* hint_name) const
     {
         int index = (address & 0xF00) >> 8;
@@ -988,6 +1014,11 @@ namespace Jasse {
         }
         
         return csr; 
+    }
+
+    inline RVCSR* RVCSRSpace::RequireCSR(const RVCSRDefinition& definition) const
+    {
+        return RequireCSR(definition.address, definition.name.c_str());
     }
 
     const RVCSRList& RVCSRSpace::ToList() const noexcept
