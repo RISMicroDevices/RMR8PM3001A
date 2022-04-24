@@ -28,15 +28,15 @@ namespace Jasse {
         uint64_t    upper_range;
 
     public:
-        RVCodeGenConstraintRangeI(int code, uint64_t lower_range, uint64_t upper_range);
-        RVCodeGenConstraintRangeI(const RVCodeGenConstraintRangeI& obj);
-        ~RVCodeGenConstraintRangeI();
+        RVCodeGenConstraintRangeI(int code, uint64_t lower_range, uint64_t upper_range) noexcept;
+        RVCodeGenConstraintRangeI(const RVCodeGenConstraintRangeI& obj) noexcept;
+        ~RVCodeGenConstraintRangeI() noexcept;
 
-        void        SetLowerRange(uint64_t lower_range);
-        void        SetUpperRange(uint64_t upper_range);
+        void        SetLowerRange(uint64_t lower_range) noexcept;
+        void        SetUpperRange(uint64_t upper_range) noexcept;
 
-        uint64_t    GetLowerRange() const;
-        uint64_t    GetUpperRange() const;
+        uint64_t    GetLowerRange() const noexcept;
+        uint64_t    GetUpperRange() const noexcept;
     };
 
     // RISC-V Code Generator CSR-List constraint
@@ -45,9 +45,17 @@ namespace Jasse {
         RVCSRList   list;
 
     public:
-        
+        RVCodeGenConstraintCSRList(int code) noexcept;
+        RVCodeGenConstraintCSRList(int code, const RVCSRList& list) noexcept;
+        RVCodeGenConstraintCSRList(const RVCodeGenConstraintCSRList& obj) noexcept;
+        ~RVCodeGenConstraintCSRList() noexcept;
 
-        // TODO
+        int                 GetSize() const noexcept;
+
+        RVCSRList&          GetList() noexcept;
+        const RVCSRList&    GetList() const noexcept;
+
+        void                SetList(const RVCSRList& list) noexcept;
     };
 }
 
@@ -76,38 +84,79 @@ namespace Jasse {
     uint64_t    upper_range;
     */
 
-    RVCodeGenConstraintRangeI::RVCodeGenConstraintRangeI(int code, uint64_t lower_range, uint64_t upper_range)
+    RVCodeGenConstraintRangeI::RVCodeGenConstraintRangeI(int code, uint64_t lower_range, uint64_t upper_range) noexcept
         : RVCodeGenConstraint   (code)
         , lower_range           (lower_range)
         , upper_range           (upper_range)
     { }
 
-    RVCodeGenConstraintRangeI::RVCodeGenConstraintRangeI(const RVCodeGenConstraintRangeI& obj)
+    RVCodeGenConstraintRangeI::RVCodeGenConstraintRangeI(const RVCodeGenConstraintRangeI& obj) noexcept
         : RVCodeGenConstraint   (obj)
         , lower_range           (obj.lower_range)
         , upper_range           (obj.upper_range)
     { }
 
-    RVCodeGenConstraintRangeI::~RVCodeGenConstraintRangeI()
+    RVCodeGenConstraintRangeI::~RVCodeGenConstraintRangeI() noexcept
     { }
 
-    inline uint64_t RVCodeGenConstraintRangeI::GetUpperRange() const
+    inline uint64_t RVCodeGenConstraintRangeI::GetUpperRange() const noexcept
     {
         return upper_range;
     }
 
-    inline uint64_t RVCodeGenConstraintRangeI::GetLowerRange() const
+    inline uint64_t RVCodeGenConstraintRangeI::GetLowerRange() const noexcept
     {
         return lower_range;
     }
 
-    inline void RVCodeGenConstraintRangeI::SetUpperRange(uint64_t upper_range)
+    inline void RVCodeGenConstraintRangeI::SetUpperRange(uint64_t upper_range) noexcept
     {
         this->upper_range = upper_range;
     }
 
-    inline void RVCodeGenConstraintRangeI::SetLowerRange(uint64_t lower_range)
+    inline void RVCodeGenConstraintRangeI::SetLowerRange(uint64_t lower_range) noexcept
     {
         this->lower_range = lower_range;
+    }
+}
+
+
+// Implementation of: class RVCodeGenConstraintCSRList
+namespace Jasse {
+    /*
+    RVCSRList   list;
+    */
+
+    RVCodeGenConstraintCSRList::RVCodeGenConstraintCSRList(int code, const RVCSRList& list) noexcept
+        : RVCodeGenConstraint   (code)
+        , list                  (list)
+    { }
+
+    RVCodeGenConstraintCSRList::RVCodeGenConstraintCSRList(const RVCodeGenConstraintCSRList& obj) noexcept
+        : RVCodeGenConstraint   (obj)
+        , list                  (obj.list)
+    { }
+
+    RVCodeGenConstraintCSRList::~RVCodeGenConstraintCSRList() noexcept
+    { }
+
+    inline int RVCodeGenConstraintCSRList::GetSize() const noexcept
+    {
+        return list.GetSize();
+    }
+
+    inline RVCSRList& RVCodeGenConstraintCSRList::GetList() noexcept
+    {
+        return list;
+    }
+
+    inline const RVCSRList& RVCodeGenConstraintCSRList::GetList() const noexcept
+    {
+        return list;
+    }
+
+    inline void RVCodeGenConstraintCSRList::SetList(const RVCSRList& list) noexcept
+    {
+        this->list = list;
     }
 }
