@@ -140,11 +140,12 @@ namespace Jasse {
         RVInstance(const RVDecoderCollection&   decoders,
                    RVArchitectural&&            arch,
                    RVMemoryInterface*           MI,
-                   const RVCSRSpace&            CSRs,
+                   const RVCSRList&             CSRs,
                    RVExecEEIHandler             exec_handler) noexcept;
 
         RVInstance() = delete;
-        RVInstance(const RVInstance& obj) noexcept;
+        RVInstance(const RVInstance& obj) = delete;
+        
         ~RVInstance() noexcept;
 
         RVDecoderCollection&            GetDecoders() noexcept;
@@ -176,7 +177,7 @@ namespace Jasse {
 
         RVMemoryInterface*      _MI;
             
-        RVCSRSpace              _CSR;        // inner-constructed
+        RVCSRList               _CSR;        // inner-constructed
 
         RVDecoderCollection     _decoders;   // inner-constructed
 
@@ -204,14 +205,14 @@ namespace Jasse {
 
         Builder&                    CSR(const RVCSRDefinition& CSR) noexcept;
         Builder&                    CSR(const RVCSRDefinition& CSR, csr_t init_value) noexcept;
-        Builder&                    CSR(std::initializer_list<const RVCSRDefinition> CSRs) noexcept;
+        Builder&                    CSR(std::initializer_list<RVCSRDefinition> CSRs) noexcept;
 
         Builder&                    ExecEEI(RVExecEEIHandler exec_handler) noexcept;
 
         arch32_t                    GR32(int address) const noexcept;
         arch64_t                    GR64(int address) const noexcept;
-        RVCSRSpace&                 CSR() noexcept;
-        const RVCSRSpace&           CSR() const noexcept;
+        RVCSRList&                  CSR() noexcept;
+        const RVCSRList&            CSR() const noexcept;
         RVDecoderCollection&        Decoder() noexcept;
         const RVDecoderCollection&  Decoder() const noexcept;
         RVExecEEIHandler&           ExecEEI() noexcept;
@@ -496,21 +497,13 @@ namespace Jasse {
     RVInstance::RVInstance(const RVDecoderCollection&   decoders,
                            RVArchitectural&&            arch,
                            RVMemoryInterface*           MI,
-                           const RVCSRSpace&            CSRs,
+                           const RVCSRList&             CSRs,
                            RVExecEEIHandler             exec_handler) noexcept
         : decoders      (decoders)
         , arch          (arch)
         , MI            (MI)
         , CSRs          (CSRs)
         , exec_handler  (exec_handler)
-    { }
-
-    RVInstance::RVInstance(const RVInstance& obj) noexcept
-        : decoders      (obj.decoders)
-        , arch          (obj.arch)
-        , MI            (obj.MI)
-        , CSRs          (obj.CSRs)
-        , exec_handler  (obj.exec_handler)
     { }
 
     RVInstance::~RVInstance() noexcept
@@ -662,7 +655,7 @@ namespace Jasse {
 
     RVMemoryInterface*      _MI;
             
-    RVCSRSpace              _CSR;        // inner-constructed
+    RVCSRList               _CSR;        // inner-constructed
 
     RVDecoderCollection     _decoders;   // inner-constructed
 
@@ -740,19 +733,13 @@ namespace Jasse {
 
     inline RVInstance::Builder& RVInstance::Builder::CSR(const RVCSRDefinition& CSR) noexcept
     {
-        this->_CSR.SetCSR(CSR);
+        this->_CSR.Add(CSR);
         return *this;
     }
 
-    inline RVInstance::Builder& RVInstance::Builder::CSR(const RVCSRDefinition& CSR, csr_t init_value) noexcept
+    inline RVInstance::Builder& RVInstance::Builder::CSR(std::initializer_list<RVCSRDefinition> CSRs) noexcept
     {
-        this->_CSR.SetCSR(CSR)->SetValue(init_value);
-        return *this;
-    }
-
-    inline RVInstance::Builder& RVInstance::Builder::CSR(std::initializer_list<const RVCSRDefinition> CSRs) noexcept
-    {
-        this->_CSR.SetCSRs(CSRs);
+        this->_CSR.AddAll(CSRs);
         return *this;
     }
 
@@ -772,12 +759,12 @@ namespace Jasse {
         return _GR.Get(address);
     }
 
-    inline RVCSRSpace& RVInstance::Builder::CSR() noexcept
+    inline RVCSRList& RVInstance::Builder::CSR() noexcept
     {
         return _CSR;
     }
 
-    inline const RVCSRSpace& RVInstance::Builder::CSR() const noexcept
+    inline const RVCSRList& RVInstance::Builder::CSR() const noexcept
     {
         return _CSR;
     }
