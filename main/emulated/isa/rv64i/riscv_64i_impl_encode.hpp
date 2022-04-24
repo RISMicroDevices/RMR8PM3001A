@@ -6,6 +6,7 @@
 //
 
 #include "riscvmisc.hpp"
+#include "riscvgenutil.hpp"
 #include "riscv_64i_def_encode.hpp"
 
 #define __RV64I_DUCGEI(name) \
