@@ -78,7 +78,7 @@ namespace Jasse {
 
         // Write 'mepc' CSR
         CSRs->RequireCSR(CSR_mepc, "mepc")
-            ->SetValue(arch->PC().pc64); // always zero-extended in XLEN=32, actually doesn't matter
+            ->Write(CSRs, arch->PC().pc64); // always zero-extended in XLEN=32, actually doesn't matter
         
 
         // Write 'mcause' CSR
@@ -96,13 +96,13 @@ namespace Jasse {
         }
 
         CSRs->RequireCSR(CSR_mcause, "mcause")
-            ->SetValue(mcause);
+            ->Write(CSRs, mcause);
         
 
         // Write 'mstatus' CSR
         RVCSR* p_mstatus = CSRs->RequireCSR(CSR_mstatus, "mstatus");
 
-        csr_t mstatus = p_mstatus->GetValue(); // read 'mstatus'
+        csr_t mstatus = p_mstatus->Read(CSRs); // read 'mstatus'
 
         SET_CSR_FIELD(mstatus, CSR_mstatus_FIELD_MPIE,
             GET_CSR_FIELD(mstatus, CSR_mstatus_FIELD_MIE)); // xPIE is set to the value of xIE
@@ -113,11 +113,11 @@ namespace Jasse {
         //          Rewrite this part after other privileged levels supported.
         SET_CSR_FIELD(mstatus, CSR_mstatus_FIELD_MPP, /*NOTICE*/ PRIV_MACHINE);
 
-        p_mstatus->SetValue(mstatus); // write 'mstatus'
+        p_mstatus->Write(CSRs, mstatus); // write 'mstatus'
 
 
         // Write PC
-        csr_t mtvec = CSRs->RequireCSR(CSR_mtvec, "mtvec")->GetValue(); // read 'mtvec'
+        csr_t mtvec = CSRs->RequireCSR(CSR_mtvec, "mtvec")->Read(CSRs); // read 'mtvec'
 
         int mode = GET_CSR_FIELD(mtvec, CSR_mtvec_FIELD_MODE);
         if (mode == CSR_mtvec_FIELD_MODE_DEF_VECTORED && type == TRAP_INTERRUPT) // vectored interrupt trap
@@ -143,7 +143,7 @@ namespace Jasse {
         // Write 'mstatus' CSR
         RVCSR* p_mstatus  = CSRs->RequireCSR(CSR_mstatus, "mstatus");
 
-        csr_t mstatus = p_mstatus->GetValue(); // read 'mstatus'
+        csr_t mstatus = p_mstatus->Read(CSRs); // read 'mstatus'
 
         SET_CSR_FIELD(mstatus, CSR_mstatus_FIELD_MIE,
             GET_CSR_FIELD(mstatus, CSR_mstatus_FIELD_MPIE)); // xIE is set to xPIE
@@ -158,11 +158,11 @@ namespace Jasse {
         // Privileged Level should be set to MPP (or xPP), not implemented now.
         // GET_CSR_FIELD(mstatus, CSR_mstatus_FIELD_MPP);
 
-        p_mstatus->SetValue(mstatus); // write 'mstatus'
+        p_mstatus->Write(CSRs, mstatus); // write 'mstatus'
 
 
         // Write PC
-        csr_t mepc = CSRs->RequireCSR(CSR_mepc, "mepc")->GetValue();
+        csr_t mepc = CSRs->RequireCSR(CSR_mepc, "mepc")->Read(CSRs);
 
         if (arch->XLEN() == XLEN32) // XLEN=32
             arch->SetPC32((uint32_t)mepc);
