@@ -35,25 +35,25 @@ namespace Jasse::CSR {
         csr_t   value;
 
     public:
-        RVCSR_mcause();
-        RVCSR_mcause(const RVCSR_mcause& obj);
-        ~RVCSR_mcause();
+        RVCSR_mcause() noexcept;
+        RVCSR_mcause(const RVCSR_mcause& obj) noexcept;
+        ~RVCSR_mcause() noexcept;
 
         virtual bool        GetValue(csr_t* dst) const noexcept override;
         virtual bool        SetValue(csr_t value) noexcept override;
 
-        virtual csr_t       Read() noexcept override;
-        virtual void        Write(csr_t value) noexcept override;
+        virtual csr_t       Read(RVCSRSpace* CSRs) noexcept override;
+        virtual void        Write(RVCSRSpace* CSRs, csr_t value) noexcept override;
     };
 
     // CSR 'mcause' instance allocator
-    RVCSR* __allocator_RVCSR_mcause()
+    RVCSR* __allocator_RVCSR_mcause() noexcept
     {
         return new RVCSR_mcause();
     }
 
     // CSR 'mcause' definition
-    static const RVCSRDefinition mcause = { CSR_mcause, &__allocator_RVCSR_mcause };
+    csrdef mcause = { CSR_mcause, "mcause", &__allocator_RVCSR_mcause };
 }
 
 
@@ -63,17 +63,17 @@ namespace Jasse::CSR {
     csr_t   value;
     */
 
-    RVCSR_mcause::RVCSR_mcause()
-        : RVCSR (mcause, "mcause")
+    RVCSR_mcause::RVCSR_mcause() noexcept
+        : RVCSR (mcause)
         , value (CSR_mcause_DEFAULT_AT_COMPILE)
     { }
 
-    RVCSR_mcause::RVCSR_mcause(const RVCSR_mcause& obj)
+    RVCSR_mcause::RVCSR_mcause(const RVCSR_mcause& obj) noexcept
         : RVCSR (obj)
         , value (obj.value)
     { }
 
-    RVCSR_mcause::~RVCSR_mcause()
+    RVCSR_mcause::~RVCSR_mcause() noexcept
     { }
 
     bool RVCSR_mcause::GetValue(csr_t* dst) const noexcept
@@ -88,12 +88,12 @@ namespace Jasse::CSR {
         return true;
     }
 
-    csr_t RVCSR_mcause::Read() noexcept
+    csr_t RVCSR_mcause::Read(RVCSRSpace* CSRs) noexcept
     {
         return value;
     }
 
-    void RVCSR_mcause::Write(csr_t value) noexcept
+    void RVCSR_mcause::Write(RVCSRSpace* CSRs, csr_t value) noexcept
     {
         this->value = value;
     }

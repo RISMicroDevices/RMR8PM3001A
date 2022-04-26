@@ -17,25 +17,25 @@ namespace Jasse::CSR {
         csr_t   value;
 
     public:
-        RVCSR_marchid();
-        RVCSR_marchid(const RVCSR_marchid& obj);
-        ~RVCSR_marchid();
+        RVCSR_marchid() noexcept;
+        RVCSR_marchid(const RVCSR_marchid& obj) noexcept;
+        ~RVCSR_marchid() noexcept;
 
         virtual bool        GetValue(csr_t* dst) const noexcept override;
         virtual bool        SetValue(csr_t value) noexcept override;
 
-        virtual csr_t       Read() noexcept override;
-        virtual void        Write(csr_t value) noexcept override;
+        virtual csr_t       Read(RVCSRSpace* CSRs) noexcept override;
+        virtual void        Write(RVCSRSpace* CSRs, csr_t value) noexcept override;
     };
 
     // CSR 'marchid' instance allocator
-    RVCSR* __allocator_RVCSR_marchid()
+    RVCSR* __allocator_RVCSR_marchid() noexcept
     {
         return new RVCSR_marchid();
     }
 
     // CSR 'marchid' definition
-    static const RVCSRDefinition marchid = { CSR_marchid, &__allocator_RVCSR_marchid };
+    csrdef marchid = { CSR_marchid, "marchid", &__allocator_RVCSR_marchid };
 }
 
 
@@ -45,17 +45,17 @@ namespace Jasse::CSR {
     csr_t   value;
     */
 
-    RVCSR_marchid::RVCSR_marchid()
-        : RVCSR (marchid, "marchid")
+    RVCSR_marchid::RVCSR_marchid() noexcept
+        : RVCSR (marchid)
         , value (CSR_marchid_DEFAULT_AT_COMPILE)
     { }
 
-    RVCSR_marchid::RVCSR_marchid(const RVCSR_marchid& obj)
+    RVCSR_marchid::RVCSR_marchid(const RVCSR_marchid& obj) noexcept
         : RVCSR (obj)
         , value (obj.value)
     { }
 
-    RVCSR_marchid::~RVCSR_marchid()
+    RVCSR_marchid::~RVCSR_marchid() noexcept
     { }
 
     bool RVCSR_marchid::GetValue(csr_t* dst) const noexcept
@@ -70,12 +70,12 @@ namespace Jasse::CSR {
         return true;
     }
 
-    csr_t RVCSR_marchid::Read() noexcept
+    csr_t RVCSR_marchid::Read(RVCSRSpace* CSRs) noexcept
     {
         return value;
     }
 
-    void RVCSR_marchid::Write(csr_t value) noexcept
+    void RVCSR_marchid::Write(RVCSRSpace* CSRs, csr_t value) noexcept
     {
         this->value = value;
     }

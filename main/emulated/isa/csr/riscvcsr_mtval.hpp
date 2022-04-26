@@ -19,25 +19,25 @@ namespace Jasse::CSR {
         csr_t   value;
 
     public:
-        RVCSR_mtval();
-        RVCSR_mtval(const RVCSR_mtval& obj);
-        ~RVCSR_mtval();
+        RVCSR_mtval() noexcept;
+        RVCSR_mtval(const RVCSR_mtval& obj) noexcept;
+        ~RVCSR_mtval() noexcept;
 
         virtual bool        GetValue(csr_t* dst) const noexcept override;
         virtual bool        SetValue(csr_t value) noexcept override;
 
-        virtual csr_t       Read() noexcept override;
-        virtual void        Write(csr_t value) noexcept override;
+        virtual csr_t       Read(RVCSRSpace* CSRs) noexcept override;
+        virtual void        Write(RVCSRSpace* CSRs, csr_t value) noexcept override;
     };
 
     // CSR 'mtval' instance allocator
-    RVCSR* __allocator_RVCSR_mtval()
+    RVCSR* __allocator_RVCSR_mtval() noexcept
     {
         return new RVCSR_mtval();
     }
 
     // CSR 'mtval' definition
-    static const RVCSRDefinition mtval = { CSR_mtval, &__allocator_RVCSR_mtval };
+    csrdef mtval = { CSR_mtval, "mtval", &__allocator_RVCSR_mtval };
 }
 
 
@@ -47,17 +47,17 @@ namespace Jasse::CSR {
     csr_t   value;
     */
 
-    RVCSR_mtval::RVCSR_mtval()
-        : RVCSR (mtval, "mtval")
+    RVCSR_mtval::RVCSR_mtval() noexcept
+        : RVCSR (mtval)
         , value (CSR_mtval_DEFAULT_AT_COMPILE)
     { }
 
-    RVCSR_mtval::RVCSR_mtval(const RVCSR_mtval& obj)
+    RVCSR_mtval::RVCSR_mtval(const RVCSR_mtval& obj) noexcept
         : RVCSR (obj)
         , value (obj.value)
     { }
 
-    RVCSR_mtval::~RVCSR_mtval()
+    RVCSR_mtval::~RVCSR_mtval() noexcept
     { }
 
     bool RVCSR_mtval::GetValue(csr_t* dst) const noexcept
@@ -72,12 +72,12 @@ namespace Jasse::CSR {
         return true;
     }
 
-    csr_t RVCSR_mtval::Read() noexcept
+    csr_t RVCSR_mtval::Read(RVCSRSpace* CSRs) noexcept
     {
         return value;
     }
 
-    void RVCSR_mtval::Write(csr_t value) noexcept
+    void RVCSR_mtval::Write(RVCSRSpace* CSRs, csr_t value) noexcept
     {
         this->value = value;
     }

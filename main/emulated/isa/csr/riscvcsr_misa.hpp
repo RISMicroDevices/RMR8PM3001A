@@ -68,25 +68,25 @@ namespace Jasse::CSR {
         csr_t   value;
 
     public:
-        RVCSR_misa();
-        RVCSR_misa(const RVCSR_misa& obj);
-        ~RVCSR_misa();
+        RVCSR_misa() noexcept;
+        RVCSR_misa(const RVCSR_misa& obj) noexcept;
+        ~RVCSR_misa() noexcept;
 
         virtual bool        GetValue(csr_t* dst) const noexcept override;
         virtual bool        SetValue(csr_t value) noexcept override;
 
-        virtual csr_t       Read() noexcept override;
-        virtual void        Write(csr_t value) noexcept override;
+        virtual csr_t       Read(RVCSRSpace* CSRs) noexcept override;
+        virtual void        Write(RVCSRSpace* CSRs, csr_t value) noexcept override;
     };
 
     // CSR 'misa' instance allocator
-    RVCSR* __allocator_RVCSR_misa()
+    RVCSR* __allocator_RVCSR_misa() noexcept
     {
         return new RVCSR_misa();
     }
 
     // CSR 'misa' definition field
-    static const RVCSRDefinition misa = { CSR_misa, &__allocator_RVCSR_misa };
+    csrdef misa = { CSR_misa, "misa", &__allocator_RVCSR_misa };
 }
 
 
@@ -96,17 +96,17 @@ namespace Jasse::CSR {
     csr_t   value;
     */
 
-    RVCSR_misa::RVCSR_misa()
-        : RVCSR (misa, "misa")
+    RVCSR_misa::RVCSR_misa() noexcept
+        : RVCSR (misa)
         , value (CSR_misa_DEFAULT_AT_COMPILE)
     { }
 
-    RVCSR_misa::RVCSR_misa(const RVCSR_misa& obj)
+    RVCSR_misa::RVCSR_misa(const RVCSR_misa& obj) noexcept
         : RVCSR (obj)
         , value (obj.value)
     { }
 
-    RVCSR_misa::~RVCSR_misa()
+    RVCSR_misa::~RVCSR_misa() noexcept
     { }
 
     bool RVCSR_misa::GetValue(csr_t* dst) const noexcept
@@ -121,12 +121,12 @@ namespace Jasse::CSR {
         return true;
     }
 
-    csr_t RVCSR_misa::Read() noexcept
+    csr_t RVCSR_misa::Read(RVCSRSpace* CSRs) noexcept
     {
         return value;
     }
 
-    void RVCSR_misa::Write(csr_t value) noexcept
+    void RVCSR_misa::Write(RVCSRSpace* CSRs, csr_t value) noexcept
     {
         this->value = value;
     }

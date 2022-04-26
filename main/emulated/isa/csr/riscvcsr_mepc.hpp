@@ -19,25 +19,25 @@ namespace Jasse::CSR {
         csr_t   value;
 
     public:
-        RVCSR_mepc();
-        RVCSR_mepc(const RVCSR_mepc& obj);
-        ~RVCSR_mepc();
+        RVCSR_mepc() noexcept;
+        RVCSR_mepc(const RVCSR_mepc& obj) noexcept;
+        ~RVCSR_mepc() noexcept;
 
         virtual bool        GetValue(csr_t* dst) const noexcept override;
         virtual bool        SetValue(csr_t value) noexcept override;
 
-        virtual csr_t       Read() noexcept override;
-        virtual void        Write(csr_t value) noexcept override;
+        virtual csr_t       Read(RVCSRSpace* CSRs) noexcept override;
+        virtual void        Write(RVCSRSpace* CSRs, csr_t value) noexcept override;
     };
 
     // CSR 'mepc' instance allocator
-    RVCSR* __allocator_RVCSR_mepc()
+    RVCSR* __allocator_RVCSR_mepc() noexcept
     {
         return new RVCSR_mepc();
     }
 
     // CSR 'mepc' definition
-    static const RVCSRDefinition mepc = { CSR_mepc, &__allocator_RVCSR_mepc };
+    csrdef mepc = { CSR_mepc, "mepc", &__allocator_RVCSR_mepc };
 }
 
 
@@ -47,17 +47,17 @@ namespace Jasse::CSR {
     csr_t   value;
     */
 
-    RVCSR_mepc::RVCSR_mepc()
-        : RVCSR (mepc, "mepc")
+    RVCSR_mepc::RVCSR_mepc() noexcept
+        : RVCSR (mepc)
         , value (CSR_mepc_DEFAULT_AT_COMPILE)
     { }
 
-    RVCSR_mepc::RVCSR_mepc(const RVCSR_mepc& obj)
+    RVCSR_mepc::RVCSR_mepc(const RVCSR_mepc& obj) noexcept
         : RVCSR (obj)
         , value (obj.value)
     { }
 
-    RVCSR_mepc::~RVCSR_mepc()
+    RVCSR_mepc::~RVCSR_mepc() noexcept
     { }
 
     bool RVCSR_mepc::GetValue(csr_t* dst) const noexcept
@@ -72,12 +72,12 @@ namespace Jasse::CSR {
         return true;
     }
 
-    csr_t RVCSR_mepc::Read() noexcept
+    csr_t RVCSR_mepc::Read(RVCSRSpace* CSRs) noexcept
     {
         return value;
     }
 
-    void RVCSR_mepc::Write(csr_t value) noexcept
+    void RVCSR_mepc::Write(RVCSRSpace* CSRs, csr_t value) noexcept
     {
         this->value = value;
     }

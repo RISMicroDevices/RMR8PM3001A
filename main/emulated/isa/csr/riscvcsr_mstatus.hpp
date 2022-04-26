@@ -107,25 +107,25 @@ namespace Jasse::CSR {
         csr_t   value;
 
     public:
-        RVCSR_mstatus();
-        RVCSR_mstatus(const RVCSR_mstatus& obj);
-        ~RVCSR_mstatus();
+        RVCSR_mstatus() noexcept;
+        RVCSR_mstatus(const RVCSR_mstatus& obj) noexcept;
+        ~RVCSR_mstatus() noexcept;
 
         virtual bool        GetValue(csr_t* dst) const noexcept override;
         virtual bool        SetValue(csr_t value) noexcept override;
 
-        virtual csr_t       Read() noexcept override;
-        virtual void        Write(csr_t value) noexcept override;
+        virtual csr_t       Read(RVCSRSpace* CSRs) noexcept override;
+        virtual void        Write(RVCSRSpace* CSRs, csr_t value) noexcept override;
     };
 
     // CSR 'mstatus' instance allocator
-    RVCSR* __allocator_RVCSR_mstatus()
+    RVCSR* __allocator_RVCSR_mstatus() noexcept
     {
         return new RVCSR_mstatus();
     }
 
     // CSR 'mstatus' definition
-    static const RVCSRDefinition mstatus = { CSR_mstatus, &__allocator_RVCSR_mstatus };
+    csrdef mstatus = { CSR_mstatus, "mstatus", &__allocator_RVCSR_mstatus };
 }
 
 
@@ -135,17 +135,17 @@ namespace Jasse::CSR {
     csr_t   value;
     */
 
-    RVCSR_mstatus::RVCSR_mstatus()
-        : RVCSR (mstatus, "mstatus")
+    RVCSR_mstatus::RVCSR_mstatus() noexcept
+        : RVCSR (mstatus)
         , value (CSR_mstatus_DEFAULT_AT_COMPILE)
     { }
 
-    RVCSR_mstatus::RVCSR_mstatus(const RVCSR_mstatus& obj)
+    RVCSR_mstatus::RVCSR_mstatus(const RVCSR_mstatus& obj) noexcept
         : RVCSR (obj)
         , value (obj.value)
     { }
 
-    RVCSR_mstatus::~RVCSR_mstatus()
+    RVCSR_mstatus::~RVCSR_mstatus() noexcept
     { }
 
     bool RVCSR_mstatus::GetValue(csr_t* dst) const noexcept
@@ -160,12 +160,12 @@ namespace Jasse::CSR {
         return true;
     }
 
-    csr_t RVCSR_mstatus::Read() noexcept
+    csr_t RVCSR_mstatus::Read(RVCSRSpace* CSRs) noexcept
     {
         return value;
     }
 
-    void RVCSR_mstatus::Write(csr_t value) noexcept
+    void RVCSR_mstatus::Write(RVCSRSpace* CSRs,csr_t value) noexcept
     {
         this->value = value;
     }
