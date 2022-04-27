@@ -52,30 +52,25 @@
 
 namespace Jasse {
 
-    // RISC-V Trap Cause
-    typedef     uint32_t            RVTrapCause;
-
-    // RISC-V Trap Types
-    typedef enum {
-        TRAP_EXCEPTION = 0,
-        TRAP_INTERRUPT
-    } RVTrapType;
-
     // RISC-V Trap Procedure
     // * Notice: Only PC and necessary CSRs (excluding 'mtval' .etc) are manipulated in this
     //           Trap-Procedure. Other software-defined or EEI-defined CSR/General Registers
     //           actions should be done out of this Trap-Procedure.
-    void TrapEnter  (RVArchitecturalOOC* arch, RVCSRSpace* CSRs, RVTrapType type, RVTrapCause cause) noexcept(false);
-    void TrapReturn (RVArchitecturalOOC* arch, RVCSRSpace* CSRs) noexcept(false);
+
+    //
+    void TrapEnterM  (RVArchitecturalOOC* arch, RVCSRSpace* CSRs, RVTrapType type, RVTrapCause cause) noexcept(false);
+    void TrapReturnM (RVArchitecturalOOC* arch, RVCSRSpace* CSRs) noexcept(false);
+
+    // M-mode Trap Procedures
+    static const RVTrapProcedures TRAP_PROCEDURES_M_MODE = { &TrapEnterM, &TrapReturnM };
 }
 
 
 namespace Jasse {
 
-    void TrapEnter(RVArchitecturalOOC* arch, RVCSRSpace* CSRs, RVTrapType type, RVTrapCause cause) noexcept(false)
+    // M-mode Trap Enter Procedure
+    void TrapEnterM(RVArchitecturalOOC* arch, RVCSRSpace* CSRs, RVTrapType type, RVTrapCause cause) noexcept(false)
     {
-        // only M-mode supported currently
-
         // Write 'mepc' CSR
         CSRs->RequireCSR(CSR_mepc, "mepc")
             ->Write(CSRs, arch->PC().pc64); // always zero-extended in XLEN=32, actually doesn't matter
@@ -136,10 +131,9 @@ namespace Jasse {
         }
     }
 
-    void TrapReturn(RVArchitecturalOOC* arch, RVCSRSpace* CSRs) noexcept(false)
+    // M-mode Trap Return Procedure
+    void TrapReturnM(RVArchitecturalOOC* arch, RVCSRSpace* CSRs) noexcept(false)
     {
-        // only M-mode supported currently
-
         // Write 'mstatus' CSR
         RVCSR* p_mstatus  = CSRs->RequireCSR(CSR_mstatus, "mstatus");
 
