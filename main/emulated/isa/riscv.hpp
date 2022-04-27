@@ -27,6 +27,7 @@
 #include "base/riscvgen.hpp"
 #include "base/riscvmem.hpp"
 #include "base/riscvcsr.hpp"
+#include "base/riscvtrap.hpp"
 
 
 namespace Jasse {
@@ -105,7 +106,7 @@ namespace Jasse {
         // TODO ... More architectural states could be appended here ...
     };
 
-    
+
     //
     class RVInstance;
 
@@ -134,6 +135,8 @@ namespace Jasse {
 
         RVCSRSpace              CSRs;
 
+        RVTrapProcedures        trap_procedures;
+
         RVExecEEIHandler        exec_handler;
 
     public:
@@ -141,6 +144,7 @@ namespace Jasse {
                    RVArchitectural&&            arch,
                    RVMemoryInterface*           MI,
                    const RVCSRList&             CSRs,
+                   const RVTrapProcedures&      trap_procedures,
                    RVExecEEIHandler             exec_handler) noexcept;
 
         RVInstance() = delete;
@@ -165,6 +169,10 @@ namespace Jasse {
         RVExecEEIHandler                GetExecEEI() const noexcept;
         void                            SetExecEEI(RVExecEEIHandler exec_handler) noexcept;
 
+        RVTrapProcedures&               GetTrapProcedures() noexcept;
+        const RVTrapProcedures&         GetTrapProcedures() const noexcept;
+        void                            SetTrapProcedures(const RVTrapProcedures& trap_procedures) noexcept;
+
         RVExecStatus                    Eval();
 
         void    operator=(const RVInstance& obj) = delete;
@@ -182,6 +190,8 @@ namespace Jasse {
         RVDecoderCollection     _decoders;   // inner-constructed
 
         RVGeneralRegisters64    _GR;         // inner-constructed, transient
+
+        RVTrapProcedures        trap_procedures;
 
         RVExecEEIHandler        exec_handler;
         
@@ -207,6 +217,8 @@ namespace Jasse {
         Builder&                    CSR(const RVCSRDefinition& CSR, csr_t init_value) noexcept;
         Builder&                    CSR(std::initializer_list<RVCSRDefinition> CSRs) noexcept;
 
+        Builder&                    TrapProcedures(const RVTrapProcedures& trap_procedures) noexcept;
+
         Builder&                    ExecEEI(RVExecEEIHandler exec_handler) noexcept;
 
         arch32_t                    GR32(int address) const noexcept;
@@ -215,6 +227,8 @@ namespace Jasse {
         const RVCSRList&            CSR() const noexcept;
         RVDecoderCollection&        Decoder() noexcept;
         const RVDecoderCollection&  Decoder() const noexcept;
+        RVTrapProcedures&           TrapProcedures() noexcept;
+        const RVTrapProcedures&     TrapProcedures() const noexcept;
         RVExecEEIHandler&           ExecEEI() noexcept;
         RVExecEEIHandler            ExecEEI() const noexcept;
 
@@ -492,18 +506,22 @@ namespace Jasse {
     RVCSRSpace              CSRs;
 
     RVExecEEIHandler        exec_handler;
+
+    RVTrapProcedures        trap;
     */
 
     RVInstance::RVInstance(const RVDecoderCollection&   decoders,
                            RVArchitectural&&            arch,
                            RVMemoryInterface*           MI,
                            const RVCSRList&             CSRs,
+                           const RVTrapProcedures&      trap_procedures,
                            RVExecEEIHandler             exec_handler) noexcept
-        : decoders      (decoders)
-        , arch          (arch)
-        , MI            (MI)
-        , CSRs          (CSRs)
-        , exec_handler  (exec_handler)
+        : decoders          (decoders)
+        , arch              (arch)
+        , MI                (MI)
+        , CSRs              (CSRs)
+        , trap_procedures   (trap_procedures)
+        , exec_handler      (exec_handler)
     { }
 
     RVInstance::~RVInstance() noexcept
@@ -569,6 +587,21 @@ namespace Jasse {
         this->exec_handler = exec_handler;
     }
 
+    inline RVTrapProcedures& RVInstance::GetTrapProcedures() noexcept
+    {
+        return trap_procedures;
+    }
+
+    inline const RVTrapProcedures& RVInstance::GetTrapProcedures() const noexcept
+    {
+        return trap_procedures;
+    }
+
+    inline void RVInstance::SetTrapProcedures(const RVTrapProcedures& trap_procedures) noexcept
+    {
+        this->trap_procedures = trap_procedures;
+    }
+
     RVExecStatus RVInstance::Eval()
     {
         // TODO interrupt inception
@@ -606,6 +639,9 @@ namespace Jasse {
             return rstatus;
         }
 
+        //
+        RVExecContext ctx { &arch, MI, &CSRs, trap_procedures };
+
         // instruction decode
         RVInstruction decoded;
 
@@ -618,7 +654,7 @@ namespace Jasse {
         }
 
         // execution
-        RVExecStatus exec_status = decoded.Execute(&arch, MI, &CSRs);
+        RVExecStatus exec_status = decoded.Execute(ctx);
         RVEEIStatus  eei_status  = EEI_BYPASS;
 
         // - note: @see RVExecStatus
@@ -743,6 +779,12 @@ namespace Jasse {
         return *this;
     }
 
+    inline RVInstance::Builder& RVInstance::Builder::TrapProcedures(const RVTrapProcedures& trap_procedures) noexcept
+    {
+        this->trap_procedures = trap_procedures;
+        return *this;
+    }
+
     inline RVInstance::Builder& RVInstance::Builder::ExecEEI(RVExecEEIHandler exec_handler) noexcept
     {
         this->exec_handler = exec_handler;
@@ -779,6 +821,16 @@ namespace Jasse {
         return _decoders;
     }
 
+    inline RVTrapProcedures& RVInstance::Builder::TrapProcedures() noexcept
+    {
+        return trap_procedures;
+    }
+
+    inline const RVTrapProcedures& RVInstance::Builder::TrapProcedures() const noexcept
+    {
+        return trap_procedures;
+    }
+
     inline RVExecEEIHandler& RVInstance::Builder::ExecEEI() noexcept
     {
         return exec_handler;
@@ -797,6 +849,7 @@ namespace Jasse {
             RVArchitectural(xlen),
             _MI,
             _CSR,
+            trap_procedures,
             exec_handler);
 
         instance->arch.SetPC({ startup_pc.pc64 });
