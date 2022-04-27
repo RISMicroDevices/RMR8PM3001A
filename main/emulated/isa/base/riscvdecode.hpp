@@ -58,7 +58,8 @@ namespace Jasse {
 
         void                        SetCodepoint(const RVCodepoint* trait);
 
-        RVExecStatus                Execute(RVArchitecturalOOC* arch, RVMemoryInterface* MI, RVCSRSpace* CSRs) const;
+        RVExecStatus                Execute(const RVExecContext& ctx) const;
+
         std::string                 ToString() const;
     };
 
@@ -250,9 +251,9 @@ namespace Jasse {
         this->codepoint = codepoint;
     }
 
-    inline RVExecStatus RVInstruction::Execute(RVArchitecturalOOC* arch, RVMemoryInterface* MI, RVCSRSpace* CSRs) const
+    inline RVExecStatus RVInstruction::Execute(const RVExecContext& ctx) const
     {
-        return GetExecutor()(*this, arch, MI, CSRs);
+        return GetExecutor()(*this, ctx);
     }
 
     inline std::string RVInstruction::ToString() const

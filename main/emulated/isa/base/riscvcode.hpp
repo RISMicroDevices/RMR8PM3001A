@@ -11,11 +11,19 @@
 #include "riscvooc.hpp"
 #include "riscvmem.hpp"
 #include "riscvcsr.hpp"
+#include "riscvtrap.hpp"
 #include "riscvgen.hpp"
 
 namespace Jasse {
     // RISC-V Codepoint Decode Path
     typedef bool    (*RVDecodePath)(insnraw_t insnraw, RVInstruction& insn);
+
+    typedef struct {
+        RVArchitecturalOOC*     arch;
+        RVMemoryInterface*      MI;
+        RVCSRSpace*             CSRs;
+        RVTrapProcedures        trap;
+    } RVExecContext;
 
     // RISC-V Codepoint
     class RVCodepoint {
@@ -24,7 +32,7 @@ namespace Jasse {
         typedef std::string     (*Textualizer)(const RVInstruction&);
 
         // RISC-V Instruction Executor
-        typedef RVExecStatus    (*Executor)(const RVInstruction&, RVArchitecturalOOC*, RVMemoryInterface*, RVCSRSpace*);
+        typedef RVExecStatus    (*Executor)(const RVInstruction& insn, const RVExecContext& ctx);
 
     private:
         std::string     name;
