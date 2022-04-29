@@ -10,7 +10,7 @@
 // executors
 namespace Jasse {
 
-#define RV64I_EXECUTOR_PARAMS       const RVInstruction& insn, RVArchitecturalOOC* arch, RVMemoryInterface* MI, RVCSRSpace* CSRs
+#define RV64I_EXECUTOR_PARAMS       const RVInstruction& insn, const RVExecContext& ctx
 
     RVExecStatus RV64IExecutor_ADDI (RV64I_EXECUTOR_PARAMS);
     RVExecStatus RV64IExecutor_SLTI (RV64I_EXECUTOR_PARAMS);
