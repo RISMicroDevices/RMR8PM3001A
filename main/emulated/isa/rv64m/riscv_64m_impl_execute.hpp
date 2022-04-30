@@ -13,13 +13,11 @@
 // executors
 namespace Jasse {
 
-#define RV64M_EXECUTOR_PARAMS       const RVInstruction& insn, RVArchitecturalOOC* arch, RVMemoryInterface* MI, RVCSRSpace* CSRs
-
     // MUL
     RVExecStatus RV64MExecutor_MUL(RV64M_EXECUTOR_PARAMS)
     {
-        arch->GR64()->Set(insn.GetRD(),
-            arch->GR64()->Get(insn.GetRS1()) * arch->GR64()->Get(insn.GetRS2()));
+        ctx.arch->GR64()->Set(insn.GetRD(),
+            ctx.arch->GR64()->Get(insn.GetRS1()) * ctx.arch->GR64()->Get(insn.GetRS2()));
 
         return EXEC_SEQUENTIAL;
     }
@@ -27,8 +25,8 @@ namespace Jasse {
     // MULH
     RVExecStatus RV64MExecutor_MULH(RV64M_EXECUTOR_PARAMS)
     {
-        int64_t multiplicand = (int64_t) arch->GR64()->Get(insn.GetRS1());
-        int64_t multiplier   = (int64_t) arch->GR64()->Get(insn.GetRS2());
+        int64_t multiplicand = (int64_t) ctx.arch->GR64()->Get(insn.GetRS1());
+        int64_t multiplier   = (int64_t) ctx.arch->GR64()->Get(insn.GetRS2());
         
         int64_t result;
 
@@ -49,7 +47,7 @@ namespace Jasse {
         mpz_clears(mpz_s, mpz_i, mpz_r, nullptr);
         //
 
-        arch->GR64()->Set(insn.GetRD(), (uint64_t) result);
+        ctx.arch->GR64()->Set(insn.GetRD(), (uint64_t) result);
 
         return EXEC_SEQUENTIAL;
     }
@@ -57,8 +55,8 @@ namespace Jasse {
     // MULHU
     RVExecStatus RV64MExecutor_MULHU(RV64M_EXECUTOR_PARAMS)
     {
-        uint64_t multiplicand = arch->GR64()->Get(insn.GetRS1());
-        uint64_t multiplier   = arch->GR64()->Get(insn.GetRS2());
+        uint64_t multiplicand = ctx.arch->GR64()->Get(insn.GetRS1());
+        uint64_t multiplier   = ctx.arch->GR64()->Get(insn.GetRS2());
         
         uint64_t result;
 
@@ -79,7 +77,7 @@ namespace Jasse {
         mpz_clears(mpz_s, mpz_i, mpz_r, nullptr);
         //
 
-        arch->GR64()->Set(insn.GetRD(), result);
+        ctx.arch->GR64()->Set(insn.GetRD(), result);
 
         return EXEC_SEQUENTIAL;
     }
@@ -87,8 +85,8 @@ namespace Jasse {
     // MULHSU
     RVExecStatus RV64MExecutor_MULHSU(RV64M_EXECUTOR_PARAMS)
     {
-        int64_t  multiplicand = arch->GR64()->Get(insn.GetRS1());
-        uint64_t multiplier   = arch->GR64()->Get(insn.GetRS2());
+        int64_t  multiplicand = ctx.arch->GR64()->Get(insn.GetRS1());
+        uint64_t multiplier   = ctx.arch->GR64()->Get(insn.GetRS2());
 
         int64_t result;
 
@@ -109,7 +107,7 @@ namespace Jasse {
         mpz_clears(mpz_s, mpz_i, mpz_r, nullptr);
         //
 
-        arch->GR64()->Set(insn.GetRD(), (uint64_t) result);
+        ctx.arch->GR64()->Set(insn.GetRD(), (uint64_t) result);
 
         return EXEC_SEQUENTIAL;
     }
@@ -118,9 +116,9 @@ namespace Jasse {
     RVExecStatus RV64MExecutor_MULW(RV64M_EXECUTOR_PARAMS)
     {
         uint32_t result =  
-            ((uint32_t) arch->GR64()->Get(insn.GetRS1())) * ((uint32_t) arch->GR64()->Get(insn.GetRS2()));
+            ((uint32_t) ctx.arch->GR64()->Get(insn.GetRS1())) * ((uint32_t) ctx.arch->GR64()->Get(insn.GetRS2()));
 
-        arch->GR64()->Set(insn.GetRD(), SEXT_W(result));
+        ctx.arch->GR64()->Set(insn.GetRD(), SEXT_W(result));
 
         return EXEC_SEQUENTIAL;
     }
@@ -128,8 +126,8 @@ namespace Jasse {
     // DIV
     RVExecStatus RV64MExecutor_DIV(RV64M_EXECUTOR_PARAMS)
     {
-        int64_t dividend = (int64_t) arch->GR64()->Get(insn.GetRS1());
-        int64_t divisor  = (int64_t) arch->GR64()->Get(insn.GetRS2());
+        int64_t dividend = (int64_t) ctx.arch->GR64()->Get(insn.GetRS1());
+        int64_t divisor  = (int64_t) ctx.arch->GR64()->Get(insn.GetRS2());
 
         int64_t result;
 
@@ -140,7 +138,7 @@ namespace Jasse {
         else
             result = dividend / divisor;
 
-        arch->GR64()->Set(insn.GetRD(), (uint64_t) result);
+        ctx.arch->GR64()->Set(insn.GetRD(), (uint64_t) result);
 
         return EXEC_SEQUENTIAL;
     }
@@ -148,8 +146,8 @@ namespace Jasse {
     // REM
     RVExecStatus RV64MExecutor_REM(RV64M_EXECUTOR_PARAMS)
     {
-        int64_t dividend = (int64_t) arch->GR64()->Get(insn.GetRS1());
-        int64_t divisor  = (int64_t) arch->GR64()->Get(insn.GetRS2());
+        int64_t dividend = (int64_t) ctx.arch->GR64()->Get(insn.GetRS1());
+        int64_t divisor  = (int64_t) ctx.arch->GR64()->Get(insn.GetRS2());
 
         int64_t result;
 
@@ -160,7 +158,7 @@ namespace Jasse {
         else
             result = dividend % divisor;
 
-        arch->GR64()->Set(insn.GetRD(), (uint64_t) result);
+        ctx.arch->GR64()->Set(insn.GetRD(), (uint64_t) result);
 
         return EXEC_SEQUENTIAL;
     }
@@ -168,8 +166,8 @@ namespace Jasse {
     // DIVU
     RVExecStatus RV64MExecutor_DIVU(RV64M_EXECUTOR_PARAMS)
     {
-        uint64_t dividend = arch->GR64()->Get(insn.GetRS1());
-        uint64_t divisor  = arch->GR64()->Get(insn.GetRS2());
+        uint64_t dividend = ctx.arch->GR64()->Get(insn.GetRS1());
+        uint64_t divisor  = ctx.arch->GR64()->Get(insn.GetRS2());
 
         uint64_t result;
 
@@ -178,7 +176,7 @@ namespace Jasse {
         else
             result = dividend / divisor;
 
-        arch->GR64()->Set(insn.GetRD(), result);
+        ctx.arch->GR64()->Set(insn.GetRD(), result);
 
         return EXEC_SEQUENTIAL;
     }
@@ -186,8 +184,8 @@ namespace Jasse {
     // REMU
     RVExecStatus RV64MExecutor_REMU(RV64M_EXECUTOR_PARAMS)
     {
-        uint64_t dividend = arch->GR64()->Get(insn.GetRS1());
-        uint64_t divisor  = arch->GR64()->Get(insn.GetRS2());
+        uint64_t dividend = ctx.arch->GR64()->Get(insn.GetRS1());
+        uint64_t divisor  = ctx.arch->GR64()->Get(insn.GetRS2());
 
         uint64_t result;
 
@@ -196,7 +194,7 @@ namespace Jasse {
         else
             result = dividend % divisor;
 
-        arch->GR64()->Set(insn.GetRD(), result);
+        ctx.arch->GR64()->Set(insn.GetRD(), result);
 
         return EXEC_SEQUENTIAL;
     }
@@ -204,8 +202,8 @@ namespace Jasse {
     // DIVW
     RVExecStatus RV64MExecutor_DIVW(RV64M_EXECUTOR_PARAMS)
     {
-        int32_t dividend = (int32_t) arch->GR64()->Get(insn.GetRS1());
-        int32_t divisor  = (int32_t) arch->GR64()->Get(insn.GetRS2());
+        int32_t dividend = (int32_t) ctx.arch->GR64()->Get(insn.GetRS1());
+        int32_t divisor  = (int32_t) ctx.arch->GR64()->Get(insn.GetRS2());
 
         int32_t result;
 
@@ -216,7 +214,7 @@ namespace Jasse {
         else
             result = dividend / divisor;
 
-        arch->GR64()->Set(insn.GetRD(), SEXT_W(result));
+        ctx.arch->GR64()->Set(insn.GetRD(), SEXT_W(result));
 
         return EXEC_SEQUENTIAL;
     }
@@ -224,8 +222,8 @@ namespace Jasse {
     // REMW
     RVExecStatus RV64MExecutor_REMW(RV64M_EXECUTOR_PARAMS)
     {
-        int32_t dividend = (int32_t) arch->GR64()->Get(insn.GetRS1());
-        int32_t divisor  = (int32_t) arch->GR64()->Get(insn.GetRS2());
+        int32_t dividend = (int32_t) ctx.arch->GR64()->Get(insn.GetRS1());
+        int32_t divisor  = (int32_t) ctx.arch->GR64()->Get(insn.GetRS2());
 
         int32_t result;
 
@@ -236,7 +234,7 @@ namespace Jasse {
         else
             result = dividend % divisor;
 
-        arch->GR64()->Set(insn.GetRD(), SEXT_W(result));
+        ctx.arch->GR64()->Set(insn.GetRD(), SEXT_W(result));
 
         return EXEC_SEQUENTIAL;
     }
@@ -244,8 +242,8 @@ namespace Jasse {
     // DIVUW
     RVExecStatus RV64MExecutor_DIVUW(RV64M_EXECUTOR_PARAMS)
     {
-        uint32_t dividend = (uint32_t) arch->GR64()->Get(insn.GetRS1());
-        uint32_t divisor  = (uint32_t) arch->GR64()->Get(insn.GetRS2());
+        uint32_t dividend = (uint32_t) ctx.arch->GR64()->Get(insn.GetRS1());
+        uint32_t divisor  = (uint32_t) ctx.arch->GR64()->Get(insn.GetRS2());
 
         uint32_t result;
 
@@ -254,7 +252,7 @@ namespace Jasse {
         else
             result = dividend / divisor;
 
-        arch->GR64()->Set(insn.GetRD(), SEXT_W(result));
+        ctx.arch->GR64()->Set(insn.GetRD(), SEXT_W(result));
 
         return EXEC_SEQUENTIAL;
     }
@@ -262,8 +260,8 @@ namespace Jasse {
     // REMUW
     RVExecStatus RV64MExecutor_REMUW(RV64M_EXECUTOR_PARAMS)
     {
-        uint32_t dividend = (uint32_t) arch->GR64()->Get(insn.GetRS1());
-        uint32_t divisor  = (uint32_t) arch->GR64()->Get(insn.GetRS2());
+        uint32_t dividend = (uint32_t) ctx.arch->GR64()->Get(insn.GetRS1());
+        uint32_t divisor  = (uint32_t) ctx.arch->GR64()->Get(insn.GetRS2());
 
         uint32_t result;
 
@@ -272,7 +270,7 @@ namespace Jasse {
         else
             result = dividend % divisor;
 
-        arch->GR64()->Set(insn.GetRD(), SEXT_W(result));
+        ctx.arch->GR64()->Set(insn.GetRD(), SEXT_W(result));
 
         return EXEC_SEQUENTIAL;
     }
