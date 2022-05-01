@@ -11,7 +11,7 @@
 // executors
 namespace Jasse {
 
-#define RVZICSR_EXECUTOR_PARAMS     const RVInstruction& insn, RVArchitecturalOOC* arch, RVMemoryInterface* MI, RVCSRSpace* CSRs    
+#define RVZICSR_EXECUTOR_PARAMS     const RVInstruction& insn, const RVExecContext& ctx
 
     RVExecStatus RVZicsrExecutor_CSRRW(RVZICSR_EXECUTOR_PARAMS);
     RVExecStatus RVZicsrExecutor_CSRRS(RVZICSR_EXECUTOR_PARAMS);

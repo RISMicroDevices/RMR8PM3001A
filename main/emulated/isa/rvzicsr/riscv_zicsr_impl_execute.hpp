@@ -12,10 +12,10 @@
 namespace Jasse {
 
 #define __RVZICSR_ACQUIRE_CSR(csr, insn) \
-    RVCSR* csr = CSRs->GetCSR(GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_CSR)); \
+    RVCSR* csr = ctx.CSRs->GetCSR(GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_CSR)); \
     if (!csr) \
     { \
-        TrapEnter(arch, CSRs, TRAP_EXCEPTION, EXCEPTION_ILLEGAL_INSTRUCTION); \
+        ctx.trap.TrapEnter(ctx.arch, ctx.CSRs, TRAP_EXCEPTION, EXCEPTION_ILLEGAL_INSTRUCTION); \
         return EXEC_TRAP_ENTER; \
     }
 
@@ -26,9 +26,9 @@ namespace Jasse {
         __RVZICSR_ACQUIRE_CSR(csr, insn)
 
         if (insn.GetRD())
-            arch->SetGRx64(insn.GetRD(), csr->Read(CSRs));
+            ctx.arch->SetGRx64(insn.GetRD(), csr->Read(ctx.CSRs));
 
-        csr->Write(CSRs, arch->GetGRx64Zext(insn.GetRS1()));
+        csr->Write(ctx.CSRs, ctx.arch->GetGRx64Zext(insn.GetRS1()));
 
         return EXEC_SEQUENTIAL;
     }
@@ -38,14 +38,14 @@ namespace Jasse {
     {
         __RVZICSR_ACQUIRE_CSR(csr, insn)
 
-        csr_t csrval  = csr->Read(CSRs);
-        csr_t csrmask = arch->GetGRx64Zext(insn.GetRS1());
+        csr_t csrval  = csr->Read(ctx.CSRs);
+        csr_t csrmask = ctx.arch->GetGRx64Zext(insn.GetRS1());
 
-        arch->SetGRx64(insn.GetRD(), csrval);
+        ctx.arch->SetGRx64(insn.GetRD(), csrval);
 
         csrval = SET_CSR_BITS(csrval, csrmask);
 
-        csr->Write(CSRs, csrval);
+        csr->Write(ctx.CSRs, csrval);
 
         return EXEC_SEQUENTIAL;
     }
@@ -55,14 +55,14 @@ namespace Jasse {
     {
         __RVZICSR_ACQUIRE_CSR(csr, insn)
 
-        csr_t csrval  = csr->Read(CSRs);
-        csr_t csrmask = arch->GetGRx64Zext(insn.GetRS1());
+        csr_t csrval  = csr->Read(ctx.CSRs);
+        csr_t csrmask = ctx.arch->GetGRx64Zext(insn.GetRS1());
 
-        arch->SetGRx64(insn.GetRD(), csrval);
+        ctx.arch->SetGRx64(insn.GetRD(), csrval);
 
         csrval = CLEAR_CSR_BITS(csrval, csrmask);
 
-        csr->Write(CSRs, csrval);
+        csr->Write(ctx.CSRs, csrval);
 
         return EXEC_SEQUENTIAL;
     }
@@ -73,9 +73,9 @@ namespace Jasse {
         __RVZICSR_ACQUIRE_CSR(csr, insn)
 
         if (insn.GetRD())
-            arch->SetGRx64(insn.GetRD(), csr->Read(CSRs));
+            ctx.arch->SetGRx64(insn.GetRD(), csr->Read(ctx.CSRs));
 
-        csr->Write(CSRs, arch->GetGRx64Zext(insn.GetRS1()));
+        csr->Write(ctx.CSRs, ctx.arch->GetGRx64Zext(insn.GetRS1()));
 
         return EXEC_SEQUENTIAL;
     }
@@ -85,14 +85,14 @@ namespace Jasse {
     {
         __RVZICSR_ACQUIRE_CSR(csr, insn);
 
-        csr_t csrval  = csr->Read(CSRs);
+        csr_t csrval  = csr->Read(ctx.CSRs);
         csr_t csrmask = GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_CSR_UIMM);
 
-        arch->SetGRx64(insn.GetRD(), csrval);
+        ctx.arch->SetGRx64(insn.GetRD(), csrval);
 
         csrval = SET_CSR_BITS(csrval, csrmask);
 
-        csr->Write(CSRs, csrval);
+        csr->Write(ctx.CSRs, csrval);
 
         return EXEC_SEQUENTIAL;   
     }
@@ -102,14 +102,14 @@ namespace Jasse {
     {
         __RVZICSR_ACQUIRE_CSR(csr, insn);
 
-        csr_t csrval  = csr->Read(CSRs);
+        csr_t csrval  = csr->Read(ctx.CSRs);
         csr_t csrmask = GET_STD_OPERAND(insn.GetRaw(), RV_OPERAND_CSR_UIMM);
 
-        arch->SetGRx64(insn.GetRD(), csrval);
+        ctx.arch->SetGRx64(insn.GetRD(), csrval);
 
         csrval = CLEAR_CSR_BITS(csrval, csrmask);
 
-        csr->Write(CSRs, csrval);
+        csr->Write(ctx.CSRs, csrval);
 
         return EXEC_SEQUENTIAL;
     }

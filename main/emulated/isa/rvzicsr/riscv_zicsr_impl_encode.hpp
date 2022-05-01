@@ -30,7 +30,7 @@ namespace Jasse {
             = constraints->Get(RV_CODEGEN_CSR_CANDIDATE);
 
         if (candidate)
-            encoder->SetImmediate(Rand32(0, candidate->GetSize() - 1));
+            encoder->SetImmediate(candidate->GetList().Get(Rand32(0, candidate->GetSize() - 1)).address);
         else
             encoder->SetImmediate(Rand32(0, CSR_ADDRESS_MASK));
     }
