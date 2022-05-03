@@ -210,12 +210,14 @@ namespace Jasse {
 
         Builder&                    Decoder(const RVDecoder* decoder) noexcept;
         Builder&                    Decoder(std::initializer_list<const RVDecoder*> decoders) noexcept;
+        Builder&                    Decoder(const RVDecoderCollection& decoders) noexcept;
 
         Builder&                    MI(RVMemoryInterface* MI) noexcept;
 
         Builder&                    CSR(const RVCSRDefinition& CSR) noexcept;
         Builder&                    CSR(const RVCSRDefinition& CSR, csr_t init_value) noexcept;
         Builder&                    CSR(std::initializer_list<RVCSRDefinition> CSRs) noexcept;
+        Builder&                    CSR(const RVCSRList& CSRs) noexcept;
 
         Builder&                    TrapProcedures(const RVTrapProcedures& trap_procedures) noexcept;
 
@@ -758,6 +760,12 @@ namespace Jasse {
     {
         for (auto iter = decoders.begin(); iter != decoders.end(); iter++)
             this->_decoders.Add(*iter);
+        return *this;
+    }
+
+    inline RVInstance::Builder& RVInstance::Builder::Decoder(const RVDecoderCollection& decoders) noexcept
+    {
+        this->_decoders.AddAll(decoders);
         return *this;
     }
 
