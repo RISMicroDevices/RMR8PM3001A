@@ -85,7 +85,8 @@ namespace Jasse {
     };
 
     // RISC-V Instruction Decoder Collection
-    typedef std::list<const RVDecoder*>::const_iterator     RVDecoderIterator;
+    typedef std::list<const RVDecoder*>::iterator           RVDecoderIterator;
+    typedef std::list<const RVDecoder*>::const_iterator     RVDecoderConstIterator;
 
     //
     class RVDecoderCollection {
@@ -101,8 +102,10 @@ namespace Jasse {
         int                 GetSize() const;
         void                Clear();
 
-        RVDecoderIterator   Begin() const;
-        RVDecoderIterator   End() const;
+        RVDecoderIterator       Begin();
+        RVDecoderConstIterator  Begin() const;
+        RVDecoderIterator       End();
+        RVDecoderConstIterator  End() const;
 
         bool                Has(const std::string& name) const;
         bool                Has(const char* name) const;
@@ -110,6 +113,7 @@ namespace Jasse {
         bool                HasCanonical(const char* name) const;
 
         bool                Add(const RVDecoder* decoder);
+        void                AddAll(const RVDecoderCollection& collection);
 
         bool                Remove(const std::string& name);
         bool                Remove(const char* name);
@@ -326,12 +330,22 @@ namespace Jasse {
         decoders.clear();
     }
 
-    inline RVDecoderIterator RVDecoderCollection::Begin() const
+    inline RVDecoderIterator RVDecoderCollection::Begin()
     {
         return decoders.begin();
     }
 
-    inline RVDecoderIterator RVDecoderCollection::End() const
+    inline RVDecoderConstIterator RVDecoderCollection::Begin() const
+    {
+        return decoders.begin();
+    }
+
+    inline RVDecoderIterator RVDecoderCollection::End()
+    {
+        return decoders.end();
+    }
+
+    inline RVDecoderConstIterator RVDecoderCollection::End() const
     {
         return decoders.end();
     }
@@ -377,6 +391,13 @@ namespace Jasse {
         decoders.push_back(decoder);
 
         return true;
+    }
+
+    void RVDecoderCollection::AddAll(const RVDecoderCollection& collection)
+    {
+        RVDecoderConstIterator iter = collection.Begin();
+        for (; iter != collection.End(); iter++)
+            Add(*iter);
     }
 
     inline bool RVDecoderCollection::Remove(const std::string& name)
