@@ -173,6 +173,8 @@ namespace Jasse {
         const RVTrapProcedures&         GetTrapProcedures() const noexcept;
         void                            SetTrapProcedures(const RVTrapProcedures& trap_procedures) noexcept;
 
+        void                            Interrupt(RVTrapCause cause);
+
         RVExecStatus                    Eval();
 
         void    operator=(const RVInstance& obj) = delete;
@@ -604,10 +606,13 @@ namespace Jasse {
         this->trap_procedures = trap_procedures;
     }
 
+    inline void RVInstance::Interrupt(RVTrapCause cause)
+    {
+        trap_procedures.TrapEnter(&arch, &CSRs, TRAP_INTERRUPT, cause);
+    }
+
     RVExecStatus RVInstance::Eval()
     {
-        // TODO interrupt inception
-
         // instruction fetch
         data_t fetched;
         RVMOPStatus mopstatus;
